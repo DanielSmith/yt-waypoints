@@ -37,6 +37,63 @@ after successful navigation, and closes the popup.
 Clipboard text is accessed only when you paste. No clipboard-reading permission
 is requested.
 
+### Copy, back up, and import videos
+
+Version 2.0 adds manual JSON transfer between Firefox, Chrome, and Brave:
+
+1. In the source browser, open **Show options** and scroll to **Export saved videos**
+   at the bottom.
+2. Click **Copy JSON**. The JSON is copied without being displayed in the panel;
+   paste it into a text editor and save a `.json` file if you want a backup.
+3. Open Waypoints in the other browser and paste the JSON anywhere in its popup.
+   It merges the videos and reports how many were added, updated, or unchanged.
+
+The export includes **all saved videos**, even when search filters the visible
+list, with titles, playback positions, durations, timestamps, and available
+channel metadata. Browser preferences are not exported or imported. This is a
+manual copy/merge feature, not automatic synchronization.
+
+Merge rules:
+
+- New video IDs are added; videos absent from the import are never deleted.
+- For matching IDs, **the pasted entry supplies the resume point**, even if
+  the local browser has a newer autosave timestamp. Import explicitly chooses
+  the source snapshot. Missing channel/title/duration metadata can be filled
+  from the local entry.
+- Import also moves matching open YouTube players to the imported position,
+  preserving their playing/paused state. A local handoff marker lets a loading
+  player apply the position before autosaving; an old playhead must not erase
+  the imported point. Reload existing YouTube tabs when updating the extension.
+- Reimporting identical data does not duplicate/change bookmarks, but requests
+  that open players restore those same positions again.
+- The entire import is validated before saving. Malformed or unsupported JSON
+  and invalid video data leave existing bookmarks untouched. Imports are limited
+  to 5 million characters. Copy all of the JSON, including its outer braces.
+
+The popup stays open after import, clears search, and shows the merged list.
+Pasted YouTube links still open videos, and ordinary pasted text still searches.
+Waypoints accepts its own versioned export, a raw video map or array, and a
+storage snapshot containing a `videos` object. Any `settings` in a snapshot are
+ignored. The JSON `version` field identifies the transfer format, not the app
+version.
+
+Accepted video fields are strictly limited to `id`, `title`, `t`, `duration`,
+`updated`, `channelName`, and `channelUrl`. Unknown fields are discarded during
+parsing, merging, and export. Positions, durations, and timestamps must be
+nonnegative safe integers; numeric strings, booleans, fractions, and nulls are
+rejected. IDs must be valid 11-character YouTube IDs and match their map key.
+Titles are limited to 1,000 characters, channel names to 200, and channel URLs
+to 2,048. Text controls/whitespace are normalized, and all displayed text uses
+text content rather than HTML. Channel URLs must resolve to a recognized HTTPS
+YouTube channel path; credentials, foreign hosts, control characters, and
+encoded path separators are rejected. Invalid known fields reject the entire
+import before any storage change.
+
+Copy runs only when you click **Copy JSON**, and import uses your paste event;
+no additional clipboard permissions are requested. A compatibility fallback uses
+a temporary offscreen selection, which is removed immediately. If copying fails,
+the popup shows an error; it never exposes a JSON editor in Options.
+
 ### Scrub a video
 
 **Hover over a row's progress bar to reveal its handle, then drag it.** The row
@@ -54,7 +111,6 @@ duration do not show a progress slider.
 | Drag the handle or click the track | Preview a position; seek/save on release |
 | Left / Right arrow on a row or slider | Scrub by the configured distance, 10 seconds by default |
 | Shift + Left / Right arrow | Apply the configured multiplier, ×3 by default |
-| Home / End with the slider focused | Go to the start / end |
 
 Set the arrow-key distance and Shift multiplier in **Show options**.
 
@@ -82,6 +138,9 @@ Press `t` outside search or use **Options → Show thumbnails (t)** to change th
 same saved preference. Typing `t` in search continues to enter text. The checkbox
 and `t` toggle directly, with no additional permission request or confirmation
 screen. Thumbnails load from YouTube's image server; see [PRIVACY.md](PRIVACY.md).
+
+The popup layout lives in `src/shared/popup.html`, with styles in the linked
+`src/shared/popup.css`. Both browser builds share these files.
 
 ## Source and build outputs
 

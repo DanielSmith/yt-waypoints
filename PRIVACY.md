@@ -29,6 +29,13 @@ a cleaned URL. Clipboard text is accessed only when you paste, and is not stored
 as a search history or sent to the developer. Ordinary pasted search text is
 used locally to filter the list.
 
+You can explicitly export all saved videos as JSON from Options. Clicking Copy
+JSON places video IDs, titles, playback positions, durations, timestamps, and
+available channel metadata on your system clipboard. You can save that text or
+paste it into another Waypoints installation to merge bookmarks. Preferences
+are not included in the export and are not imported from pasted data. JSON
+imports are processed locally; no import/export service or account is used.
+
 Opening a bookmarked video navigates the browser to YouTube and includes the
 video ID and saved playback time in the URL. YouTube's own privacy practices
 apply to that website independently of this extension.

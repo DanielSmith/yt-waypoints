@@ -42,6 +42,8 @@ def validate(package):
             attrs = dict(attrs)
             if tag == 'script' and 'src' in attrs:
                 refs.append(attrs['src'])
+            if tag == 'link' and attrs.get('rel') == 'stylesheet' and 'href' in attrs:
+                refs.append(attrs['href'])
 
     Page().feed((package / manifest['action']['default_popup']).read_text())
     for ref in refs:

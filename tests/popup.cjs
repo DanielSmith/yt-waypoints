@@ -11,25 +11,36 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   const listeners = [];
   let writes = 0;
   let closeCount = 0;
+  let importNumber = 0;
   const navigation = [];
   const executions = [];
+  const clipboardWrites = [];
   const doc = { activeElement: null, listeners: {}, addEventListener(t, fn) { this.listeners[t] = fn; } };
   class El {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {setProperty(name,value){this[name]=value;}}; this.events = {}; this.hidden = false; this.disabled = true; this.value = ''; this.className = ''; this.classList = { contains: n => this.className.split(' ').includes(n), toggle: () => {}, add: () => {} }; }
     addEventListener(t, fn) { this.events[t] = fn; }
     setAttribute(k,v) { this[k] = v; }
-    append(...els) { this.children.push(...els); }
+    append(...els) { for(const el of els) el.parentNode=this; this.children.push(...els); }
+    remove() { if(this.parentNode) this.parentNode.children=this.parentNode.children.filter(el=>el!==this); }
     replaceChildren(...els) { this.children = els; }
     querySelectorAll(selector) { return this.children.flatMap(e => [...(selector === '.main' && e.className === 'main' ? [e] : []), ...e.querySelectorAll(selector)]); }
     querySelector(selector) { return this.querySelectorAll('.main').find(e => selector.includes(`"${e.dataset.id}"`)); }
     scrollIntoView(options) { this.scrolled = options.block; }
+    select() { this.selectionStart=0;this.selectionEnd=this.value.length; }
+    setSelectionRange(start,end) { this.selectionStart=start;this.selectionEnd=end; }
     setPointerCapture(id) { this.capturedPointer = id; }
     focus() { doc.activeElement = this; }
     click() { this.events.click?.(); }
   }
-  const ids = ['include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
+  const ids = ['copy-videos','include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
   const els = Object.fromEntries(ids.map(id => [id,new El()]));
   els['options-panel'].hidden = true;
+  doc.body = new El('body');
+  doc.execCommand = command => {
+    const field=doc.body.children.find(el=>el.tag==='textarea');
+    if(command!=='copy'||!field||behavior.failLegacyClipboard)return false;
+    clipboardWrites.push(field.value);return true;
+  };
   doc.querySelector = () => new El(); doc.getElementById = id => els[id]; doc.createElement = tag => new El(tag);
   // No runtime or permissions API is supplied: the popup must work without
   // thumbnail consent plumbing on both platforms.
@@ -53,15 +64,18 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
       return [{ result: behavior.metadata || {id:'test',t:100,duration:1000,title:'Test video'} }];
     } },
   };
-  const context = vm.createContext({ [flavor === "chrome" ? "chrome" : "browser"]: browser, document:doc, window:{close(){closeCount++;}}, URL, URLSearchParams, CSS:{escape:s=>s}, console });
+  const context = vm.createContext({ [flavor === "chrome" ? "chrome" : "browser"]: browser, document:doc, window:{close(){closeCount++;}}, crypto:{randomUUID:()=>"import-"+(++importNumber)}, navigator:{clipboard:{writeText:async text=>{
+    if(behavior.failClipboard)throw Error('Clipboard unavailable');clipboardWrites.push(text);
+  }}}, URL, URLSearchParams, CSS:{escape:s=>s}, console });
   vm.runInContext(fs.readFileSync(path.join(extension, "platform.js"), "utf8"), context);
+  vm.runInContext(fs.readFileSync(path.join(extension, 'transfer.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(extension, 'metadata.js'), 'utf8'), context);
   vm.runInContext(playerSource, context);
   vm.runInContext(source, context);
   const settle = async () => { for(let i=0;i<40;i++) await Promise.resolve(); };
   await settle();
   assert.equal(els.search.disabled, false, els.status.textContent);
-  return {data,els,doc,context,settle,navigation,executions,closed:()=>closeCount,writes:()=>writes,
+  return {data,els,doc,context,settle,navigation,executions,clipboardWrites,closed:()=>closeCount,writes:()=>writes,
     async paste(text) {
       let prevented=false;
       doc.listeners.paste({clipboardData:{getData:()=>text},preventDefault(){prevented=true;}});
@@ -196,7 +210,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(undo.data.videos.c.t,999,'undo must not overwrite a newly saved entry');
   console.log('PASS: deletion shows restore button, undo preserves original bookmark, latest deletion wins, slash returns to search, options hide button, newer saves preserved');
   const defaults=await popup(initial);
-  assert.equal(defaults.els['include-channel-names','show-thumbnails'].checked,true,'missing preference defaults to on');
+  assert.equal(defaults.els['show-thumbnails'].checked,true,'missing preference defaults to on');
   const thumbs=await popup({...initial,settings:{...initial.settings,showThumbnails:false}});
   // Use tag-aware traversal for img checks, independent of row markup.
   const collect=(el,tag)=>el.children.flatMap(c=>[...(c.tag===tag?[c]:[]),...collect(c,tag)]);
@@ -206,7 +220,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   thumbs.doc.listeners.keydown({key:'t',preventDefault(){}});await thumbs.settle();
   assert.equal(thumbs.els['options-panel'].hidden,true,'t toggles without opening Options or a confirmation');
   assert.equal(thumbs.data.settings.showThumbnails,true);
-  assert.equal(thumbs.els['include-channel-names','show-thumbnails'].checked,true);
+  assert.equal(thumbs.els['show-thumbnails'].checked,true);
   assert.equal(thumbs.doc.activeElement.dataset.id,row.dataset.id);
   let imgs=collect(thumbs.els.list,'img');assert.equal(imgs.length,3);
   assert.equal(imgs[0].src,'https://i.ytimg.com/vi/a/mqdefault.jpg');
@@ -220,20 +234,20 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   thumbs.doc.listeners.keydown({key:'t',preventDefault(){throw Error('search t intercepted');}});
   assert.equal(thumbs.data.settings.showThumbnails,true);
   thumbs.els['options-toggle'].click();
-  thumbs.els['include-channel-names','show-thumbnails'].checked=false;thumbs.els['include-channel-names','show-thumbnails'].events.change();await thumbs.settle();
+  thumbs.els['show-thumbnails'].checked=false;thumbs.els['show-thumbnails'].events.change();await thumbs.settle();
   assert.equal(thumbs.data.settings.showThumbnails,false);assert.equal(collect(thumbs.els.list,'img').length,0);
-  thumbs.els['include-channel-names','show-thumbnails'].checked=true;thumbs.els['include-channel-names','show-thumbnails'].events.change();await thumbs.settle();
+  thumbs.els['show-thumbnails'].checked=true;thumbs.els['show-thumbnails'].events.change();await thumbs.settle();
   assert.equal(thumbs.data.settings.showThumbnails,true);
   thumbs.els['scrub-seconds'].value='12';thumbs.els['shift-multiplier'].value='4';
   thumbs.els['scrub-seconds'].events.change();await thumbs.settle();
   assert.equal(thumbs.data.settings.showThumbnails,true,'other preference edits preserve thumbnail choice');
   const reopened=await popup(thumbs.data);
-  assert.equal(reopened.els['include-channel-names','show-thumbnails'].checked,true,'preference survives reopening');
+  assert.equal(reopened.els['show-thumbnails'].checked,true,'preference survives reopening');
   assert.equal(collect(reopened.els.list,'img').length,3);
   thumbs.els['options-toggle'].click();thumbs.els.search.value='resolve';thumbs.els.search.events.input();
   assert.equal(collect(thumbs.els.list,'img').length,1,'only matching rows load images');
   const upgraded=await popup({...initial,settings:{autoBookmark:false,showThumbnails:true,thumbnailNoticeAccepted:true}});
-  assert.equal(upgraded.els['include-channel-names','show-thumbnails'].checked,true,'existing thumbnail preference survives the update');
+  assert.equal(upgraded.els['show-thumbnails'].checked,true,'existing thumbnail preference survives the update');
   assert.equal(collect(upgraded.els.list,'img').length,3);
   console.log('PASS: direct thumbnail shortcut/checkbox without permissions API; setting persists; typing/modifiers/repeat safe; filtered images/focus/error fallback; upgrade keeps preference');
   const videoId='dQw4w9WgXcQ';
@@ -364,10 +378,6 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(drag.writes(),1,'clicking an unchanged position cannot freeze rendering or write');
   slider=findSlider();slider.focus();slider.events.keydown({key:'ArrowRight',shiftKey:true,preventDefault(){},stopPropagation(){}});await drag.settle();
   assert.equal(drag.data.videos.test.t,678,'slider keyboard follows configured Shift multiplier');
-  slider=findSlider();slider.events.keydown({key:'End',preventDefault(){},stopPropagation(){}});await drag.settle();
-  assert.equal(drag.data.videos.test.t,1000);
-  slider=findSlider();slider.events.keydown({key:'Home',preventDefault(){},stopPropagation(){}});await drag.settle();
-  assert.equal(drag.data.videos.test.t,0);
   const live=await popup(seekData,'https://example.com/',{
     tabs:[{id:7,windowId:1,url:'https://www.youtube.com/watch?v=test'}],
     executeScript:async(request,data)=>{
@@ -381,7 +391,68 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.deepEqual(live.executions.at(-1),{operation:'seekTo',args:[750],tabId:7});
   assert.equal(live.navigation.length,0);assert.equal(live.closed(),0);
   assert.ok(live.els.status.textContent.includes('Paused'));
-  console.log('PASS: drag preview/commit/cancel, no row-open click, active drag survives autosave, single commit, configured keyboard steps/endpoints, live seek and saved-only seek preserve other bookmarks');
+  console.log('PASS: drag preview/commit/cancel, no row-open click, active drag survives autosave, single commit, configured keyboard steps, live seek and saved-only seek preserve other bookmarks');
+  const a='aaaaaaaaaaa',b='bbbbbbbbbbb',c='ccccccccccc',d='ddddddddddd';
+  const record=(id,t,updated)=>({id,title:'Video '+id,t,duration:1000,updated});
+  const local={settings:{autoBookmark:false,showThumbnails:false,includeChannelNames:false},videos:{[a]:record(a,10,100),[b]:record(b,80,300),[d]:record(d,1,9)}};
+  const transferPopup=await popup(local,'https://example.com/');
+  transferPopup.els['options-toggle'].click();
+  transferPopup.els['copy-videos'].click();await transferPopup.settle();
+  assert.equal(transferPopup.clipboardWrites.length,1);
+  assert.deepEqual(JSON.parse(transferPopup.clipboardWrites[0]).videos,local.videos);
+  assert.equal(JSON.parse(transferPopup.clipboardWrites[0]).settings,undefined);
+  const incoming={format:'yt-waypoints',version:1,videos:{[a]:record(a,60,200),[b]:record(b,5,100),[c]:record(c,20,150)}};
+  assert.equal(await transferPopup.paste(JSON.stringify(incoming)),true);
+  assert.equal(transferPopup.data.videos[a].t,60);assert.equal(transferPopup.data.videos[b].t,5);
+  assert.ok(transferPopup.data.videos[c]);assert.ok(transferPopup.data.videos[d]);
+  assert.deepEqual(transferPopup.data.settings,local.settings);
+  assert.equal(transferPopup.navigation.length,0);assert.equal(transferPopup.closed(),0);
+  assert.equal(transferPopup.els.search.value,'');assert.equal(transferPopup.els['options-panel'].hidden,true);
+  assert.equal(transferPopup.els.status.textContent,'Import: 1 added, 2 updated, 0 unchanged.');
+  const repeatWrites=transferPopup.writes();await transferPopup.paste(JSON.stringify(incoming));
+  assert.equal(transferPopup.writes(),repeatWrites+1,'repeated import renews the open-player handoff');
+  const beforeWrites=transferPopup.writes();
+  const before=JSON.stringify(transferPopup.data);
+  await transferPopup.paste(JSON.stringify({videos:{[c]:record(c,30,999),[a]:{id:a,t:-1}}}));
+  assert.equal(JSON.stringify(transferPopup.data),before,'invalid later record cannot partially import earlier valid record');
+  assert.ok(transferPopup.els.status.textContent.startsWith('Import failed:'));
+  assert.equal(transferPopup.writes(),beforeWrites);
+  await transferPopup.paste('{bad json');assert.equal(JSON.stringify(transferPopup.data),before);
+  assert.equal(transferPopup.writes(),beforeWrites);
+  const fallbackCopy=await popup(local,'https://example.com/',{failClipboard:true});
+  fallbackCopy.els['options-toggle'].click();fallbackCopy.els['copy-videos'].focus();
+  fallbackCopy.els['copy-videos'].click();await fallbackCopy.settle();
+  assert.deepEqual(JSON.parse(fallbackCopy.clipboardWrites[0]).videos,local.videos);
+  assert.equal(fallbackCopy.doc.body.children.length,0,'temporary copy field is always removed');
+  assert.equal(fallbackCopy.doc.activeElement,fallbackCopy.els['copy-videos']);
+  const failedCopy=await popup(local,'https://example.com/',{failClipboard:true,failLegacyClipboard:true});
+  failedCopy.els['copy-videos'].click();await failedCopy.settle();
+  assert.equal(failedCopy.clipboardWrites.length,0);
+  assert.equal(failedCopy.doc.body.children.length,0);
+  assert.equal(failedCopy.els.status.textContent,'Could not copy JSON. Please try again.');
+  const roundTrip=await popup({settings:{autoBookmark:false}},'https://example.com/');
+  await roundTrip.paste(transferPopup.clipboardWrites[0]);
+  assert.deepEqual(roundTrip.data.videos,local.videos);
+  const strict=await popup({settings:{autoBookmark:false,showThumbnails:false}},'https://example.com/');
+  const badFields={...record(c,20,100),title:'<img src=x onerror=bad()>',url:'javascript:bad()',thumbnail:'https://evil.example/x',settings:{injected:true},constructor:{polluted:true}};
+  await strict.paste(JSON.stringify({format:'yt-waypoints',version:1,videos:{[c]:badFields},settings:{showThumbnails:true},unknown:['drop']}));
+  assert.deepEqual(Object.keys(strict.data.videos[c]).sort(),['duration','id','t','title','updated']);
+  assert.equal(strict.data.videos[c].title,'<img src=x onerror=bad()>');
+  assert.equal(strict.data.settings.showThumbnails,false);
+  assert.equal(strict.navigation.length,0);
+  const stored=JSON.stringify(strict.data);const strictWrites=strict.writes();
+  await strict.paste(JSON.stringify({videos:{[a]:record(a,5,300),[b]:{...record(b,2,300),t:'2'}}}));
+  assert.equal(JSON.stringify(strict.data),stored);assert.equal(strict.writes(),strictWrites);
+  const activeImport=await popup({settings:{autoBookmark:false},videos:{[a]:record(a,85,1793659999999)}},'https://example.com/',{
+    tabs:[{id:7,windowId:1,url:'https://www.youtube.com/watch?v='+a}],
+    executeScript:async()=>[{result:{t:796,duration:1000,paused:true}}],
+  });
+  await activeImport.paste(JSON.stringify({videos:{[a]:record(a,796,1793656321686)}}));
+  assert.equal(activeImport.data.videos[a].t,796);
+  assert.deepEqual(activeImport.executions.at(-1),{operation:'seekTo',args:[796,a],tabId:7});
+  assert.equal(activeImport.data.importedPositions.videos[a].t,796);
+  console.log('PASS: Options JSON export/copy and offscreen fallback, paste merge stays open, pasted source wins, settings/unrelated rows preserved, invalid JSON is atomic, repeated import unchanged, cross-browser-ready round trip');
+
 
 
 

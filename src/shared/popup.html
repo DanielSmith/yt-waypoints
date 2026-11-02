@@ -2,78 +2,7 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <style>
-    :root {
-      --bg: #fff; --fg: #1a1a1a; --muted: #6b6b6b; --line: #e6e6e6;
-      --hover: #f3f3f3; --accent: #e5322d; --bar: #ddd;
-    }
-    @media (prefers-color-scheme: dark) {
-      :root {
-        --bg: #232327; --fg: #ececec; --muted: #9a9aa0; --line: #38383d;
-        --hover: #2f2f34; --accent: #ff4e45; --bar: #44444a;
-      }
-    }
-    * { box-sizing: border-box; }
-    body {
-      margin: 0; width: 360px; background: var(--bg); color: var(--fg);
-      font: 13px/1.35 system-ui, -apple-system, sans-serif;
-    }
-    header { padding: 10px; border-bottom: 1px solid var(--line); }
-    .actions { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
-    .actions button {
-      padding: 8px; border: 0; border-radius: 6px;
-      background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
-    }
-    .actions.options-open #options-toggle { grid-column: 1 / -1; }
-    .search { position: relative; min-width: 0; }
-    #search { width: 100%; height: 100%; min-width: 0; padding: 8px 28px 8px 9px;
-      border: 1px solid var(--line); border-radius: 6px; background: var(--bg); color: var(--fg); font: inherit; }
-    #search::placeholder { color: var(--muted); }
-    #clear-search { position: absolute; right: 3px; top: 50%; transform: translateY(-50%);
-      padding: 2px 5px; background: transparent; color: var(--muted); font-size: 18px; line-height: 1; }
-    #clear-search:hover { color: var(--fg); background: var(--hover); }
-    #restore-bookmark { background: #247a43; }
-    #options-toggle { background: var(--hover); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
-    button:disabled { opacity: .6; cursor: wait; }
-    [hidden] { display: none !important; }
-    #options-panel { padding: 14px 10px; }
-    .setting { display: block; margin-bottom: 20px; }
-    .setting:last-child { margin-bottom: 0; }
-    .setting-title { display: flex; justify-content: space-between; gap: 8px; font-weight: 600; }
-    .setting p { margin: 5px 0 8px; color: var(--muted); font-size: 12px; }
-    input[type="range"] { width: 100%; margin: 8px 0 0; accent-color: var(--accent); }
-    input[type="checkbox"] { accent-color: #247a43; }
-    output { white-space: nowrap; font-variant-numeric: tabular-nums; }
-    button:focus-visible, input:focus-visible { outline: 2px solid var(--fg); outline-offset: 2px; }
-    #status { margin-top: 6px; color: var(--fg); min-height: 1em; font-size: 12px; }
-    #hint { color: var(--muted); font-size: 11px; white-space: pre-line; }
-    .main:focus { outline: none; }
-    li:has(.main:focus-within) { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); }
-    ul { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
-    li { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
-    li:hover { background: var(--hover); }
-    .main { flex: 1; min-width: 0; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-    .details { flex: 1; min-width: 0; }
-    .thumbnail { flex: 0 0 64px; width: 64px; height: 36px; overflow: hidden; border-radius: 3px; background: var(--bar); }
-    .thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
-    .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
-    .channel-name { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .bar { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: ew-resize; touch-action: none; }
-    .bar::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--progress), var(--bar) var(--progress)); }
-    .bar::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 9px; height: 9px; margin-top: -3px; border: 0; border-radius: 50%; background: var(--accent); opacity: 0; }
-    .bar::-moz-range-track { height: 3px; border-radius: 2px; background: var(--bar); }
-    .bar::-moz-range-progress { height: 3px; border-radius: 2px; background: var(--accent); }
-    .bar::-moz-range-thumb { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--accent); opacity: 0; }
-    .bar:hover::-webkit-slider-thumb, .bar:focus::-webkit-slider-thumb, .bar:active::-webkit-slider-thumb { opacity: 1; }
-    .bar:hover::-moz-range-thumb, .bar:focus::-moz-range-thumb, .bar:active::-moz-range-thumb { opacity: 1; }
-    .del {
-      border: 0; background: none; color: var(--muted); cursor: pointer;
-      font-size: 16px; padding: 2px 6px; border-radius: 4px;
-    }
-    .del:hover { color: var(--accent); background: var(--line); }
-    .empty { padding: 16px 10px; color: var(--muted); text-align: center; }
-  </style>
+  <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
@@ -113,8 +42,13 @@
       <input id="shift-multiplier" type="range" min="1" max="10" step="1" value="3">
     </label>
     <p id="shortcut-help"></p>
+    <div class="setting export-videos">
+      <div class="export-heading"><strong>Export saved videos</strong><button id="copy-videos" type="button" aria-describedby="export-help">Copy JSON</button></div>
+      <p id="export-help">Copy all videos. Paste into another Waypoints popup to merge.</p>
+    </div>
   </section>
   <script src="platform.js"></script>
+  <script src="transfer.js"></script>
   <script src="metadata.js"></script>
   <script src="player.js"></script>
   <script src="popup.js"></script>

@@ -21,6 +21,7 @@ const includeChannelsEl = document.getElementById("include-channel-names");
 const thumbnailsEl = document.getElementById("show-thumbnails");
 const scrubSecondsEl = document.getElementById("scrub-seconds");
 const shiftMultiplierEl = document.getElementById("shift-multiplier");
+const copyVideosEl = document.getElementById("copy-videos");
 const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3, showThumbnails: true, includeChannelNames: true };
 let settings = { ...DEFAULT_SETTINGS };
 let thumbnailChangePending = false;
@@ -106,6 +107,73 @@ async function loadVideos() {
 
 async function saveVideos(videos) {
   await api.storage.local.set({ videos });
+}
+
+function copyWithSelection(text) {
+  // Compatibility fallback only. The temporary selection stays offscreen and
+  // is removed immediately; JSON is never displayed in the Options panel.
+  const field = document.createElement("textarea");
+  const previousFocus = document.activeElement;
+  field.value = text;
+  field.readOnly = true;
+  field.tabIndex = -1;
+  field.className = "clipboard-copy-buffer";
+  document.body.append(field);
+  try {
+    field.select();
+    return document.execCommand("copy");
+  } catch {
+    return false;
+  } finally {
+    field.remove();
+    previousFocus?.focus();
+  }
+}
+
+async function copyVideos() {
+  const text = WAYPOINTS_TRANSFER.stringify(savedVideos);
+  let copied = false;
+  try {
+    const clipboard = globalThis.navigator?.clipboard;
+    if (clipboard?.writeText) {
+      await clipboard.writeText(text);
+      copied = true;
+    } else copied = copyWithSelection(text);
+  } catch {
+    copied = copyWithSelection(text);
+  }
+  setStatus(copied ? `Copied ${Object.keys(savedVideos).length} videos as JSON.` :
+    "Could not copy JSON. Please try again.");
+}
+
+async function importVideos(incoming) {
+  const { videos, counts } = WAYPOINTS_TRANSFER.merge(await loadVideos(), incoming);
+  const ids = Object.keys(incoming);
+  let positions;
+  if (ids.length) {
+    positions = Object.fromEntries(ids.map(id => [id, { t: videos[id].t, duration: videos[id].duration }]));
+    // Persist the handoff with the data. Content scripts adopt this position
+    // before autosaving, including when a player is paused or still loading.
+    await api.storage.local.set({
+      videos,
+      importedPositions: { revision: crypto.randomUUID(), videos: positions },
+    });
+
+  }
+  showRestoreBookmark = false;
+  searchRequested = true;
+  searchEl.value = "";
+  setOptionsOpen(false);
+  await render();
+  searchEl.focus();
+  setStatus(`Import: ${counts.added} added, ${counts.updated} updated, ${counts.kept} unchanged.`);
+  if (positions) {
+    try {
+      const tabs = await api.tabs.query({ url: "*://*.youtube.com/watch*" });
+      await Promise.allSettled(tabs.filter(tab => Object.hasOwn(positions, videoIdOf(tab.url)))
+        .map(tab => inPlayer(tab.id, "seekTo", [positions[videoIdOf(tab.url)].t, videoIdOf(tab.url)])));
+    } catch { /* The saved positions remain available even if a tab disappears. */ }
+  }
 }
 
 // Holding an arrow key fires keydowns faster than storage round-trips;
@@ -276,6 +344,19 @@ function pasteIntoPopup(event) {
   if (event.defaultPrevented) return;
   const text = event.clipboardData?.getData("text/plain").trim();
   if (!text) return;
+  if (/^[\[{]/.test(text)) {
+    event.preventDefault();
+    let incoming;
+    try {
+      // Validate the entire payload before queuing a single merge/write.
+      incoming = WAYPOINTS_TRANSFER.parse(text);
+    } catch (error) {
+      setStatus(`Import failed: ${error.message}`);
+      return;
+    }
+    enqueue(() => importVideos(incoming));
+    return;
+  }
   const link = parseVideoLink(text);
   // Ordinary pastes within search retain native insertion/selection behavior.
   if (!link && document.activeElement === searchEl) return;
@@ -449,12 +530,12 @@ function makeScrubber(v, meta, when) {
   slider.addEventListener("pointercancel", cancel);
   slider.addEventListener("lostpointercapture", cancel);
   slider.addEventListener("keydown", (event) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    if (!["ArrowLeft", "ArrowRight"].includes(event.key)) return;
     event.preventDefault();
     event.stopPropagation();
     const step = settings.scrubSeconds * (event.shiftKey ? settings.shiftMultiplier : 1);
-    slider.value = String(event.key === "Home" ? 0 : event.key === "End" ? v.duration :
-      Math.min(v.duration, Math.max(0, value() + (event.key === "ArrowRight" ? step : -step))));
+    slider.value = String(Math.min(v.duration,
+      Math.max(0, value() + (event.key === "ArrowRight" ? step : -step))));
     preview();
     commit();
   });
@@ -648,6 +729,7 @@ async function init() {
   onVideo = WATCH_RE.test(tab?.url || "") && Boolean(videoIdOf(tab.url));
   currentId = onVideo ? videoIdOf(tab.url) : null;
   updateSettingsUI();
+  copyVideosEl.addEventListener("click", copyVideos);
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   searchEl.addEventListener("input", renderList);
   document.addEventListener("paste", pasteIntoPopup);

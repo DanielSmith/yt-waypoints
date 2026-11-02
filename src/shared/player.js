@@ -9,7 +9,8 @@ globalThis.WAYPOINTS_PLAYER_ACTIONS = {
     el.currentTime = Math.min(el.duration, Math.max(0, el.currentTime + delta));
     return { t: Math.floor(el.currentTime), duration: Math.floor(el.duration), paused: el.paused };
   },
-  seekTo: (time) => {
+  seekTo: (time, expectedId = null) => {
+    if (expectedId && new URLSearchParams(location.search).get("v") !== expectedId) return null;
     const el = document.querySelector("video");
     if (!el || !isFinite(el.duration) || el.duration <= 0) return null;
     if (document.querySelector(".html5-video-player.ad-showing")) return null;
