@@ -73,4 +73,17 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
     failed = subprocess.run(['python3', str(clone / 'scripts/build.py'), 'firefox'], capture_output=True, text=True)
     assert failed.returncode != 0
     assert (clone / 'yt-waypoints-firefox/manifest.json').read_bytes() == old_manifest
-print('PASS: reviewer source ZIP rebuilds identical packages; validation failure preserves existing loadable package')
+    # Exercise the native rule that caused Brave to reject an earlier package.
+    chrome_source = clone / 'src/chrome/manifest.json'
+    before = (clone / 'yt-waypoints-chrome/manifest.json').read_bytes()
+    valid = chrome_source.read_text()
+    for platform, shortcut in [('default', 'Ctrl+Alt+Y'), ('mac', 'Command+Alt+Y'), ('mac', 'Command+Option+Y')]:
+        invalid = json.loads(valid)
+        invalid['commands']['_execute_action']['suggested_key'][platform] = shortcut
+        chrome_source.write_text(json.dumps(invalid))
+        rejected = subprocess.run(['python3', str(clone / 'scripts/build.py'), 'chrome'], capture_output=True, text=True)
+        assert rejected.returncode != 0, shortcut
+        assert 'Invalid Chromium shortcut' in rejected.stderr
+        assert (clone / 'yt-waypoints-chrome/manifest.json').read_bytes() == before
+
+print('PASS: reviewer source ZIP rebuilds identical packages; missing resources/invalid Chromium shortcuts rejected without replacing existing packages')

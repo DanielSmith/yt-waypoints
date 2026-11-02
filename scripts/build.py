@@ -17,6 +17,17 @@ TARGETS = ('firefox', 'chrome')
 
 def validate(package):
     manifest = json.loads((package / 'manifest.json').read_text())
+    # Chromium validates every suggested shortcut, including the default on Mac.
+    # Ctrl+Alt and Command+Option are forbidden in shortcut suggestions.
+    if 'browser_specific_settings' not in manifest:
+        for command in manifest.get('commands', {}).values():
+            keys = command.get('suggested_key', {})
+            if isinstance(keys, str):
+                keys = {'default': keys}
+            for platform, shortcut in keys.items():
+                modifiers = set(shortcut.split('+')[:-1])
+                if modifiers & {'Alt', 'Option'} and modifiers & {'Ctrl', 'Command', 'MacCtrl'}:
+                    raise ValueError(f'Invalid Chromium shortcut ({platform}): {shortcut}; use Ctrl+Shift instead')
     refs = [manifest['action']['default_popup']]
     icons = manifest['action']['default_icon']
     refs.extend(icons.values() if isinstance(icons, dict) else [icons])

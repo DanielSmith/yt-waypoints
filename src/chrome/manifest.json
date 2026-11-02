@@ -40,8 +40,8 @@
   "commands": {
     "_execute_action": {
       "suggested_key": {
-        "default": "Ctrl+Alt+Y",
-        "mac": "Command+Alt+Y"
+        "default": "Ctrl+Shift+Y",
+        "mac": "Command+Shift+Y"
       },
       "description": "Open YT Waypoints menu"
     }

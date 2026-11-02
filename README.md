@@ -63,9 +63,13 @@ Both builds use the browser’s normal toolbar popup and action shortcut, with
 no background handler or service worker. Firefox uses the extension
 ID `yt-waypoints@local`. Keep this ID stable for future releases.
 
-The launch shortcut is **Open YT Waypoints menu**, defaulting to Ctrl+Alt+Y
-(Command+Option+Y on macOS). If upgrading from the fullscreen experiment, your
-old custom shortcut may need reassigning to this ordinary popup action.
+The launch shortcut is **Open YT Waypoints menu**. Defaults:
+
+- All browsers: Ctrl+Shift+Y (Command+Shift+Y on macOS).
+
+Chrome does not permit Ctrl+Alt or Command+Option shortcut suggestions. The build
+checks for these restrictions. If upgrading from the fullscreen experiment, your old custom
+shortcut may need reassigning to this ordinary popup action.
 
 - Chrome: `chrome://extensions/shortcuts`
 - Brave: `brave://extensions/shortcuts`
