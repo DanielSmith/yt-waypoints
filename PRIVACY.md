@@ -14,6 +14,15 @@ The extension does not send bookmarks, preferences, or search text to its
 developer or any analytics service. It contains no telemetry, advertising,
 account system, developer-operated server, or cloud synchronization.
 
+Thumbnails are on by default and can be disabled in Options or with the t key.
+While enabled, the extension loads
+images from YouTube's image service (`i.ytimg.com`) for displayed bookmarks.
+These requests include the video IDs and expose your IP address and normal
+network request metadata to that service. They do not send your saved playback
+positions, video titles, search text, or preferences. Turning thumbnails off
+stops the extension from creating thumbnail requests. The browser may cache
+previously downloaded images.
+
 Opening a bookmarked video navigates the browser to YouTube and includes the
 video ID and saved playback time in the URL. YouTube's own privacy practices
 apply to that website independently of this extension.

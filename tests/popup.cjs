@@ -23,10 +23,12 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test')
     focus() { doc.activeElement = this; }
     click() { this.events.click?.(); }
   }
-  const ids = ['shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
+  const ids = ['show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
   const els = Object.fromEntries(ids.map(id => [id,new El()]));
   els['options-panel'].hidden = true;
   doc.querySelector = () => new El(); doc.getElementById = id => els[id]; doc.createElement = tag => new El(tag);
+  // No runtime or permissions API is supplied: the popup must work without
+  // thumbnail consent plumbing on both platforms.
   const browser = {
     storage: { local: { get: async key => structuredClone({[key]: data[key]}), set: async obj => { writes++; const changes = {}; for (const [k,v] of Object.entries(obj)) { changes[k] = {newValue: structuredClone(v)}; data[k] = structuredClone(v); } for (const fn of listeners) fn(changes, 'local'); } }, onChanged: { addListener: fn => listeners.push(fn) } },
     tabs: { query: async q => q.active ? [{id:1,url}] : [], create: async () => {} },
@@ -167,4 +169,46 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test')
   undo.els['restore-bookmark'].click();await undo.settle();
   assert.equal(undo.data.videos.c.t,999,'undo must not overwrite a newly saved entry');
   console.log('PASS: deletion shows restore button, undo preserves original bookmark, latest deletion wins, slash returns to search, options hide button, newer saves preserved');
+  const defaults=await popup(initial);
+  assert.equal(defaults.els['show-thumbnails'].checked,true,'missing preference defaults to on');
+  const thumbs=await popup({...initial,settings:{...initial.settings,showThumbnails:false}});
+  // Use tag-aware traversal for img checks, independent of row markup.
+  const collect=(el,tag)=>el.children.flatMap(c=>[...(c.tag===tag?[c]:[]),...collect(c,tag)]);
+  assert.equal(collect(defaults.els.list,'img').length,3,'default setting renders thumbnails');
+  assert.equal(collect(thumbs.els.list,'img').length,0,'explicit off preference is preserved');
+  const row=thumbs.els.list.querySelectorAll('.main')[1];row.focus();
+  thumbs.doc.listeners.keydown({key:'t',preventDefault(){}});await thumbs.settle();
+  assert.equal(thumbs.els['options-panel'].hidden,true,'t toggles without opening Options or a confirmation');
+  assert.equal(thumbs.data.settings.showThumbnails,true);
+  assert.equal(thumbs.els['show-thumbnails'].checked,true);
+  assert.equal(thumbs.doc.activeElement.dataset.id,row.dataset.id);
+  let imgs=collect(thumbs.els.list,'img');assert.equal(imgs.length,3);
+  assert.equal(imgs[0].src,'https://i.ytimg.com/vi/a/mqdefault.jpg');
+  assert.equal(imgs[0].referrerPolicy,'no-referrer');assert.equal(imgs[0].loading,'lazy');
+  imgs[0].events.error();assert.equal(imgs[0].hidden,true,'unavailable image hides broken-image icon');
+  const writes=thumbs.writes();
+  thumbs.doc.listeners.keydown({key:'t',repeat:true,preventDefault(){}});await thumbs.settle();
+  assert.equal(thumbs.writes(),writes,'held shortcut toggles only once');
+  thumbs.doc.listeners.keydown({key:'t',ctrlKey:true,preventDefault(){throw Error('modified t intercepted');}});
+  thumbs.els.search.focus();
+  thumbs.doc.listeners.keydown({key:'t',preventDefault(){throw Error('search t intercepted');}});
+  assert.equal(thumbs.data.settings.showThumbnails,true);
+  thumbs.els['options-toggle'].click();
+  thumbs.els['show-thumbnails'].checked=false;thumbs.els['show-thumbnails'].events.change();await thumbs.settle();
+  assert.equal(thumbs.data.settings.showThumbnails,false);assert.equal(collect(thumbs.els.list,'img').length,0);
+  thumbs.els['show-thumbnails'].checked=true;thumbs.els['show-thumbnails'].events.change();await thumbs.settle();
+  assert.equal(thumbs.data.settings.showThumbnails,true);
+  thumbs.els['scrub-seconds'].value='12';thumbs.els['shift-multiplier'].value='4';
+  thumbs.els['scrub-seconds'].events.change();await thumbs.settle();
+  assert.equal(thumbs.data.settings.showThumbnails,true,'other preference edits preserve thumbnail choice');
+  const reopened=await popup(thumbs.data);
+  assert.equal(reopened.els['show-thumbnails'].checked,true,'preference survives reopening');
+  assert.equal(collect(reopened.els.list,'img').length,3);
+  thumbs.els['options-toggle'].click();thumbs.els.search.value='resolve';thumbs.els.search.events.input();
+  assert.equal(collect(thumbs.els.list,'img').length,1,'only matching rows load images');
+  const upgraded=await popup({...initial,settings:{autoBookmark:false,showThumbnails:true,thumbnailNoticeAccepted:true}});
+  assert.equal(upgraded.els['show-thumbnails'].checked,true,'existing thumbnail preference survives the update');
+  assert.equal(collect(upgraded.els.list,'img').length,3);
+  console.log('PASS: direct thumbnail shortcut/checkbox without permissions API; setting persists; typing/modifiers/repeat safe; filtered images/focus/error fallback; upgrade keeps preference');
+
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -119,7 +119,7 @@ def write_sources():
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
         (stage / 'scripts').mkdir()
         shutil.copy2(ROOT / 'scripts/build.py', stage / 'scripts/build.py')
-        for name in ('package.json', 'README.md', 'STORE-SUBMISSION.md', 'PRIVACY.md', 'LICENSE'):
+        for name in ('package.json', 'README.md', 'PRIVACY.md', 'LICENSE'):
             shutil.copy2(ROOT / name, stage / name)
         write_zip(stage, artifacts / f'yt-waypoints-source-{version}.zip')
     print(f'Reviewer sources: artifacts/yt-waypoints-source-{version}.zip')

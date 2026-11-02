@@ -17,10 +17,12 @@ const hintEl = document.getElementById("hint");
 const optionsToggle = document.getElementById("options-toggle");
 const optionsPanel = document.getElementById("options-panel");
 const autoBookmarkEl = document.getElementById("auto-bookmark");
+const thumbnailsEl = document.getElementById("show-thumbnails");
 const scrubSecondsEl = document.getElementById("scrub-seconds");
 const shiftMultiplierEl = document.getElementById("shift-multiplier");
-const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3 };
+const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3, showThumbnails: true };
 let settings = { ...DEFAULT_SETTINGS };
+let thumbnailChangePending = false;
 let onVideo = false;
 let currentId = null;
 let optionsOpen = false;
@@ -29,6 +31,7 @@ function normalizeSettings(saved = {}) {
   const bounded = (value, fallback, max) => Number.isInteger(value) && value >= 1 && value <= max ? value : fallback;
   return {
     autoBookmark: typeof saved?.autoBookmark === "boolean" ? saved.autoBookmark : true,
+    showThumbnails: typeof saved?.showThumbnails === "boolean" ? saved.showThumbnails : true,
     scrubSeconds: bounded(saved?.scrubSeconds, 10, 60),
     shiftMultiplier: bounded(saved?.shiftMultiplier, 3, 10),
   };
@@ -36,6 +39,8 @@ function normalizeSettings(saved = {}) {
 
 function updateSettingsUI() {
   autoBookmarkEl.checked = settings.autoBookmark;
+  thumbnailsEl.checked = settings.showThumbnails;
+  thumbnailsEl.disabled = thumbnailChangePending;
   scrubSecondsEl.value = settings.scrubSeconds;
   shiftMultiplierEl.value = settings.shiftMultiplier;
   document.getElementById("scrub-value").textContent = `${settings.scrubSeconds} s`;
@@ -44,21 +49,49 @@ function updateSettingsUI() {
 }
 
 function updateHint() {
-  hintEl.textContent = `/ search · ↑↓ pick · ↵ open · ←→ ±${settings.scrubSeconds}s\nspace play/pause · ⌫ remove`;
+  hintEl.textContent = `/ search · ↑↓ pick · ↵ open · ←→ ±${settings.scrubSeconds}s\nspace play/pause · ⌫ remove · t thumbs`;
 }
 
 async function saveSettings() {
   const next = normalizeSettings({
+    ...settings,
     autoBookmark: autoBookmarkEl.checked,
     scrubSeconds: Number(scrubSecondsEl.value),
     shiftMultiplier: Number(shiftMultiplierEl.value),
   });
+  await persistSettings(next);
+}
+
+async function persistSettings(next) {
   const autoBookmarkChanged = next.autoBookmark !== settings.autoBookmark;
   await api.storage.local.set({ settings: next });
   settings = next;
   if (autoBookmarkChanged) searchRequested = false;
   updateSettingsUI();
   await render();
+}
+
+function setOptionsOpen(open) {
+  optionsOpen = open;
+  optionsPanel.hidden = !open;
+  updateHeaderMode();
+  actionsEl.classList.toggle("options-open", open);
+  listEl.hidden = open;
+  hintEl.hidden = open;
+  optionsToggle.textContent = open ? "Hide options" : "Show options";
+  optionsToggle.setAttribute("aria-expanded", String(open));
+}
+
+async function setThumbnails(show) {
+  if (thumbnailChangePending) return;
+  thumbnailChangePending = true;
+  updateSettingsUI();
+  try {
+    await enqueue(() => persistSettings({ ...settings, showThumbnails: show }));
+  } finally {
+    thumbnailChangePending = false;
+    updateSettingsUI();
+  }
 }
 
 async function loadVideos() {
@@ -75,6 +108,7 @@ async function saveVideos(videos) {
 let queue = Promise.resolve();
 function enqueue(fn) {
   queue = queue.then(fn).catch((e) => setStatus(e.message));
+  return queue;
 }
 
 function fmt(sec) {
@@ -269,7 +303,14 @@ function focusables() {
 let pendingFocusIndex = null;
 
 document.addEventListener("keydown", (e) => {
-  if (optionsOpen || e.isComposing) return;
+  if (e.isComposing) return;
+  if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.altKey && !e.metaKey &&
+      document.activeElement !== searchEl) {
+    e.preventDefault();
+    if (!e.repeat) setThumbnails(!settings.showThumbnails).catch((error) => setStatus(error.message));
+    return;
+  }
+  if (optionsOpen) return;
   if (e.key === "/" && !e.ctrlKey && !e.altKey && !e.metaKey && document.activeElement !== searchEl) {
     e.preventDefault();
     showRestoreBookmark = false;
@@ -342,6 +383,25 @@ function renderList() {
     main.title = linkFor(v);
     main.addEventListener("click", () => openVideo(v));
 
+    if (settings.showThumbnails) {
+      const thumbnail = document.createElement("span");
+      thumbnail.className = "thumbnail";
+      thumbnail.setAttribute("aria-hidden", "true");
+      const img = document.createElement("img");
+      img.alt = "";
+      img.width = 64;
+      img.height = 36;
+      img.loading = "lazy";
+      img.decoding = "async";
+      img.referrerPolicy = "no-referrer";
+      img.addEventListener("error", () => { img.hidden = true; });
+      img.src = `https://i.ytimg.com/vi/${encodeURIComponent(v.id)}/mqdefault.jpg`;
+      thumbnail.append(img);
+      main.append(thumbnail);
+    }
+    const details = document.createElement("div");
+    details.className = "details";
+
     const title = document.createElement("div");
     title.className = "title";
     title.textContent = v.title || v.id;
@@ -353,7 +413,7 @@ function renderList() {
       ? `${fmt(v.t)} / ${fmt(v.duration)} · ${when}`
       : `${fmt(v.t)} · ${when}`;
 
-    main.append(title, meta);
+    details.append(title, meta);
 
     if (v.duration) {
       const bar = document.createElement("div");
@@ -361,8 +421,9 @@ function renderList() {
       const fill = document.createElement("span");
       fill.style.width = `${Math.min(100, (v.t / v.duration) * 100)}%`;
       bar.append(fill);
-      main.append(bar);
+      details.append(bar);
     }
+    main.append(details);
 
     const del = document.createElement("button");
     del.className = "del";
@@ -402,16 +463,12 @@ async function init() {
     searchEl.focus();
   });
   optionsToggle.addEventListener("click", () => {
-    optionsOpen = !optionsOpen;
-    optionsPanel.hidden = !optionsOpen;
-    updateHeaderMode();
-    actionsEl.classList.toggle("options-open", optionsOpen);
-    listEl.hidden = optionsOpen;
-    hintEl.hidden = optionsOpen;
-    optionsToggle.textContent = optionsOpen ? "Hide options" : "Show options";
-    optionsToggle.setAttribute("aria-expanded", String(optionsOpen));
+    setOptionsOpen(!optionsOpen);
   });
   autoBookmarkEl.addEventListener("change", () => enqueue(saveSettings));
+  thumbnailsEl.addEventListener("change", () => {
+    setThumbnails(thumbnailsEl.checked).catch((error) => setStatus(error.message));
+  });
   for (const slider of [scrubSecondsEl, shiftMultiplierEl]) {
     slider.addEventListener("input", () => {
       document.getElementById("scrub-value").textContent = `${scrubSecondsEl.value} s`;

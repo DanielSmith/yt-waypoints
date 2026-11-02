@@ -42,6 +42,7 @@ for browser in ('firefox', 'chrome'):
         gecko = manifest['browser_specific_settings']['gecko']
         assert gecko['id'] == 'yt-waypoints@local'
         assert gecko['data_collection_permissions']['required'] == ['none']
+        assert 'optional' not in gecko['data_collection_permissions']
     archive = ROOT / 'artifacts' / f'yt-waypoints-{browser}-{version}.zip'
     with zipfile.ZipFile(archive) as z:
         assert 'manifest.json' in z.namelist()
@@ -63,6 +64,7 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
         assert z.read('LICENSE') == (ROOT / 'LICENSE').read_bytes()
         assert json.loads(z.read('package.json'))['license'] == 'Apache-2.0'
         assert 'src/shared/popup.js' in names and 'scripts/build.py' in names and 'README.md' in names
+        assert 'STORE-SUBMISSION.md' not in names
         assert not any(p.startswith(('artifacts/', 'backups/', 'yt-waypoints-')) for p in names)
         z.extractall(clone)
     result = subprocess.run(['python3', str(clone / 'scripts/build.py')], cwd=td, capture_output=True, text=True)

@@ -5,7 +5,14 @@ Brave. Both browser flavors now use the same popup, search, keyboard controls,
 options, delete/restore behavior, and autosave. While a bookmarked video plays,
 its saved position and open-popup progress update every 5 seconds. Fullscreen controls are currently
 disabled; exit video fullscreen before opening the popup.
-There is no account, server, analytics, or automatic browser-to-browser sync.
+There is no account, developer-operated server, analytics, or automatic browser-to-browser sync.
+
+Optional thumbnails appear at the start of each bookmark row. They are on by
+default. Press `t` outside search or use **Options → Show thumbnails (t)** to
+change the same saved preference. Typing `t` in search continues to enter text.
+The checkbox and `t` toggle directly, with no additional permission request or
+confirmation screen. A note in Options explains that thumbnail images load from
+YouTube's image server; see PRIVACY.md.
 
 ## Source and build outputs
 
@@ -84,8 +91,7 @@ npm test
 This builds both flavors, runs popup interaction tests against each built
 package, and checks packaging and reproducibility. The manifests and ZIPs are
 also checked for the absence of fullscreen/background/worker files. Tests use
-mock browser/DOM objects; live acceptance testing remains necessary. See
-[STORE-SUBMISSION.md](STORE-SUBMISSION.md) for the checks and upload steps.
+mock browser/DOM objects; live acceptance testing remains necessary. Local store-submission notes, when present, contain the checks and upload steps.
 
 ## Backups
 
