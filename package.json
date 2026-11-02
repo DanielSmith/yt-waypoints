@@ -1,0 +1,15 @@
+{
+  "name": "yt-waypoints",
+  "version": "1.8.5",
+  "private": true,
+  "description": "Local YouTube bookmarks and resume points for Firefox, Chrome, and Brave.",
+  "scripts": {
+    "build": "python3 scripts/build.py",
+    "build:firefox": "python3 scripts/build.py firefox",
+    "build:chrome": "python3 scripts/build.py chrome",
+    "test": "python3 scripts/build.py && node tests/popup.cjs firefox && node tests/popup.cjs chrome && python3 tests/build.py"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
