@@ -18,7 +18,9 @@ async function autosave() {
 
   const t = Math.floor(video.currentTime);
   if (t < 5) return; // page still loading or seeking to &t=
-  if (lastSaved.id === id && lastSaved.t === t) return;
+  const info = WAYPOINTS_READ_METADATA();
+  if (lastSaved.id === id && lastSaved.t === t &&
+      lastSaved.channelName === info.channelName && lastSaved.channelUrl === info.channelUrl) return;
 
   const { videos = {} } = await api.storage.local.get("videos");
   const entry = videos[id];
@@ -29,9 +31,12 @@ async function autosave() {
   // previous video. A duration mismatch means it isn't this one yet.
   if (entry.duration && duration && Math.abs(entry.duration - duration) > 2) return;
 
-  videos[id] = { ...entry, t, duration: duration || entry.duration, updated: Date.now() };
+  const channel = info.channelName
+    ? { channelName: info.channelName, channelUrl: info.channelUrl }
+    : {};
+  videos[id] = { ...entry, ...channel, t, duration: duration || entry.duration, updated: Date.now() };
   await api.storage.local.set({ videos });
-  lastSaved = { id, t };
+  lastSaved = { id, t, channelName: info.channelName, channelUrl: info.channelUrl };
 }
 
 function tick() {

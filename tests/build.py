@@ -30,7 +30,7 @@ for browser in ('firefox', 'chrome'):
             assert item.read_bytes() == (package / item.relative_to(shared)).read_bytes(), item
     assert 'background' not in manifest
     assert 'web_accessible_resources' not in manifest
-    assert manifest['content_scripts'][0]['js'] == ['content.js']
+    assert manifest['content_scripts'][0]['js'] == ['metadata.js', 'content.js']
     assert set(manifest['commands']) == {'_execute_action'}
     for removed in ('overlay.js', 'background.js', 'bridge.js', 'worker.js'):
         assert not (package / removed).exists(), removed

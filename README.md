@@ -1,18 +1,87 @@
 # YT Waypoints
 
 Local YouTube bookmarks and saved playback positions for Firefox, Chrome, and
-Brave. Both browser flavors now use the same popup, search, keyboard controls,
-options, delete/restore behavior, and autosave. While a bookmarked video plays,
-its saved position and open-popup progress update every 5 seconds. Fullscreen controls are currently
-disabled; exit video fullscreen before opening the popup.
-There is no account, developer-operated server, analytics, or automatic browser-to-browser sync.
+Brave, with search across video titles and channel names. While a bookmarked
+video plays, its saved position and open-popup progress
+update every 5 seconds. There is no account, developer-operated server,
+analytics, or automatic browser-to-browser sync.
 
-Optional thumbnails appear at the start of each bookmark row. They are on by
-default. Press `t` outside search or use **Options → Show thumbnails (t)** to
-change the same saved preference. Typing `t` in search continues to enter text.
-The checkbox and `t` toggle directly, with no additional permission request or
-confirmation screen. A note in Options explains that thumbnail images load from
-YouTube's image server; see PRIVACY.md.
+## Using Waypoints
+
+Open the popup using its toolbar icon or **Command+Shift+Y on macOS**,
+**Ctrl+Shift+Y elsewhere**. Exit video fullscreen before opening the popup.
+
+### Paste a YouTube link
+
+1. Copy a YouTube video link.
+2. Open the Waypoints popup.
+3. Press **Command+V on macOS** or **Ctrl+V elsewhere**.
+
+**You do not need to focus the search field or press Enter.** Paste works when
+a bookmark row, the Add bookmark button, or Options has focus. Waypoints reveals
+search, switches to an existing tab for the video or opens it, clears search
+after successful navigation, and closes the popup.
+
+- A timestamp in the pasted link is honored.
+- Without a timestamp, an already open video keeps its current position. A
+  closed bookmarked video resumes at its saved position; a new video starts at
+  the beginning.
+- Standard watch links, `youtu.be` links, and Shorts, live, and embed video links
+  are accepted. Only recognized YouTube video URLs are opened. Navigation uses
+  a clean HTTPS URL built from a validated video ID and optional time, dropping
+  tracking and playlist parameters.
+- Pasting ordinary text outside search focuses search and filters the list.
+  Ordinary text pasted inside search keeps normal text editing behavior.
+- If navigation fails, the pasted link stays in search and an error is shown.
+
+Clipboard text is accessed only when you paste. No clipboard-reading permission
+is requested.
+
+### Scrub a video
+
+**Hover over a row's progress bar to reveal its handle, then drag it.** The row
+previews the target time while you drag. Release to seek the open video or, if
+the video is closed, update its saved resume point. Clicking the track also
+seeks to that position.
+
+Scrubbing keeps the popup open and does not open the video or change its
+playing/paused state. Progress updates do not interrupt an active drag, and
+cancelling a drag leaves the saved position unchanged. Videos without a known
+duration do not show a progress slider.
+
+| Control | Action |
+| --- | --- |
+| Drag the handle or click the track | Preview a position; seek/save on release |
+| Left / Right arrow on a row or slider | Scrub by the configured distance, 10 seconds by default |
+| Shift + Left / Right arrow | Apply the configured multiplier, ×3 by default |
+| Home / End with the slider focused | Go to the start / end |
+
+Set the arrow-key distance and Shift multiplier in **Show options**.
+
+### Search titles and channels
+
+Press `/` to focus on the search input field. Search ignores case and matches against your saved **video titles or
+channel names by default**. For example, searching for `Bloomberg` finds videos
+from that channel even when “Bloomberg” is not in their titles.
+
+Turn off **Show options → Include channel names in search** for title-only
+matching. The setting persists between sessions. Channel names remain visible
+beneath video titles when available, even with channel-name searching off.
+
+Channel metadata is read from the video's owner information on the YouTube page
+using existing permissions, without an API key or extra lookup request. New
+bookmarks include `channelName` and `channelUrl` when available. Older bookmarks
+are enriched while their videos play or when the popup opens on those videos.
+Opening the popup to enrich a bookmark preserves its saved playback position
+and update timestamp. Unavailable metadata leaves the known channel untouched.
+
+### Thumbnails
+
+Thumbnails appear at the start of each bookmark row and are on by default.
+Press `t` outside search or use **Options → Show thumbnails (t)** to change the
+same saved preference. Typing `t` in search continues to enter text. The checkbox
+and `t` toggle directly, with no additional permission request or confirmation
+screen. Thumbnails load from YouTube's image server; see [PRIVACY.md](PRIVACY.md).
 
 ## Source and build outputs
 

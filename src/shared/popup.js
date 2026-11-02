@@ -17,20 +17,23 @@ const hintEl = document.getElementById("hint");
 const optionsToggle = document.getElementById("options-toggle");
 const optionsPanel = document.getElementById("options-panel");
 const autoBookmarkEl = document.getElementById("auto-bookmark");
+const includeChannelsEl = document.getElementById("include-channel-names");
 const thumbnailsEl = document.getElementById("show-thumbnails");
 const scrubSecondsEl = document.getElementById("scrub-seconds");
 const shiftMultiplierEl = document.getElementById("shift-multiplier");
-const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3, showThumbnails: true };
+const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3, showThumbnails: true, includeChannelNames: true };
 let settings = { ...DEFAULT_SETTINGS };
 let thumbnailChangePending = false;
 let onVideo = false;
 let currentId = null;
 let optionsOpen = false;
+let activeScrubber = null;
 
 function normalizeSettings(saved = {}) {
   const bounded = (value, fallback, max) => Number.isInteger(value) && value >= 1 && value <= max ? value : fallback;
   return {
     autoBookmark: typeof saved?.autoBookmark === "boolean" ? saved.autoBookmark : true,
+    includeChannelNames: typeof saved?.includeChannelNames === "boolean" ? saved.includeChannelNames : true,
     showThumbnails: typeof saved?.showThumbnails === "boolean" ? saved.showThumbnails : true,
     scrubSeconds: bounded(saved?.scrubSeconds, 10, 60),
     shiftMultiplier: bounded(saved?.shiftMultiplier, 3, 10),
@@ -39,6 +42,7 @@ function normalizeSettings(saved = {}) {
 
 function updateSettingsUI() {
   autoBookmarkEl.checked = settings.autoBookmark;
+  includeChannelsEl.checked = settings.includeChannelNames;
   thumbnailsEl.checked = settings.showThumbnails;
   thumbnailsEl.disabled = thumbnailChangePending;
   scrubSecondsEl.value = settings.scrubSeconds;
@@ -56,6 +60,7 @@ async function saveSettings() {
   const next = normalizeSettings({
     ...settings,
     autoBookmark: autoBookmarkEl.checked,
+    includeChannelNames: includeChannelsEl.checked,
     scrubSeconds: Number(scrubSecondsEl.value),
     shiftMultiplier: Number(shiftMultiplierEl.value),
   });
@@ -150,6 +155,46 @@ function videoIdOf(url) {
   }
 }
 
+// Parse video links, never navigate to raw clipboard text. Every accepted link
+// is rebuilt by linkFor() on www.youtube.com with just an ID and a timestamp.
+function parseVideoLink(text) {
+  let value = text.trim();
+  if (/^(?:(?:www\.|m\.)?youtube\.com|youtu\.be)\//i.test(value)) value = "https://" + value;
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return null;
+  }
+  if (url.protocol !== "https:" || url.username || url.password || url.port) return null;
+  let id;
+  const parts = url.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+  if (url.hostname === "youtu.be" && parts.length === 1) {
+    id = parts[0];
+  } else if (["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname)) {
+    if (url.pathname === "/watch" && url.searchParams.getAll("v").length === 1) {
+      id = url.searchParams.get("v");
+    } else if (parts.length === 2 && ["shorts", "live", "embed"].includes(parts[0])) {
+      id = parts[1];
+    }
+  }
+  if (!/^[A-Za-z0-9_-]{11}$/.test(id || "")) return null;
+  const stamp = url.searchParams.get("t") ?? url.searchParams.get("start") ??
+    new URLSearchParams(url.hash.slice(1)).get("t");
+  let t = null;
+  if (stamp !== null) {
+    if (/^\d+$/.test(stamp)) {
+      t = Number(stamp);
+    } else {
+      const match = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s)?$/.exec(stamp);
+      if (!match || !match.slice(1).some(Boolean)) return null;
+      t = Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
+    }
+    if (!Number.isSafeInteger(t)) return null;
+  }
+  return { id, t };
+}
+
 // The open tab (any window) that's playing this video, if any.
 async function findVideoTab(id) {
   const tabs = await api.tabs.query({ url: "*://*.youtube.com/watch*" });
@@ -184,11 +229,24 @@ async function bookmarkCurrent() {
   setStatus(`Saved at ${fmt(info.t)}.`);
 }
 
+// Enrich an existing bookmark without overwriting its saved time or recency.
+async function refreshCurrentChannel() {
+  const tab = await activeTab();
+  const info = await inPlayer(tab.id, "bookmark");
+  if (info?.id !== currentId || !info.channelName) return;
+  const videos = await loadVideos();
+  const entry = videos[currentId];
+  if (!entry || (entry.channelName === info.channelName && entry.channelUrl === info.channelUrl)) return;
+  videos[currentId] = { ...entry, channelName: info.channelName, channelUrl: info.channelUrl };
+  await saveVideos(videos);
+}
+
 // If the video is already open in some tab, switch to it. Otherwise load it
 // at the saved time.
-async function openVideo(v) {
+async function navigateVideo(v, applyTimestamp = false) {
   const existing = await findVideoTab(v.id);
   if (existing) {
+    if (applyTimestamp) await api.tabs.update(existing.id, { url: linkFor(v) });
     await focusTab(existing);
   } else {
     const tab = await activeTab();
@@ -198,7 +256,37 @@ async function openVideo(v) {
       await api.tabs.create({ url: linkFor(v) });
     }
   }
+}
+
+async function openVideo(v) {
+  await navigateVideo(v);
   window.close();
+}
+
+async function openPastedVideo(link) {
+  const videos = await loadVideos();
+  const target = { id: link.id, t: link.t ?? videos[link.id]?.t ?? 0 };
+  await navigateVideo(target, link.t !== null);
+  searchEl.value = "";
+  renderList();
+  window.close();
+}
+
+function pasteIntoPopup(event) {
+  if (event.defaultPrevented) return;
+  const text = event.clipboardData?.getData("text/plain").trim();
+  if (!text) return;
+  const link = parseVideoLink(text);
+  // Ordinary pastes within search retain native insertion/selection behavior.
+  if (!link && document.activeElement === searchEl) return;
+  event.preventDefault();
+  showRestoreBookmark = false;
+  searchRequested = true;
+  setOptionsOpen(false);
+  searchEl.value = text;
+  renderList();
+  searchEl.focus();
+  if (link) enqueue(() => openPastedVideo(link));
 }
 
 function headerControl() {
@@ -274,6 +362,105 @@ async function scrub(id, delta) {
   await saveVideos(videos);
 }
 
+// Absolute scrubbing from a row slider. Read again after seeking so concurrent
+// autosaves/deletions of other bookmarks aren't overwritten with an old list.
+async function seekTo(id, time) {
+  const before = (await loadVideos())[id];
+  if (!before) return;
+  const tab = await findVideoTab(id);
+  const live = tab ? await inPlayer(tab.id, "seekTo", [time]) : null;
+  const videos = await loadVideos();
+  const v = videos[id];
+  if (!v) return;
+  if (live) {
+    v.t = live.t;
+    v.duration = live.duration;
+    showPlayer(live);
+  } else {
+    v.t = Math.floor(Math.min(v.duration, Math.max(0, time)));
+    setStatus(`Resume point ${fmt(v.t)}`);
+  }
+  await saveVideos(videos);
+}
+
+function makeScrubber(v, meta, when) {
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "bar";
+  slider.dataset.id = v.id;
+  slider.min = "0";
+  slider.max = String(v.duration);
+  slider.step = "1";
+  slider.value = String(Math.min(v.duration, Math.max(0, v.t)));
+  slider.setAttribute("aria-label", `Playback position for ${v.title || v.id}`);
+  let lastCommitted = Number(slider.value);
+  let cancelled = false;
+  const value = () => Math.floor(Math.min(v.duration, Math.max(0, Number(slider.value))));
+  function paint() {
+    slider.style.setProperty("--progress", `${(value() / v.duration) * 100}%`);
+    slider.setAttribute("aria-valuetext", `${fmt(value())} of ${fmt(v.duration)}`);
+    slider.title = `${fmt(value())} / ${fmt(v.duration)}`;
+  }
+  function preview() {
+    paint();
+    meta.textContent = `${fmt(value())} / ${fmt(v.duration)} · ${when}`;
+    setStatus(`Seek to ${fmt(value())}`);
+  }
+  function commit() {
+    if (cancelled) return;
+    const wasDragging = activeScrubber === slider;
+    if (wasDragging) activeScrubber = null;
+    const time = value();
+    if (time === lastCommitted) {
+      if (wasDragging) renderList();
+      return;
+    }
+    lastCommitted = time;
+    enqueue(async () => {
+      try {
+        await seekTo(v.id, time);
+      } finally {
+        await render();
+      }
+    });
+  }
+  function cancel() {
+    if (activeScrubber !== slider) return;
+    cancelled = true;
+    activeScrubber = null;
+    renderList();
+    setStatus("Scrub cancelled.");
+  }
+  paint();
+  slider.addEventListener("click", (event) => event.stopPropagation());
+  slider.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || activeScrubber) return;
+    event.stopPropagation();
+    cancelled = false;
+    activeScrubber = slider;
+    slider.setPointerCapture(event.pointerId);
+    slider.focus();
+  });
+  slider.addEventListener("input", preview);
+  slider.addEventListener("change", commit);
+  slider.addEventListener("pointerup", () => {
+    if (activeScrubber === slider) commit();
+  });
+  slider.addEventListener("pointercancel", cancel);
+  slider.addEventListener("lostpointercapture", cancel);
+  slider.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const step = settings.scrubSeconds * (event.shiftKey ? settings.shiftMultiplier : 1);
+    slider.value = String(event.key === "Home" ? 0 : event.key === "End" ? v.duration :
+      Math.min(v.duration, Math.max(0, value() + (event.key === "ArrowRight" ? step : -step))));
+    preview();
+    commit();
+  });
+  return slider;
+}
+
 // Space: play/pause the video in its open tab. Not open → open it (like Enter).
 async function togglePlay(id) {
   const videos = await loadVideos();
@@ -323,14 +510,15 @@ document.addEventListener("keydown", (e) => {
   // Text editing keys belong to search; only ↑/↓ move into the result list.
   if (document.activeElement === searchEl && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
   const items = focusables();
-  const i = items.indexOf(document.activeElement);
+  const row = items.find((item) => item.dataset.id && item.dataset.id === document.activeElement?.dataset?.id)
+    || document.activeElement;
+  const i = items.indexOf(row);
   if (e.key === "ArrowDown" || e.key === "ArrowUp") {
     e.preventDefault();
     const next = e.key === "ArrowDown" ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
     items[next]?.focus();
     return;
   }
-  const row = document.activeElement;
   if (!row?.classList.contains("main")) return;
   const id = row.dataset.id;
 
@@ -358,11 +546,14 @@ async function render() {
 }
 
 function renderList() {
+  // Native range dragging must retain the same DOM node until release/cancel.
+  if (activeScrubber) return;
   updateHeaderMode();
   const query = searchEl.value.trim().toLocaleLowerCase();
   clearSearchEl.hidden = searchEl.value.length === 0;
   const videos = Object.values(savedVideos)
-    .filter((v) => !query || (v.title || "").toLocaleLowerCase().includes(query))
+    .filter((v) => !query || (v.title || "").toLocaleLowerCase().includes(query) ||
+      (settings.includeChannelNames && (v.channelName || "").toLocaleLowerCase().includes(query)))
     .sort((a, b) => b.updated - a.updated);
   // Keep keyboard focus on the same row across re-renders (scrub, auto-save).
   const focusedId = document.activeElement?.dataset?.id;
@@ -380,7 +571,7 @@ function renderList() {
     main.className = "main";
     main.tabIndex = 0;
     main.dataset.id = v.id;
-    main.title = linkFor(v);
+    main.title = v.channelName ? `${v.channelName}\n${linkFor(v)}` : linkFor(v);
     main.addEventListener("click", () => openVideo(v));
 
     if (settings.showThumbnails) {
@@ -413,15 +604,17 @@ function renderList() {
       ? `${fmt(v.t)} / ${fmt(v.duration)} · ${when}`
       : `${fmt(v.t)} · ${when}`;
 
-    details.append(title, meta);
+    details.append(title);
+    if (v.channelName) {
+      const channel = document.createElement("div");
+      channel.className = "channel-name";
+      channel.textContent = v.channelName;
+      details.append(channel);
+    }
+    details.append(meta);
 
     if (v.duration) {
-      const bar = document.createElement("div");
-      bar.className = "bar";
-      const fill = document.createElement("span");
-      fill.style.width = `${Math.min(100, (v.t / v.duration) * 100)}%`;
-      bar.append(fill);
-      details.append(bar);
+      details.append(makeScrubber(v, meta, when));
     }
     main.append(details);
 
@@ -457,6 +650,7 @@ async function init() {
   updateSettingsUI();
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   searchEl.addEventListener("input", renderList);
+  document.addEventListener("paste", pasteIntoPopup);
   clearSearchEl.addEventListener("click", () => {
     searchEl.value = "";
     renderList();
@@ -466,6 +660,7 @@ async function init() {
     setOptionsOpen(!optionsOpen);
   });
   autoBookmarkEl.addEventListener("change", () => enqueue(saveSettings));
+  includeChannelsEl.addEventListener("change", () => enqueue(saveSettings));
   thumbnailsEl.addEventListener("change", () => {
     setThumbnails(thumbnailsEl.checked).catch((error) => setStatus(error.message));
   });
@@ -478,8 +673,10 @@ async function init() {
     slider.addEventListener("change", () => enqueue(saveSettings));
   }
   // Only bookmark on popup activation, never as a side effect of rendering.
-  if (onVideo && settings.autoBookmark && !(await loadVideos())[currentId]) {
-    await bookmarkCurrent();
+  if (onVideo) {
+    const videos = await loadVideos();
+    if (settings.autoBookmark && !videos[currentId]) await bookmarkCurrent();
+    else if (videos[currentId]) await refreshCurrentChannel();
   }
   await render();
   searchEl.disabled = false;

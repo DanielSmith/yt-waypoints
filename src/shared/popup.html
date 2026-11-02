@@ -48,7 +48,7 @@
     #status { margin-top: 6px; color: var(--fg); min-height: 1em; font-size: 12px; }
     #hint { color: var(--muted); font-size: 11px; white-space: pre-line; }
     .main:focus { outline: none; }
-    li:has(.main:focus) { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); }
+    li:has(.main:focus-within) { background: var(--hover); box-shadow: inset 3px 0 0 var(--accent); }
     ul { list-style: none; margin: 0; padding: 0; max-height: 420px; overflow-y: auto; }
     li { display: flex; align-items: center; gap: 6px; padding: 8px 10px; border-bottom: 1px solid var(--line); }
     li:hover { background: var(--hover); }
@@ -57,9 +57,16 @@
     .thumbnail { flex: 0 0 64px; width: 64px; height: 36px; overflow: hidden; border-radius: 3px; background: var(--bar); }
     .thumbnail img { display: block; width: 100%; height: 100%; object-fit: cover; }
     .title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 500; }
+    .channel-name { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
-    .bar { height: 3px; background: var(--bar); border-radius: 2px; margin-top: 4px; overflow: hidden; }
-    .bar > span { display: block; height: 100%; background: var(--accent); }
+    .bar { appearance: none; -webkit-appearance: none; display: block; width: 100%; height: 14px; margin: 0; padding: 0; border: 0; border-radius: 3px; background: transparent; cursor: ew-resize; touch-action: none; }
+    .bar::-webkit-slider-runnable-track { height: 3px; border-radius: 2px; background: linear-gradient(to right, var(--accent) var(--progress), var(--bar) var(--progress)); }
+    .bar::-webkit-slider-thumb { appearance: none; -webkit-appearance: none; width: 9px; height: 9px; margin-top: -3px; border: 0; border-radius: 50%; background: var(--accent); opacity: 0; }
+    .bar::-moz-range-track { height: 3px; border-radius: 2px; background: var(--bar); }
+    .bar::-moz-range-progress { height: 3px; border-radius: 2px; background: var(--accent); }
+    .bar::-moz-range-thumb { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--accent); opacity: 0; }
+    .bar:hover::-webkit-slider-thumb, .bar:focus::-webkit-slider-thumb, .bar:active::-webkit-slider-thumb { opacity: 1; }
+    .bar:hover::-moz-range-thumb, .bar:focus::-moz-range-thumb, .bar:active::-moz-range-thumb { opacity: 1; }
     .del {
       border: 0; background: none; color: var(--muted); cursor: pointer;
       font-size: 16px; padding: 2px 6px; border-radius: 4px;
@@ -72,7 +79,7 @@
   <header>
     <div class="actions">
       <div id="search-control" class="search">
-        <input id="search" type="text" placeholder="Search titles…" aria-label="Search video titles" aria-controls="list" autocomplete="off" spellcheck="false" disabled>
+        <input id="search" type="text" placeholder="Search or paste…" aria-label="Search saved videos" aria-controls="list" autocomplete="off" spellcheck="false" disabled>
         <button id="clear-search" type="button" aria-label="Clear search" title="Clear search" hidden>×</button>
       </div>
       <button id="restore-bookmark" type="button" hidden>Add bookmark</button>
@@ -86,6 +93,10 @@
     <label class="setting">
       <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
       <p id="thumbnail-help">On by default. Loads images from YouTube’s image server using the video IDs. Your bookmarks stay local. Press t outside search to toggle.</p>
+    </label>
+    <label class="setting">
+      <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox"></span>
+      <p>Match video titles or channel names. Channel names are saved when you bookmark or revisit a video.</p>
     </label>
     <label class="setting">
       <span class="setting-title"><span>Auto-bookmark</span><input id="auto-bookmark" type="checkbox"></span>
@@ -104,6 +115,7 @@
     <p id="shortcut-help"></p>
   </section>
   <script src="platform.js"></script>
+  <script src="metadata.js"></script>
   <script src="player.js"></script>
   <script src="popup.js"></script>
 </body>

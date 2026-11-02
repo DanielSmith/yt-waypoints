@@ -27,6 +27,7 @@
         "*://*.youtube.com/*"
       ],
       "js": [
+        "metadata.js",
         "content.js"
       ],
       "run_at": "document_idle"
