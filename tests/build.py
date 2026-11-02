@@ -17,6 +17,7 @@ for browser in ('firefox', 'chrome'):
     manifest = json.loads((package / 'manifest.json').read_text())
     assert manifest['version'] == version
     assert manifest['name'] == 'YT Waypoints'
+    assert (package / 'LICENSE').read_bytes() == (ROOT / 'LICENSE').read_bytes()
     assert manifest['permissions'] == ['storage', 'activeTab', 'scripting']
     assert all(p.endswith('.png') for p in manifest['icons'].values())
     for size in (16,32,48,96,128):
@@ -59,6 +60,8 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
     with zipfile.ZipFile(source_zip) as z:
         names = z.namelist()
         assert all(not p.startswith('/') and '..' not in Path(p).parts for p in names)
+        assert z.read('LICENSE') == (ROOT / 'LICENSE').read_bytes()
+        assert json.loads(z.read('package.json'))['license'] == 'Apache-2.0'
         assert 'src/shared/popup.js' in names and 'scripts/build.py' in names and 'README.md' in names
         assert not any(p.startswith(('artifacts/', 'backups/', 'yt-waypoints-')) for p in names)
         z.extractall(clone)

@@ -11,13 +11,13 @@ create a listing.
 python3 scripts/build.py
 ```
 
-For version 1.8.8 the generated files are:
+For version 1.8.9 the generated files are:
 
 | File | Use |
 | --- | --- |
-| `artifacts/yt-waypoints-chrome-1.8.8.zip` | Upload to Chrome Web Store; Chrome and Brave users install this listing |
-| `artifacts/yt-waypoints-firefox-1.8.8.zip` | Upload to Mozilla Add-ons (AMO) |
-| `artifacts/yt-waypoints-source-1.8.8.zip` | Reviewer source/build instructions; not an installable extension |
+| `artifacts/yt-waypoints-chrome-1.8.9.zip` | Upload to Chrome Web Store; Chrome and Brave users install this listing |
+| `artifacts/yt-waypoints-firefox-1.8.9.zip` | Upload to Mozilla Add-ons (AMO) |
+| `artifacts/yt-waypoints-source-1.8.9.zip` | Reviewer source/build instructions; not an installable extension |
 
 Do not ZIP the parent project directory. Backups, tests, and build scripts must
 not be in the installable extension package. The build handles this and puts
@@ -60,7 +60,7 @@ these live checks before submitting either flavor.
 
 1. Register/sign in at the [Chrome Developer Dashboard](https://chrome.google.com/webstore/devconsole).
    Complete the account requirements presented there.
-2. Create a new item and upload `yt-waypoints-chrome-1.8.8.zip`.
+2. Create a new item and upload `yt-waypoints-chrome-1.8.9.zip`.
 3. Fill in the listing: name, summary, description, category, screenshots, and
    requested graphics. The existing icon files are extension icons; store
    screenshots/promotional images are separate work.
@@ -93,16 +93,15 @@ Brave supports Chromium extensions through the
 
 1. Sign in to the [Mozilla Add-ons Developer Hub](https://addons.mozilla.org/developers/).
 2. Submit a new add-on and choose distribution on addons.mozilla.org for a
-   public Firefox listing. Upload `yt-waypoints-firefox-1.8.8.zip`.
+   public Firefox listing. Upload `yt-waypoints-firefox-1.8.9.zip`.
 3. Resolve validator findings. The extension ID is `yt-waypoints@local`; the store display name is
    YT Waypoints. Keep this ID stable for future releases.
-4. Supply `yt-waypoints-source-1.8.8.zip` in the source-code upload if requested
+4. Supply `yt-waypoints-source-1.8.9.zip` in the source-code upload if requested
    for the build, with `python3 scripts/build.py firefox` as the reproduction
    command. This project does not minify or bundle JavaScript; the source ZIP
    is included so reviewers can reproduce manifest assembly as well.
 5. Fill in listing text, screenshots, support/contact details, privacy
-   information, and choose the distribution license. No license has been chosen
-   on your behalf. Submit for review when satisfied.
+   information, and select **Apache License 2.0** as the distribution license. Submit for review when satisfied.
 
 Mozilla reviews/signs the submitted extension; a locally generated ZIP is not a
 signed public Firefox release. You do not upload the Chrome ZIP to Firefox or
@@ -123,5 +122,5 @@ separate. Never change the Firefox ID after publishing merely to match the name.
 ## Remaining before public release
 
 Live acceptance checks, screenshots/listing graphics, a hosted privacy-policy
-URL, chosen Firefox license, developer accounts/listing details, and review of
+URL, developer accounts/listing details, and review of
 store validation results. No submission or account action has been performed.

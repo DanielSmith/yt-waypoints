@@ -101,3 +101,8 @@ Both browser builds use the same PNG artwork from `src/shared/icons/`, exported
 at 16, 32, 48, 96, and 128 pixels. The original transparent image and exact
 generation prompt are preserved under `assets/`. The image was generated with
 the built-in image-generation tool, then resized for browser icons.
+
+## License
+
+YT Waypoints is licensed under the [Apache License, Version 2.0](LICENSE).
+The license is included in both extension packages and the reviewer source ZIP.

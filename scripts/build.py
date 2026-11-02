@@ -84,6 +84,7 @@ def build(browser):
         (staged / 'BUILD-INFO.txt').write_text(
             'Generated extension. Edit src/shared/ and src/' + browser + '/, then rebuild.\n'
         )
+        shutil.copy2(ROOT / "LICENSE", staged / "LICENSE")
         validate(staged)
         artifacts = ROOT / 'artifacts'
         artifacts.mkdir(exist_ok=True)
@@ -118,7 +119,7 @@ def write_sources():
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
         (stage / 'scripts').mkdir()
         shutil.copy2(ROOT / 'scripts/build.py', stage / 'scripts/build.py')
-        for name in ('package.json', 'README.md', 'STORE-SUBMISSION.md', 'PRIVACY.md'):
+        for name in ('package.json', 'README.md', 'STORE-SUBMISSION.md', 'PRIVACY.md', 'LICENSE'):
             shutil.copy2(ROOT / name, stage / name)
         write_zip(stage, artifacts / f'yt-waypoints-source-{version}.zip')
     print(f'Reviewer sources: artifacts/yt-waypoints-source-{version}.zip')
