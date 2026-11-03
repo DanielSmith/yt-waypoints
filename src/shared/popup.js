@@ -22,6 +22,12 @@ const thumbnailsEl = document.getElementById("show-thumbnails");
 const scrubSecondsEl = document.getElementById("scrub-seconds");
 const shiftMultiplierEl = document.getElementById("shift-multiplier");
 const copyVideosEl = document.getElementById("copy-videos");
+const helpDialog = document.getElementById("help-dialog");
+const helpToggle = document.getElementById("help-toggle");
+const helpClose = document.getElementById("help-close");
+let helpPreviousFocus = null;
+let helpPreviousRowId = null;
+let helpEscapeHeld = false;
 const DEFAULT_SETTINGS = { autoBookmark: true, scrubSeconds: 10, shiftMultiplier: 3, showThumbnails: true, includeChannelNames: true };
 let settings = { ...DEFAULT_SETTINGS };
 let thumbnailChangePending = false;
@@ -54,7 +60,27 @@ function updateSettingsUI() {
 }
 
 function updateHint() {
-  hintEl.textContent = `/ search · ↑↓ pick · ↵ open · ←→ ±${settings.scrubSeconds}s\nspace play/pause · ⌫ remove · t thumbs`;
+  document.getElementById("help-escape").textContent = WAYPOINTS_ESCAPE_CLOSES_POPUP
+    ? "Close entire popup (Firefox)" : "Close help";
+  document.getElementById("help-scrub").textContent = `Scrub ${settings.scrubSeconds} seconds`;
+  document.getElementById("help-multiplier").textContent = `×${settings.shiftMultiplier} (${settings.scrubSeconds * settings.shiftMultiplier} seconds)`;
+}
+
+function openHelp() {
+  if (helpDialog.open) return;
+  helpPreviousFocus = document.activeElement;
+  helpPreviousRowId = helpPreviousFocus?.dataset?.id;
+  updateHint();
+  document.body.classList.add("help-open");
+  helpDialog.showModal();
+}
+
+function closeHelp() {
+  if (!helpDialog.open) return;
+  helpDialog.close();
+  document.body.classList.remove("help-open");
+  const row = helpPreviousRowId && listEl.querySelector(`.main[data-id="${CSS.escape(helpPreviousRowId)}"]`);
+  (row || (helpPreviousRowId ? headerControl() : helpPreviousFocus))?.focus();
 }
 
 async function saveSettings() {
@@ -130,8 +156,7 @@ function copyWithSelection(text) {
   }
 }
 
-async function copyVideos() {
-  const text = WAYPOINTS_TRANSFER.stringify(savedVideos);
+async function copyText(text, success, failure) {
   let copied = false;
   try {
     const clipboard = globalThis.navigator?.clipboard;
@@ -142,8 +167,12 @@ async function copyVideos() {
   } catch {
     copied = copyWithSelection(text);
   }
-  setStatus(copied ? `Copied ${Object.keys(savedVideos).length} videos as JSON.` :
-    "Could not copy JSON. Please try again.");
+  setStatus(copied ? success : failure);
+}
+
+function copyVideos(videos = savedVideos) {
+  return copyText(WAYPOINTS_TRANSFER.stringify(videos),
+    `Copied ${Object.keys(videos).length} videos as JSON.`, "Could not copy JSON. Please try again.");
 }
 
 async function importVideos(incoming) {
@@ -341,7 +370,7 @@ async function openPastedVideo(link) {
 }
 
 function pasteIntoPopup(event) {
-  if (event.defaultPrevented) return;
+  if (event.defaultPrevented || helpDialog.open) return;
   const text = event.clipboardData?.getData("text/plain").trim();
   if (!text) return;
   if (/^[\[{]/.test(text)) {
@@ -572,6 +601,36 @@ let pendingFocusIndex = null;
 
 document.addEventListener("keydown", (e) => {
   if (e.isComposing) return;
+  // Chromium can consume Escape here. Firefox reserves it for closing the
+  // entire toolbar popup, outside the control of content event listeners.
+  if (e.key === "Escape" && WAYPOINTS_ESCAPE_CLOSES_POPUP) return;
+  if (e.key === "Escape" && (helpDialog.open || helpEscapeHeld)) {
+    e.preventDefault();
+    e.stopPropagation();
+    helpEscapeHeld = true;
+    closeHelp();
+    return;
+  }
+  const modified = e.ctrlKey || e.altKey || e.metaKey;
+  const helpKey = e.key === "?" || e.key.toLowerCase() === "h";
+  if (helpDialog.open) {
+    if (!modified && helpKey) {
+      e.preventDefault();
+      if (!e.repeat) closeHelp();
+    }
+    return;
+  }
+  if (modified) return;
+  if (helpKey && document.activeElement !== searchEl) {
+    e.preventDefault();
+    if (!e.repeat) openHelp();
+    return;
+  }
+  if (e.key === "C" && document.activeElement !== searchEl) {
+    e.preventDefault();
+    if (!e.repeat) copyVideos();
+    return;
+  }
   if (e.key.toLowerCase() === "t" && !e.ctrlKey && !e.altKey && !e.metaKey &&
       document.activeElement !== searchEl) {
     e.preventDefault();
@@ -603,22 +662,35 @@ document.addEventListener("keydown", (e) => {
   if (!row?.classList.contains("main")) return;
   const id = row.dataset.id;
 
-  if (e.key === "Enter") {
+  if (e.key === "u" || e.key === "c") {
+    e.preventDefault();
+    const video = savedVideos[id];
+    if (e.repeat || !video) return;
+    if (e.key === "c") copyVideos({ [id]: video });
+    else copyText(linkFor(video), "Copied video URL.", "Could not copy URL. Please try again.");
+  } else if (e.key === "Enter") {
     e.preventDefault();
     row.click();
   } else if (e.key === " ") {
     e.preventDefault();
     enqueue(() => togglePlay(id));
-  } else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+  } else if (["ArrowLeft", "ArrowRight", "<", ">", ",", "."].includes(e.key)) {
     e.preventDefault();
     const step = settings.scrubSeconds * (e.shiftKey ? settings.shiftMultiplier : 1);
-    enqueue(() => scrub(id, e.key === "ArrowRight" ? step : -step));
+    enqueue(() => scrub(id, ["ArrowRight", ">", "."].includes(e.key) ? step : -step));
   } else if (e.key === "Delete" || e.key === "Backspace") {
     e.preventDefault();
     pendingFocusIndex = i; // same position after re-render
     enqueue(() => deleteVideo(id));
   }
-});
+}, true);
+
+document.addEventListener("keyup", (e) => {
+  if (e.key !== "Escape" || !helpEscapeHeld) return;
+  e.preventDefault();
+  e.stopPropagation();
+  helpEscapeHeld = false;
+}, true);
 
 async function render() {
   savedVideos = await loadVideos();
@@ -729,7 +801,15 @@ async function init() {
   onVideo = WATCH_RE.test(tab?.url || "") && Boolean(videoIdOf(tab.url));
   currentId = onVideo ? videoIdOf(tab.url) : null;
   updateSettingsUI();
-  copyVideosEl.addEventListener("click", copyVideos);
+  copyVideosEl.addEventListener("click", () => copyVideos());
+  helpToggle.addEventListener("click", openHelp);
+  helpClose.addEventListener("click", closeHelp);
+  helpDialog.addEventListener("cancel", (event) => { event.preventDefault(); closeHelp(); });
+  helpDialog.addEventListener("click", (event) => {
+    const bounds = helpDialog.getBoundingClientRect();
+    if (event.target === helpDialog && (event.clientX < bounds.left || event.clientX > bounds.right ||
+        event.clientY < bounds.top || event.clientY > bounds.bottom)) closeHelp();
+  });
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   searchEl.addEventListener("input", renderList);
   document.addEventListener("paste", pasteIntoPopup);

@@ -11,6 +11,42 @@ analytics, or automatic browser-to-browser sync.
 Open the popup using its toolbar icon or **Command+Shift+Y on macOS**,
 **Ctrl+Shift+Y elsewhere**. Exit video fullscreen before opening the popup.
 
+### Upcoming in 2.0.4: keyboard shortcuts and help
+
+Version 2.0.3 remains the submitted store release. These additions are in the
+local 2.0.4 build and have not been submitted to either store.
+
+The compact hint shows search, play, open, and **h / ? toggle help**. Click **h / ? toggle help** or
+press `?` or `h` outside search for the complete shortcut table. Close it with
+the same keys, Close, or a click outside the table; focus returns to
+the previously selected row or control.
+
+Firefox reserves Escape to close the entire toolbar popup, even while help is
+open; use `h`, `?`, or Close to dismiss only help. Chromium handles Escape within
+help. See [Mozilla bug 1443758](https://bugzilla.mozilla.org/show_bug.cgi?id=1443758).
+
+| Key | Action |
+| --- | --- |
+| Left / Right, or comma / period (`<` / `>` keys) | Scrub by the configured distance |
+| Shift + a scrub key | Apply the configured multiplier |
+| Space | Play / pause the selected video |
+| Delete / Backspace | Remove the selected row |
+| Enter | Open the selected video |
+| Up / Down | Move between rows and search |
+| `/` | Search |
+| `t` | Toggle thumbnails |
+| `u` | Copy the selected video's clean URL, including its saved position |
+| `c` | Copy just the selected row in the standard JSON transfer envelope |
+| `C` (Shift + c) | Copy all saved videos as JSON, including filtered-out rows |
+| `h` / `?` | Toggle help |
+
+The help table displays your current scrub distance and multiplier. On keyboards
+where Shift produces `<` and `>`, those shifted keys apply the multiplier; use
+unshifted comma and period for an ordinary step. The arrow keys still work.
+Letter shortcuts leave search typing and Command/Ctrl/Alt combinations alone.
+Row copy commands require a focused row; uppercase `C` also works in Options.
+Copying uses the existing clipboard handling without additional permissions.
+
 ### Paste a YouTube link
 
 1. Copy a YouTube video link.
@@ -89,7 +125,7 @@ YouTube channel path; credentials, foreign hosts, control characters, and
 encoded path separators are rejected. Invalid known fields reject the entire
 import before any storage change.
 
-Copy runs only when you click **Copy JSON**, and import uses your paste event;
+Copy runs only when you click **Copy JSON** or invoke a copy shortcut, and import uses your paste event;
 no additional clipboard permissions are requested. A compatibility fallback uses
 a temporary offscreen selection, which is removed immediately. If copying fails,
 the popup shows an error; it never exposes a JSON editor in Options.

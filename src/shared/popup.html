@@ -15,7 +15,7 @@
       <button id="options-toggle" aria-expanded="false" aria-controls="options-panel" disabled>Show options</button>
     </div>
     <div id="status" role="status"></div>
-    <div id="hint"></div>
+    <div id="hint"><span>/ search · space play · ↵ open · </span><button id="help-toggle" type="button" aria-haspopup="dialog" aria-controls="help-dialog">h / ? toggle help</button></div>
   </header>
   <ul id="list"></ul>
   <section id="options-panel" aria-label="Options" hidden>
@@ -47,6 +47,27 @@
       <p id="export-help">Copy all videos. Paste into another Waypoints popup to merge.</p>
     </div>
   </section>
+  <dialog id="help-dialog" aria-labelledby="help-title">
+    <div class="help-heading"><strong id="help-title">Keyboard shortcuts</strong><button id="help-close" type="button" autofocus>Close</button></div>
+    <table class="help-table">
+      <thead><tr><th scope="col">Key</th><th scope="col">Action</th></tr></thead>
+      <tbody>
+        <tr><td>← / → or &lt; / &gt;</td><td id="help-scrub"></td></tr>
+        <tr><td>Shift + scrub key</td><td id="help-multiplier"></td></tr>
+        <tr><td>Space</td><td>Play / pause</td></tr>
+        <tr><td>Delete / Backspace</td><td>Remove selected row</td></tr>
+        <tr><td>Enter</td><td>Open / play selected video</td></tr>
+        <tr><td>↑ / ↓</td><td>Move between rows</td></tr>
+        <tr><td>/</td><td>Search</td></tr>
+        <tr><td>t</td><td>Toggle thumbnails</td></tr>
+        <tr><td>u</td><td>Copy selected video URL</td></tr>
+        <tr><td>c</td><td>Copy selected row as JSON</td></tr>
+        <tr><td>C (Shift + c)</td><td>Copy all videos as JSON</td></tr>
+        <tr><td>h / ?</td><td>Toggle help</td></tr>
+        <tr><td>Escape</td><td id="help-escape">Close popup</td></tr>
+      </tbody>
+    </table>
+  </dialog>
   <script src="platform.js"></script>
   <script src="transfer.js"></script>
   <script src="metadata.js"></script>

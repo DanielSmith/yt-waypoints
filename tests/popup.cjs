@@ -17,7 +17,9 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   const clipboardWrites = [];
   const doc = { activeElement: null, listeners: {}, addEventListener(t, fn) { this.listeners[t] = fn; } };
   class El {
-    constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {setProperty(name,value){this[name]=value;}}; this.events = {}; this.hidden = false; this.disabled = true; this.value = ''; this.className = ''; this.classList = { contains: n => this.className.split(' ').includes(n), toggle: () => {}, add: () => {} }; }
+    constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {setProperty(name,value){this[name]=value;}}; this.events = {}; this.hidden = false; this.disabled = true; this.value = ''; this.className = ''; this.classList = { contains: n => this.className.split(' ').includes(n), toggle: () => {}, add: () => {}, remove: () => {} }; }
+    showModal() { this.open = true; els['help-close'].focus(); }
+    close() { this.open = false; }
     addEventListener(t, fn) { this.events[t] = fn; }
     setAttribute(k,v) { this[k] = v; }
     append(...els) { for(const el of els) el.parentNode=this; this.children.push(...els); }
@@ -32,7 +34,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
     focus() { doc.activeElement = this; }
     click() { this.events.click?.(); }
   }
-  const ids = ['copy-videos','include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
+  const ids = ['help-escape','help-dialog','help-toggle','help-close','help-scrub','help-multiplier','copy-videos','include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
   const els = Object.fromEntries(ids.map(id => [id,new El()]));
   els['options-panel'].hidden = true;
   doc.body = new El('body');
@@ -189,6 +191,14 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(scrubber.data.videos.test.t,107);
   scrubber.doc.listeners.keydown({key:'ArrowLeft',shiftKey:true,preventDefault(){}});await scrubber.settle();
   assert.equal(scrubber.data.videos.test.t,79);
+  scrubber.doc.listeners.keydown({key:'>',preventDefault(){}});await scrubber.settle();
+  assert.equal(scrubber.data.videos.test.t,86);
+  scrubber.doc.listeners.keydown({key:'<',shiftKey:true,preventDefault(){}});await scrubber.settle();
+  assert.equal(scrubber.data.videos.test.t,58);
+  scrubber.doc.listeners.keydown({key:'.',preventDefault(){}});await scrubber.settle();
+  assert.equal(scrubber.data.videos.test.t,65);
+  scrubber.doc.listeners.keydown({key:',',preventDefault(){}});await scrubber.settle();
+  assert.equal(scrubber.data.videos.test.t,58);
   console.log('PASS: ordinary popup uses saved arrow scrub distance and Shift multiplier');
   const undo=await popup(initial);
   await vm.runInContext('deleteVideo("b")',undo.context);
@@ -395,6 +405,65 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   const a='aaaaaaaaaaa',b='bbbbbbbbbbb',c='ccccccccccc',d='ddddddddddd';
   const record=(id,t,updated)=>({id,title:'Video '+id,t,duration:1000,updated});
   const local={settings:{autoBookmark:false,showThumbnails:false,includeChannelNames:false},videos:{[a]:record(a,10,100),[b]:record(b,80,300),[d]:record(d,1,9)}};
+  const shortcuts=await popup(local,'https://example.com/');
+  const key=async (key,extra={})=>{shortcuts.doc.listeners.keydown({key,preventDefault(){},stopPropagation(){},...extra});await shortcuts.settle();};
+  shortcuts.els.search.value='Video '+b;shortcuts.els.search.events.input();
+  shortcuts.els.list.querySelectorAll('.main')[0].focus();
+  await key('u');assert.equal(shortcuts.clipboardWrites.at(-1),`https://www.youtube.com/watch?v=${b}&t=80s`);
+  await key('c');
+  const single=JSON.parse(shortcuts.clipboardWrites.at(-1));
+  assert.deepEqual(single,{format:'yt-waypoints',version:1,videos:{[b]:local.videos[b]}});
+  const singleTarget=await popup({settings:{autoBookmark:false}},'https://example.com/');
+  await singleTarget.paste(shortcuts.clipboardWrites.at(-1));assert.deepEqual(singleTarget.data.videos,single.videos);
+  await key('C',{shiftKey:true});assert.deepEqual(JSON.parse(shortcuts.clipboardWrites.at(-1)).videos,local.videos);
+  const copies=shortcuts.clipboardWrites.length;
+  for(const name of ['u','c','C']) {
+    await key(name,{repeat:true});
+    await key(name,{metaKey:true});await key(name,{ctrlKey:true});await key(name,{altKey:true});
+  }
+  assert.equal(shortcuts.clipboardWrites.length,copies);
+  await key('?');assert.equal(shortcuts.els['help-dialog'].open,true);
+  assert.equal(shortcuts.doc.activeElement,shortcuts.els['help-close']);
+  assert.equal(shortcuts.els['help-scrub'].textContent,'Scrub 10 seconds');
+  assert.equal(shortcuts.els['help-multiplier'].textContent,'×3 (30 seconds)');
+  await key('?',{repeat:true});assert.equal(shortcuts.els['help-dialog'].open,true);
+  for(const name of ['Delete','t','C','ArrowRight','Enter']) await key(name);
+  assert.equal(await shortcuts.paste(JSON.stringify({videos:{[a]:record(a,999,100)}})),false);
+  assert.deepEqual(shortcuts.data,local,'help isolates background actions');
+  assert.equal(shortcuts.clipboardWrites.length,copies);
+  // Storage-driven rerenders replace the focused row while help is visible.
+  await vm.runInContext('render()',shortcuts.context);
+  await key('h');assert.equal(shortcuts.els['help-dialog'].open,false);
+  assert.equal(shortcuts.doc.activeElement,shortcuts.els.list.querySelectorAll('.main')[0]);
+  shortcuts.els['help-toggle'].click();assert.equal(shortcuts.els['help-dialog'].open,true);
+  let escapePrevented=0,escapeStopped=0;
+  const escapeEvent={key:'Escape',preventDefault(){escapePrevented++;},stopPropagation(){escapeStopped++;}};
+  shortcuts.doc.listeners.keydown(escapeEvent);
+  shortcuts.doc.listeners.keydown({...escapeEvent,repeat:true});
+  shortcuts.doc.listeners.keyup(escapeEvent);
+  if(flavor==='firefox') {
+    assert.equal(escapePrevented,0,'Firefox owns popup dismissal; do not pretend to suppress it');
+    assert.equal(escapeStopped,0);
+    assert.equal(shortcuts.els['help-escape'].textContent,'Close entire popup (Firefox)');
+    await key('h');
+  } else {
+    assert.equal(escapePrevented,3,'consume Escape down, held repeats, and release');
+    assert.equal(escapeStopped,3,'consume Escape propagation within the document');
+    assert.equal(shortcuts.els['help-escape'].textContent,'Close help');
+  }
+  assert.equal(shortcuts.els['help-dialog'].open,false);
+  assert.equal(shortcuts.closed(),0,'extension code never calls window.close for help');
+  shortcuts.doc.listeners.keydown({key:'Escape',preventDefault(){throw Error('ordinary popup Escape intercepted');}});
+  shortcuts.doc.listeners.keyup({key:'Escape',preventDefault(){throw Error('ordinary popup Escape release intercepted');}});
+  await key('h');shortcuts.els['help-close'].click();assert.equal(shortcuts.els['help-dialog'].open,false);
+  shortcuts.els.search.focus();
+  for(const name of ['?','h','u','c','C','<','>']) await key(name,{preventDefault(){throw Error('search typing intercepted');}});
+  assert.equal(shortcuts.clipboardWrites.length,copies);
+  shortcuts.els['options-toggle'].click();shortcuts.els['options-toggle'].focus();
+  await key('C');assert.deepEqual(JSON.parse(shortcuts.clipboardWrites.at(-1)).videos,local.videos);
+  await key('h');assert.equal(shortcuts.els['help-dialog'].open,true);
+  await key(flavor==='firefox'?'h':'Escape');assert.equal(shortcuts.doc.activeElement,shortcuts.els['options-toggle']);
+  console.log('PASS: row URL/JSON and all-JSON shortcuts, importable single export, filter/modifier/repeat/search safety, modal help isolation and focus restoration');
   const transferPopup=await popup(local,'https://example.com/');
   transferPopup.els['options-toggle'].click();
   transferPopup.els['copy-videos'].click();await transferPopup.settle();
