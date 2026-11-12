@@ -11,10 +11,19 @@ analytics, or automatic browser-to-browser sync.
 Open the popup using its toolbar icon or **Command+Shift+Y on macOS**,
 **Ctrl+Shift+Y elsewhere**. Exit video fullscreen before opening the popup.
 
-### Upcoming in 2.0.4: keyboard shortcuts and help
+### Light and dark themes
 
-Version 2.0.3 remains the submitted store release. These additions are in the
-local 2.0.4 build and have not been submitted to either store.
+Choose **Show options → Theme → System, Light, or Dark**. System is the default
+and follows changes to your device's appearance while the popup is open.
+An explicit Light or Dark choice is saved locally and takes precedence over
+the system setting. The choice applies to the bookmark list, Options,
+transcript dropdown, help, and file-save dialogs, including native form controls.
+
+Theme colors live in `src/shared/themes/light.css` and `dark.css`. Shared
+typography and dimensions live in `src/shared/styles/tokens.css`; `popup.css`
+contains the component layout and interaction rules, with one declaration per
+line and no hard-coded colors. See [THEMES.md](THEMES.md) for the theme contract
+and steps to add a new theme.
 
 The compact hint shows search, play, open, and **h / ? toggle help**. Click **h / ? toggle help** or
 press `?` or `h` outside search for the complete shortcut table. Close it with
@@ -27,25 +36,96 @@ help. See [Mozilla bug 1443758](https://bugzilla.mozilla.org/show_bug.cgi?id=144
 
 | Key | Action |
 | --- | --- |
-| Left / Right, or comma / period (`<` / `>` keys) | Scrub by the configured distance |
-| Shift + a scrub key | Apply the configured multiplier |
+| Left / Right | Scrub by the configured distance |
+| Shift + Left / Right | Apply the configured multiplier |
+| `,` / `.` | Previous / next frame; pauses automatically (video must be open) |
+| `<` / `>` (Shift + comma / period) | Decrease / increase playback speed (video must be open) |
 | Space | Play / pause the selected video |
 | Delete / Backspace | Remove the selected row |
 | Enter | Open the selected video |
 | Up / Down | Move between rows and search |
 | `/` | Search |
 | `t` | Toggle thumbnails |
+| `T` (Shift + t) | Copy the selected video's transcript in your chosen format (video must be open) |
 | `u` | Copy the selected video's clean URL, including its saved position |
 | `c` | Copy just the selected row in the standard JSON transfer envelope |
 | `C` (Shift + c) | Copy all saved videos as JSON, including filtered-out rows |
 | `h` / `?` | Toggle help |
 
-The help table displays your current scrub distance and multiplier. On keyboards
-where Shift produces `<` and `>`, those shifted keys apply the multiplier; use
-unshifted comma and period for an ordinary step. The arrow keys still work.
+The help table displays your current arrow scrub distance and multiplier.
+Comma/period and angle brackets follow YouTube's frame and playback speed
+shortcuts. Frame steps use the current video's reported frame rate, pause
+playback automatically when needed, and leave the video paused after the step.
+Speed changes use the rates supported by YouTube's player;
+if that API is unavailable, they use quarter-speed steps on the video element.
+Playback actions run in the page world on current Firefox/Chromium, with a
+compatibility fallback for Firefox before 128. Script errors and missing-player,
+loading, and ad states have separate messages.
+These controls do not open a closed video or change its saved position.
 Letter shortcuts leave search typing and Command/Ctrl/Alt combinations alone.
 Row copy commands require a focused row; uppercase `C` also works in Options.
 Copying uses the existing clipboard handling without additional permissions.
+
+Select a bookmark row and press uppercase `T` to copy its transcript. Waypoints
+opens YouTube's transcript panel when available and requests YouTube's complete
+structured response using the page's own video-bound request and web-client
+context. The legacy layout uses its selected-language token; newer panels use
+their native `/get_panel` request without guessing a language. Mounted or virtualized
+rows are never treated as the whole transcript. The default is **Markdown with
+linked timestamps**, including video title and source URL. No third-party
+transcript service, developer API key, or speech recognition is used.
+
+A recognized terminal response is required. Continued/loading responses,
+unknown layouts, network failures, or video/language changes produce an error
+without copying partial text or offering a file. You may need to open Show
+transcript on YouTube first. Lowercase `t` continues to toggle thumbnails.
+
+In **Show options → Transcript format**, choose from:
+
+| Format | Best use | File |
+| --- | --- | --- |
+| Markdown with linked timestamps (default) | Obsidian notes with links back to each moment | `.md` |
+| Markdown with bold timestamps | Notes in the style of Obsidian Web Clipper | `.md` |
+| Plain text with timestamps | Text editors, email, and general clipboard use | `.txt` |
+| Plain text without timestamps | Continuous reading and text processing | `.txt` |
+| SRT subtitles | Subtitle editors and video players | `.srt` |
+| WebVTT subtitles | Web video captions and browser players | `.vtt` |
+| JSON with timed segments | Scripts, indexing, and structured processing | `.json` |
+
+Open the dropdown and hover over a choice to see its best use, explanation,
+and example in a panel to the right. Keyboard users can use arrows to preview,
+Enter or Space to choose, and Escape to cancel (Firefox may close the whole
+toolbar popup on Escape). Hovering does not change the saved choice. Your
+chosen format persists locally and applies to both copying and saving.
+
+Select a video before opening Options, then use **Copy transcript**, or press T
+on a bookmark row. Copying happens first. The shared **Offer to save to file**
+checkbox in Options is **off by default** and applies to transcripts and
+all-bookmark JSON copies (Copy JSON in Options or uppercase C).
+
+When the checkbox is on and copying succeeds, a small popup asks **Also save
+to file?** Choose **Yes** to enter a filename, then **Save file**. No thanks,
+Cancel, and save failures leave the clipboard copy intact. Single-row JSON
+copy and URL copy do not trigger this offer. If clipboard copying fails, no
+save offer appears.
+
+Transcript filenames start with the video title and ID; bookmark backups start
+with `yt-waypoints-bookmarks-YYYY-MM-DD.json`. You can change the filename, and
+the appropriate extension is added if needed. Saving uses the browser's normal
+download behavior; it decides whether to ask for a destination folder. No
+download permission is added. Prepared transcript/file content is held in
+memory only while copying or offering a save, unless you explicitly copy or
+save it.
+
+Transcript timestamps use the supplied millisecond cue timing. SRT, WebVTT,
+and JSON retain source cue ends, clipping overlaps at the next start and caption
+padding at the known media duration. The final cue is not stretched across
+trailing silence to the end of the video. Duplicate starts are joined.
+A known media duration is unnecessary when the source supplies every cue end.
+Modern transcript panels provide paragraph start times without cue ends.
+Markdown and plain text retain all passages; JSON records null ends. SRT and
+WebVTT cannot be exported from these panels and explain which formats to use.
+JSON transcript exports remain separate from the bookmark backup format.
 
 ### Paste a YouTube link
 
@@ -129,6 +209,56 @@ Copy runs only when you click **Copy JSON** or invoke a copy shortcut, and impor
 no additional clipboard permissions are requested. A compatibility fallback uses
 a temporary offscreen selection, which is removed immediately. If copying fails,
 the popup shows an error; it never exposes a JSON editor in Options.
+
+### Concurrent saves and upgrade storage
+
+Bookmark mutations use separately keyed, versioned changes so one tab's
+progress save does not replace another bookmark. Deletions block stale saves;
+imports and deliberate re-adds establish a new bookmark lifetime. Internal
+versions and deletion records are excluded from JSON exports.
+
+Legacy bookmarks are read automatically and migrated into durable checkpoints
+before old storage copies are removed. Permanent deletion also removes the
+row's stored content from older journal/recovery copies; only its identity and
+version remain to block stale saves. Use **Copy JSON** to back up current data
+before downgrading: older builds cannot read the new storage format. Reload
+the extension and existing YouTube tabs after upgrading.
+
+Player results are checked inside the extension before use: the expected video
+and frame must match, positions/durations must be valid bounded numbers, and
+metadata is limited to recognized fields and YouTube channel URLs. Invalid
+open-player responses leave the bookmark unchanged and show an error; only a
+video with no open tab uses saved-only scrubbing. These checks also protect
+metadata enrichment and autosave. Transcript identity/timing/size checks accompany the reader’s recognized
+terminal-response requirement; unverified mounted rows are not exportable.
+
+### Deletion and trash
+
+In Options, **Deletion mode** chooses what × or Delete does:
+
+- **Timed: move to trash** (default): preserve the bookmark for restoration.
+- **Permanent: delete now**: remove its stored content immediately, with no Undo.
+
+Current bookmarks always participate in the normal list and search. Trash is
+hidden by default. Turn on **Show trash in the list and search** to include it:
+trash rows have a red tint, a “Trash” label, and a **Restore** checkbox that
+moves them back to current. Current rows remain visible. The header can also
+restore the most recently trashed bookmark. Deleting a visible trash row
+permanently removes it.
+
+Set **Permanently delete trash after** to 1–365 days; the default is **7 days
+(one week)**. This applies to the age of existing trash too. Cleanup runs when
+the popup opens, periodically while it remains open, and while a YouTube tab
+with the extension is active. If the browser/extension is inactive at the
+deadline, cleanup occurs at the next active check. **Empty trash** permanently
+removes all trash immediately, leaving current bookmarks intact.
+
+Trash is not autosaved or automatically re-bookmarked. Permanently deleted
+videos also require an explicit Add bookmark or import to return; opening the
+popup alone does not recreate them. Restoring a row keeps its saved position
+and metadata. JSON copy/export includes current bookmarks only, even when
+trash is shown; trash state and settings are not transferred. An explicit
+import of a trashed/deleted video makes it current.
 
 ### Scrub a video
 
@@ -253,9 +383,25 @@ npm test
 ```
 
 This builds both flavors, runs popup interaction tests against each built
-package, and checks packaging and reproducibility. The manifests and ZIPs are
+package, exercises independent contexts against shared asynchronous storage,
+and checks packaging and reproducibility. The manifests and ZIPs are
 also checked for the absence of fullscreen/background/worker files. Tests use
 mock browser/DOM objects; live acceptance testing remains necessary. Local store-submission notes, when present, contain the checks and upload steps.
+
+An optional real-DOM keyboard regression runs against each built adapter in
+headless Chrome/Chromium, using disposable fixture storage and an isolated
+profile:
+
+```sh
+node tests/keyboard-browser.cjs chrome
+node tests/keyboard-browser.cjs firefox
+```
+
+Set `WAYPOINTS_CHROME_BINARY` if the browser executable is not in a standard
+location. This checks real DOM capture/target propagation; the Firefox argument
+selects the Firefox adapter, not the Firefox browser engine. It does not replace
+native installed-extension testing on YouTube. It is separate from `npm test`
+so the standard suite still requires only Python and Node.
 
 ## Backups
 

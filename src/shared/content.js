@@ -15,13 +15,15 @@ const handledImports = new Set();
 
 function adoptImportedPosition(request, videos) {
   if (!request || typeof request.revision !== "string") return true;
-  if (request.revision !== importRevision) {
-    importRevision = request.revision;
+  const id = currentVideoId();
+  if (!id || !request.videos || !Object.hasOwn(request.videos, id)) return true;
+  const target = request.videos[id];
+  const revision = target.revision || request.revision;
+  if (revision !== importRevision) {
+    importRevision = revision;
     handledImports.clear();
   }
-  const id = currentVideoId();
-  if (!id || handledImports.has(id) || !request.videos || !Object.hasOwn(request.videos, id)) return true;
-  const target = request.videos[id];
+  if (handledImports.has(id)) return true;
   const entry = videos[id];
   if (!entry || entry.t !== target.t || !Number.isSafeInteger(target.t) || target.t < 0) {
     handledImports.add(id); // A subsequent edit/deletion superseded this import.
@@ -40,35 +42,42 @@ function adoptImportedPosition(request, videos) {
 
 async function followImport() {
   const generation = importGeneration;
-  const { videos = {}, importedPositions } = await api.storage.local.get(["videos", "importedPositions"]);
+  const { videos = {}, importedPositions } = await WAYPOINTS_STORAGE.read();
   if (generation === importGeneration) adoptImportedPosition(importedPositions, videos);
 }
 
 api.storage.onChanged.addListener((changes, area) => {
-  if (area !== "local" || !changes.importedPositions) return;
+  if (area !== "local" || !WAYPOINTS_STORAGE.imported(changes)) return;
   importGeneration++;
   followImport().catch(() => {});
 });
 followImport().catch(() => {});
+WAYPOINTS_STORAGE.expire().catch(() => {});
 
 async function autosave() {
   const id = currentVideoId();
   const video = document.querySelector("video");
   if (!id || !video) return;
   const generation = importGeneration;
-  const { videos = {}, importedPositions } = await api.storage.local.get(["videos", "importedPositions"]);
+  const snapshot = await WAYPOINTS_STORAGE.read();
+  const { videos, importedPositions } = snapshot;
   if (generation !== importGeneration || currentVideoId() !== id ||
       document.querySelector("video") !== video || !adoptImportedPosition(importedPositions, videos)) return;
   if (document.querySelector(".html5-video-player.ad-showing")) return;
+  if (!Number.isFinite(video.currentTime) || video.currentTime < 0) return;
   const t = Math.floor(video.currentTime);
   if (t < 5) return;
-  const info = WAYPOINTS_READ_METADATA();
-  if (lastSaved.id === id && lastSaved.t === t &&
-      lastSaved.channelName === info.channelName && lastSaved.channelUrl === info.channelUrl) return;
+  let info;
+  try { info = WAYPOINTS_PLAYER_RESULTS.metadata(WAYPOINTS_READ_METADATA(id), id); }
+  catch { return; } // Never let an invalid page value corrupt an autosave.
+  if (info.t !== t) return;
   const entry = videos[id];
   if (!entry) return;
-
-  const duration = isFinite(video.duration) ? Math.floor(video.duration) : 0;
+  const lifetime = JSON.stringify(snapshot.records[id].life.v);
+  if (lastSaved.id === id && lastSaved.lifetime === lifetime && lastSaved.t === t &&
+      lastSaved.channelName === info.channelName && lastSaved.channelUrl === info.channelUrl) return;
+  const duration = info.duration;
+  if ((duration || entry.duration) && t > (duration || entry.duration)) return;
   // On YouTube's in-page navigation, the <video> may briefly still hold the
   // previous video. A duration mismatch means it isn't this one yet.
   if (entry.duration && duration && Math.abs(entry.duration - duration) > 2) return;
@@ -77,11 +86,12 @@ async function autosave() {
     ? { channelName: info.channelName, channelUrl: info.channelUrl }
     : {};
   videos[id] = { ...entry, ...channel, t, duration: duration || entry.duration, updated: Date.now() };
-  await api.storage.local.set({ videos });
-  if (generation === importGeneration) lastSaved = { id, t, channelName: info.channelName, channelUrl: info.channelUrl };
+  await WAYPOINTS_STORAGE.save(snapshot);
+  if (generation === importGeneration) lastSaved = { id, t, lifetime, channelName: info.channelName, channelUrl: info.channelUrl };
 }
 
 function tick() {
+  WAYPOINTS_STORAGE.expire().catch(() => {});
   const video = document.querySelector("video");
   if (video && !video.paused) autosave().catch(() => {});
 }

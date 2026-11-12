@@ -6,15 +6,19 @@ const flavor = process.argv[2] || 'firefox';
 const extension = path.resolve(__dirname, '../yt-waypoints-' + flavor);
 const source = fs.readFileSync(path.join(extension, 'popup.js'), 'utf8');
 const playerSource = fs.readFileSync(path.join(extension, 'player.js'), 'utf8');
-async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test', behavior = {}) {
+async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=aaaaaaaaaaa', behavior = {}) {
   const data = structuredClone(initial);
   const listeners = [];
+  const themeListeners = [];
+  const themeMedia = {matches:!!behavior.dark,addEventListener:(event,fn)=>themeListeners.push(fn)};
   let writes = 0;
   let closeCount = 0;
-  let importNumber = 0;
+
   const navigation = [];
   const executions = [];
   const clipboardWrites = [];
+  const downloads = [];
+  const timers = [];
   const doc = { activeElement: null, listeners: {}, addEventListener(t, fn) { this.listeners[t] = fn; } };
   class El {
     constructor(tag = 'div') { this.tag = tag; this.children = []; this.dataset = {}; this.style = {setProperty(name,value){this[name]=value;}}; this.events = {}; this.hidden = false; this.disabled = true; this.value = ''; this.className = ''; this.classList = { contains: n => this.className.split(' ').includes(n), toggle: () => {}, add: () => {}, remove: () => {} }; }
@@ -23,19 +27,27 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
     addEventListener(t, fn) { this.events[t] = fn; }
     setAttribute(k,v) { this[k] = v; }
     append(...els) { for(const el of els) el.parentNode=this; this.children.push(...els); }
+    contains(el) { return el===this || this.children.some(child=>child.contains(el)); }
     remove() { if(this.parentNode) this.parentNode.children=this.parentNode.children.filter(el=>el!==this); }
     replaceChildren(...els) { this.children = els; }
-    querySelectorAll(selector) { return this.children.flatMap(e => [...(selector === '.main' && e.className === 'main' ? [e] : []), ...e.querySelectorAll(selector)]); }
-    querySelector(selector) { return this.querySelectorAll('.main').find(e => selector.includes(`"${e.dataset.id}"`)); }
+    querySelectorAll(selector) { return this.children.flatMap(e => [...((selector === '.main' && e.className === 'main') || (selector === '.bar' && e.className === 'bar') ? [e] : []), ...e.querySelectorAll(selector)]); }
+    querySelector(selector) { return selector === '.bar' ? this.querySelectorAll('.bar')[0] : this.querySelectorAll('.main').find(e => selector.includes(`"${e.dataset.id}"`)); }
     scrollIntoView(options) { this.scrolled = options.block; }
     select() { this.selectionStart=0;this.selectionEnd=this.value.length; }
     setSelectionRange(start,end) { this.selectionStart=start;this.selectionEnd=end; }
     setPointerCapture(id) { this.capturedPointer = id; }
-    focus() { doc.activeElement = this; }
-    click() { this.events.click?.(); }
+    focus() { doc.activeElement = this; this.events.focus?.();doc.listeners.focusin?.({target:this}); }
+    click() { if(this.tag==='a')downloads.push({filename:this.download,href:this.href});this.events.click?.({target:this}); }
   }
-  const ids = ['help-escape','help-dialog','help-toggle','help-close','help-scrub','help-multiplier','copy-videos','include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
+  const ids = ['offer-save-file','file-save-dialog','file-name-fields','file-save-name','file-save-confirm','file-save-cancel','file-save-title','file-save-description','file-save-error','transcript-format-toggle','transcript-format-menu','transcript-format-list','transcript-format-picker','transcript-format-use','transcript-format-description','transcript-format-example','transcript-target','copy-transcript','help-escape','help-dialog','help-toggle','help-close','help-scrub','help-multiplier','copy-videos','include-channel-names','show-thumbnails','shortcut-help','restore-bookmark','list','status','search','search-control','clear-search','hint','options-toggle','options-panel','auto-bookmark','scrub-seconds','shift-multiplier','scrub-value','multiplier-value','shift-preview'];
   const els = Object.fromEntries(ids.map(id => [id,new El()]));
+  for(const id of ['about-toggle','about-dialog','about-close','about-version']) els[id]=new El();
+  els['about-dialog'].showModal=function(){this.open=true;els['about-close'].focus();};
+  for(const id of ['deletion-mode','trash-days','show-trash','empty-trash','trash-count']) els[id]=new El();
+  els['deletion-mode'].tag='select';
+  els['theme-select']=new El('select');
+  doc.documentElement=new El('html');
+  els['file-save-dialog'].showModal=function(){this.open=true;els['file-save-cancel'].focus();};
   els['options-panel'].hidden = true;
   doc.body = new El('body');
   doc.execCommand = command => {
@@ -47,7 +59,8 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   // No runtime or permissions API is supplied: the popup must work without
   // thumbnail consent plumbing on both platforms.
   const browser = {
-    storage: { local: { get: async key => structuredClone({[key]: data[key]}), set: async obj => { writes++; const changes = {}; for (const [k,v] of Object.entries(obj)) { changes[k] = {newValue: structuredClone(v)}; data[k] = structuredClone(v); } for (const fn of listeners) fn(changes, 'local'); } }, onChanged: { addListener: fn => listeners.push(fn) } },
+    runtime: {getManifest:()=>({version:require('../package.json').version})},
+    storage: { local: { get: async key => structuredClone(key == null ? data : Object.fromEntries((Array.isArray(key) ? key : [key]).map(k => [k, data[k]]))), remove: async keys => { if(behavior.failStorageRemove) throw Error('Test cleanup failure'); for (const key of keys) delete data[key]; }, set: async obj => { writes++; const changes = {}; for (const [k,v] of Object.entries(obj)) { changes[k] = {newValue: structuredClone(v)}; data[k] = structuredClone(v); } for (const fn of listeners) fn(changes, 'local'); } }, onChanged: { addListener: fn => listeners.push(fn) } },
     tabs: {
       query: async q => q.active ? [{id:1,windowId:1,url}] : (behavior.tabs || []),
       update: async (id,changes) => {
@@ -62,22 +75,37 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
     windows:{update:async(id,changes)=>navigation.push({type:'window',id,...changes})},
     scripting: { executeScript: async request => {
       executions.push({operation:request.func.name,args:Array.from(request.args||[]),tabId:request.target.tabId});
-      if(behavior.executeScript) return behavior.executeScript(request,data);
-      return [{ result: behavior.metadata || {id:'test',t:100,duration:1000,title:'Test video'} }];
+      if(behavior.executeScript) {
+        const responses = await behavior.executeScript(request,data);
+        return Array.isArray(responses) ? responses.map(response=>({frameId:0,...response})) : responses;
+      }
+      if(request.func.name==='WAYPOINTS_READ_METADATA' || request.func === context.WAYPOINTS_READ_METADATA) return [{frameId:0,result:behavior.metadata || {id:'aaaaaaaaaaa',t:100,duration:1000,title:'Test video'}}];
+      return [{frameId:0,result:{id:request.args.at(-1),t:100,duration:1000,paused:true}}];
     } },
   };
-  const context = vm.createContext({ [flavor === "chrome" ? "chrome" : "browser"]: browser, document:doc, window:{close(){closeCount++;}}, crypto:{randomUUID:()=>"import-"+(++importNumber)}, navigator:{clipboard:{writeText:async text=>{
+  const context = vm.createContext({ [flavor === "chrome" ? "chrome" : "browser"]: browser, matchMedia:()=>themeMedia, document:doc, window:{close(){closeCount++;}}, crypto:{randomUUID:require('node:crypto').randomUUID}, navigator:{clipboard:{writeText:async text=>{
     if(behavior.failClipboard)throw Error('Clipboard unavailable');clipboardWrites.push(text);
-  }}}, URL, URLSearchParams, CSS:{escape:s=>s}, console });
+  }}}, URL, URLSearchParams, Blob, setTimeout:fn=>timers.push(fn), CSS:{escape:s=>s}, console });
+  vm.runInContext(fs.readFileSync(path.join(extension, 'theme.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(extension, "platform.js"), "utf8"), context);
   vm.runInContext(fs.readFileSync(path.join(extension, 'transfer.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(extension, 'storage.js'), 'utf8'), context);
   vm.runInContext(fs.readFileSync(path.join(extension, 'metadata.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(extension, 'transcript-reader.js'), 'utf8'), context);
   vm.runInContext(playerSource, context);
+  vm.runInContext(fs.readFileSync(path.join(extension, 'player-results.js'), 'utf8'), context);
+  vm.runInContext(fs.readFileSync(path.join(extension, 'transcript.js'), 'utf8'), context);
   vm.runInContext(source, context);
-  const settle = async () => { for(let i=0;i<40;i++) await Promise.resolve(); };
+  const settle = async () => { for(let i=0;i<100;i++) await Promise.resolve(); };
   await settle();
   assert.equal(els.search.disabled, false, els.status.textContent);
-  return {data,els,doc,context,settle,navigation,executions,clipboardWrites,closed:()=>closeCount,writes:()=>writes,
+  return {get data() {
+    const snapshot = context.WAYPOINTS_STORAGE.decode(data);
+    return { ...structuredClone(data),
+      videos: data.videos || Object.keys(snapshot.videos).length || Object.keys(data).some(key=>key.startsWith('waypoints.bookmarks.v2:')) ? JSON.parse(JSON.stringify(snapshot.videos)) : undefined,
+      ...(snapshot.importedPositions ? {importedPositions: snapshot.importedPositions} : {}) };
+  },els,doc,context,settle,navigation,executions,clipboardWrites,downloads,timers,closed:()=>closeCount,writes:()=>writes,
+    systemTheme(dark){themeMedia.matches=dark;themeListeners.forEach(fn=>fn());},
     async paste(text) {
       let prevented=false;
       doc.listeners.paste({clipboardData:{getData:()=>text},preventDefault(){prevented=true;}});
@@ -87,12 +115,50 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
 }
 (async () => {
   console.log('Popup target:', flavor);
+  const themed=await popup({settings:{autoBookmark:false},videos:{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Keep me',t:42}}},'https://example.com/',{dark:true});
+  assert.equal(themed.els['theme-select'].value,'system');
+  assert.equal(themed.doc.documentElement.dataset.theme,'dark');
+  themed.systemTheme(false);assert.equal(themed.doc.documentElement.dataset.theme,'light');
+  themed.els['options-toggle'].click();themed.els['theme-select'].focus();
+  for(const key of ['h','t','C','ArrowDown'])themed.doc.listeners.keydown({key,preventDefault(){throw Error('native theme select intercepted');}});
+  themed.els['theme-select'].value='light';themed.els['theme-select'].events.change();await themed.settle();
+  assert.equal(themed.data.settings.theme,'light');themed.systemTheme(true);
+  assert.equal(themed.doc.documentElement.dataset.theme,'light','explicit choice ignores system changes');
+  themed.els['theme-select'].value='dark';themed.els['theme-select'].events.change();await themed.settle();
+  const themeReopen=await popup(themed.data,'https://example.com/');
+  assert.equal(themeReopen.doc.documentElement.dataset.theme,'dark');
+  assert.deepEqual(themed.data.videos,{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Keep me',t:42}},'theme selection never changes bookmarks');
+  themed.els['auto-bookmark'].checked=true;themed.els['auto-bookmark'].events.change();await themed.settle();
+  assert.equal(themed.data.settings.theme,'dark','other settings preserve selected theme');
+  const invalidTheme=await popup({settings:{autoBookmark:false,theme:'unknown'}},'https://example.com/');
+  assert.equal(invalidTheme.els['theme-select'].value,'system');
+  console.log('PASS: system/light/dark themes, live system changes, persisted overrides, native select keys, bookmark/settings preservation');
   const initial = {settings:{autoBookmark:false}, videos:{
     a:{id:'a',title:'Dario and Daniela',t:100,updated:3},
     b:{id:'b',title:'Making Videos in Resolve',t:50,updated:2},
     c:{id:'c',title:'Video animation tips',t:20,updated:1},
   }};
   let p=await popup(initial);
+  const about=await popup(initial);
+  about.els['about-toggle'].click();
+  assert.equal(about.els['about-dialog'].open,true);
+  assert.equal(about.els['about-version'].textContent,`Version ${require('../package.json').version}`);
+  assert.equal(about.doc.activeElement,about.els['about-close']);
+  const aboutWrites=about.writes();
+  for(const key of ['Delete','t','T','C','h','ArrowRight']) {
+    about.doc.listeners.keydown({key,preventDefault(){throw Error('About invoked a background shortcut');}});
+  }
+  assert.equal(await about.paste('https://www.youtube.com/watch?v=abcdefghijk'),false);
+  assert.equal(about.writes(),aboutWrites);
+  assert.equal(about.clipboardWrites.length,0);
+  assert.equal(about.navigation.length,0);
+  about.els['about-close'].click();
+  assert.equal(about.els['about-dialog'].open,false);
+  assert.equal(about.doc.activeElement,about.els['about-toggle']);
+  about.els['about-toggle'].click();
+  about.els['about-dialog'].events.cancel({preventDefault(){}});
+  assert.equal(about.els['about-dialog'].open,false);
+  console.log('PASS: About displays manifest version, isolates shortcuts/paste, closes and restores focus');
   p.doc.listeners.keydown({key:"/",preventDefault(){}});
   const rows=()=>p.els.list.querySelectorAll('.main').map(e=>e.dataset.id);
   assert.deepEqual(rows(),['a','b','c']);
@@ -128,11 +194,11 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   p.els['options-toggle'].click();
   assert.equal(p.els['search-control'].hidden,false);
   assert.equal(p.els.search.value,'Dario');assert.deepEqual(rows(),['a']);
-  p.data.videos.a.title='Renamed title';await vm.runInContext('render()',p.context);
+  await vm.runInContext('(async () => { const videos = await loadVideos(); videos.a.title = "Renamed title"; await saveVideos(videos); await render(); })()', p.context);
   assert.deepEqual(rows(),[],'storage refresh must keep applying current search');
   console.log('PASS: options hide search, restore query/filter, storage refresh respects search');
-  p=await popup();assert.equal(p.data.videos.test.t,100);
-  assert.equal(p.doc.activeElement.dataset.id,'test');
+  p=await popup();assert.equal(p.data.videos.aaaaaaaaaaa.t,100);
+  assert.equal(p.doc.activeElement.dataset.id,'aaaaaaaaaaa');
   assert.equal(p.doc.activeElement.scrolled,'nearest');
   let prevented=false;
   p.doc.listeners.keydown({key:'/',preventDefault(){prevented=true;}});
@@ -148,9 +214,9 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(p.doc.activeElement,firstRow);
   p.els['options-toggle'].click();
   console.log('PASS: slash focuses search; slash typing, modifier shortcuts, and options mode remain unaffected');
-  const existing=await popup({settings:{autoBookmark:false},videos:{test:{id:'test',title:'Current',t:70,updated:1},other:{id:'other',title:'Newer',t:10,updated:2}}});
-  assert.equal(existing.doc.activeElement.dataset.id,'test');
-  assert.equal(existing.data.videos.test.t,70);
+  const existing=await popup({settings:{autoBookmark:false},videos:{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Current',t:70,updated:1},other:{id:'other',title:'Newer',t:10,updated:2}}});
+  assert.equal(existing.doc.activeElement.dataset.id,'aaaaaaaaaaa');
+  assert.equal(existing.data.videos.aaaaaaaaaaa.t,70);
   const unsaved=await popup({settings:{autoBookmark:false}});
   assert.equal(unsaved.doc.activeElement,unsaved.els['restore-bookmark']);
   assert.equal(unsaved.els['restore-bookmark'].hidden,false);
@@ -159,7 +225,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   unsaved.els['options-toggle'].click();assert.equal(unsaved.els['restore-bookmark'].hidden,true);
   unsaved.els['options-toggle'].click();assert.equal(unsaved.els['restore-bookmark'].hidden,false);
   unsaved.els['restore-bookmark'].click();await unsaved.settle();
-  assert.equal(unsaved.data.videos.test.t,100);
+  assert.equal(unsaved.data.videos.aaaaaaaaaaa.t,100);
   assert.equal(unsaved.data.settings.autoBookmark,false);
   assert.equal(unsaved.els['restore-bookmark'].hidden,true);
   assert.equal(unsaved.els['search-control'].hidden,false);
@@ -184,22 +250,176 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(nonVideo.doc.activeElement,nonVideo.els.search);
   console.log('PASS: bookmarked row focused/scrolled; unsaved video gets manual action; non-video page gets search');
   p.els.search.value='no match';p.els.search.events.input();
-  assert.equal(p.data.videos.test.t,100);
+  assert.equal(p.data.videos.aaaaaaaaaaa.t,100);
   console.log('PASS: default auto-bookmark retained');
-  const scrubber=await popup({settings:{autoBookmark:false,scrubSeconds:7,shiftMultiplier:4},videos:{test:{id:'test',title:'Saved',t:100,duration:1000,updated:1}}});
+  const scrubber=await popup({settings:{autoBookmark:false,scrubSeconds:7,shiftMultiplier:4},videos:{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Saved',t:100,duration:1000,updated:1}}});
   scrubber.doc.listeners.keydown({key:'ArrowRight',preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,107);
+  assert.equal(scrubber.data.videos.aaaaaaaaaaa.t,107);
   scrubber.doc.listeners.keydown({key:'ArrowLeft',shiftKey:true,preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,79);
-  scrubber.doc.listeners.keydown({key:'>',preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,86);
-  scrubber.doc.listeners.keydown({key:'<',shiftKey:true,preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,58);
-  scrubber.doc.listeners.keydown({key:'.',preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,65);
-  scrubber.doc.listeners.keydown({key:',',preventDefault(){}});await scrubber.settle();
-  assert.equal(scrubber.data.videos.test.t,58);
+  assert.equal(scrubber.data.videos.aaaaaaaaaaa.t,79);
+  for (const key of ['>', '<', '.', ',']) {
+    scrubber.doc.listeners.keydown({key,preventDefault(){}});await scrubber.settle();
+    assert.equal(scrubber.data.videos.aaaaaaaaaaa.t,79,'frame/rate controls never change a closed video resume point');
+    assert.match(scrubber.els.status.textContent,/Open this video/);
+  }
   console.log('PASS: ordinary popup uses saved arrow scrub distance and Shift multiplier');
+  const controlsId='abcdefghijk';
+  const timedTranscript={id:controlsId,complete:true,source:'youtube-transcript-response',language:'English',segments:[{start:0,end:5,text:'First line'},{start:90,end:95,text:'Second line'}],duration:100};
+  let transcriptResult=timedTranscript;
+  const controls=await popup({settings:{autoBookmark:false},videos:{[controlsId]:{id:controlsId,title:'Saved',t:100,duration:1000,updated:1}}},'https://example.com/',{
+    tabs:[{id:7,url:`https://www.youtube.com/watch?v=${controlsId}`}],
+    executeScript:async request=>{
+      if(request.func.name==='transcript') return [{result:transcriptResult}];
+      assert.equal(request.world,'MAIN');
+      return [{result:request.args[0]==='rate'?{id:controlsId,rate:1.25}:{id:controlsId,t:101,duration:1000,paused:true,fps:60}}];
+    },
+  });
+  const controlKey=async(key,extra={})=>{
+    controls.doc.listeners.keydown({key,preventDefault(){},...extra});await controls.settle();
+  };
+  controls.els.list.querySelectorAll('.main')[0].focus();
+  for (const [key,extra,action,direction] of [[',',{},'frame',-1],['.',{},'frame',1],['<',{},'rate',-1],['>',{},'rate',1],[',',{shiftKey:true},'rate',-1],['.',{shiftKey:true},'rate',1]]) {
+    await controlKey(key,extra);
+    assert.deepEqual(controls.executions.at(-1),{operation:'playback',args:[action,direction,controlsId],tabId:7});
+  }
+  await controlKey('T',{shiftKey:true});
+  assert.match(controls.clipboardWrites.at(-1),/\[1:30\]\(https:\/\/www.youtube.com\/watch\?v=abcdefghijk&t=90s\) · Second line/);
+  assert.equal(controls.els['offer-save-file'].checked,false);
+  assert.ok(!controls.els['file-save-dialog'].open,'default does not offer a file');
+  assert.notEqual(controls.data.settings.showThumbnails,false,'uppercase T must not toggle thumbnails');
+  const executionCount=controls.executions.length;
+  for (const extra of [{repeat:true},{ctrlKey:true},{metaKey:true},{altKey:true}]) await controlKey('T',extra);
+  assert.equal(controls.executions.length,executionCount);
+  controls.els.search.focus();
+  for(const key of ['T',',','.','<','>']) await controlKey(key,{preventDefault(){throw Error('search intercepted');}});
+  assert.equal(controls.executions.length,executionCount);
+  controls.els.list.querySelectorAll('.main')[0].focus();
+  await controlKey('h');await controlKey('T');assert.equal(controls.executions.length,executionCount);
+  await controlKey('h');
+  const transcriptCopies=controls.clipboardWrites.length;
+  for(const result of [{error:'No transcript available.'},{text:''},null]) {
+    transcriptResult=result;await controlKey('T');
+    assert.equal(controls.clipboardWrites.length,transcriptCopies,'unavailable transcript preserves clipboard');
+    assert.match(controls.els.status.textContent,/transcript/);
+  }
+  scrubber.doc.listeners.keydown({key:'T',preventDefault(){}});await scrubber.settle();
+  assert.match(scrubber.els.status.textContent,/Open this video/);assert.equal(scrubber.clipboardWrites.length,0);
+  console.log('PASS: frame/speed shortcut routing, open-tab requirement, uppercase transcript copy, repeats/modifiers/search/help guards');
+  for (const [result,message] of [[{error:new Error('Permission denied to page method')},'Permission denied to page method'],[{},'returned no result']]) {
+    const failure=await popup({settings:{autoBookmark:false}},'https://example.com/',{executeScript:async()=>[result]});
+    const response=await vm.runInContext('inPlayer(7,"playback",["frame",1,"abcdefghijk"])',failure.context);
+    assert.ok(response.error.includes(message),'injection failures must retain an actionable reason');
+  }
+  let worldAttempts=[];
+  const compatibility=await popup({settings:{autoBookmark:false}},'https://example.com/',{executeScript:async request=>{
+    worldAttempts.push(request.world);
+    if(request.world==='MAIN')throw Error('Invalid value MAIN for world: unsupported world');
+    return [{result:{id:request.args[2],rate:1.25}}];
+  }});
+  const compatibilityResult=await vm.runInContext('inPlayer(7,"playback",["rate",1,"abcdefghijk"])',compatibility.context);
+  if(flavor==='firefox') {
+    assert.equal(compatibilityResult.rate,1.25);assert.deepEqual(worldAttempts,['MAIN',undefined]);
+  } else {
+    assert.match(compatibilityResult.error,/Invalid value/);assert.deepEqual(worldAttempts,['MAIN']);
+  }
+
+  transcriptResult=timedTranscript;
+  controls.els['options-toggle'].click();
+  assert.match(controls.els['transcript-target'].textContent,/Saved/);
+  controls.els['transcript-format-toggle'].click();
+  assert.equal(controls.els['transcript-format-menu'].hidden,false);
+  const choices=controls.els['transcript-format-list'].children;
+  assert.equal(choices.length,7);
+  const currentLabel=controls.els['transcript-format-toggle'].textContent;
+  choices[4].events.mouseenter();
+  assert.match(controls.els['transcript-format-use'].textContent,/Subtitle editors/);
+  assert.equal(controls.els['transcript-format-toggle'].textContent,currentLabel,'hover previews without committing');
+  await controlKey('Escape');
+  assert.equal(controls.els['transcript-format-menu'].hidden,true);
+  assert.equal(controls.doc.activeElement,controls.els['transcript-format-toggle']);
+  controls.els['transcript-format-toggle'].click();
+  await controlKey('End');
+  assert.match(controls.els['transcript-format-use'].textContent,/Scripts/);
+  await controlKey('Enter');
+  assert.equal(controls.data.settings.transcriptFormat,'json');
+  assert.equal(controls.els['transcript-format-menu'].hidden,true);
+  controls.els['copy-transcript'].click();await controls.settle();
+  assert.equal(JSON.parse(controls.clipboardWrites.at(-1)).segments[1].end,95);
+  controls.els['offer-save-file'].checked=true;
+  controls.els['offer-save-file'].events.change();await controls.settle();
+  assert.equal(controls.data.settings.offerSaveFile,true);
+  controls.els['copy-transcript'].click();await controls.settle();
+  assert.equal(controls.els['file-save-dialog'].open,true);
+  assert.equal(controls.downloads.length,0,'offering never downloads automatically');
+  assert.equal(controls.els['file-name-fields'].hidden,true);
+  const beforeSaveCopy=controls.clipboardWrites.at(-1);
+  controls.els['file-save-confirm'].click();
+  assert.equal(controls.doc.activeElement,controls.els['file-save-name']);
+  controls.els['file-save-name'].value='../bad';controls.els['file-save-confirm'].click();
+  assert.equal(controls.downloads.length,0);assert.match(controls.els['file-save-error'].textContent,/filename/);
+  controls.els['file-save-name'].value='my-transcript';controls.els['file-save-confirm'].click();
+  assert.equal(controls.downloads.at(-1).filename,'my-transcript.json');
+  assert.equal(controls.clipboardWrites.at(-1),beforeSaveCopy,'saving never replaces clipboard');
+  const jsonFile=await (await fetch(controls.downloads.at(-1).href)).text();
+  assert.equal(JSON.parse(jsonFile).video.id,controlsId);
+  assert.equal(controls.els['file-save-dialog'].open,false);
+  controls.els['copy-videos'].click();await controls.settle();
+  const allVideosCopy=controls.clipboardWrites.at(-1);
+  assert.equal(JSON.parse(allVideosCopy).format,'yt-waypoints');
+  assert.equal(controls.els['file-save-dialog'].open,true,'global JSON uses the same offer toggle');
+  assert.match(controls.els['file-save-name'].value,/^yt-waypoints-bookmarks-.*\.json$/);
+  controls.els['file-save-cancel'].click();
+  assert.equal(controls.clipboardWrites.at(-1),allVideosCopy);assert.equal(controls.downloads.length,1);
+  controls.els['copy-videos'].click();await controls.settle();
+  controls.els['file-save-confirm'].click();
+  controls.els['file-save-name'].value='all-videos.json';controls.els['file-save-confirm'].click();
+  const savedBookmarks=await (await fetch(controls.downloads.at(-1).href)).text();
+  assert.equal(savedBookmarks,controls.clipboardWrites.at(-1),'saved global JSON exactly matches clipboard');
+  controls.els['copy-videos'].click();await controls.settle();
+  const duringPrompt=controls.clipboardWrites.length;
+  await controlKey('C');await controlKey('t');
+  assert.equal(controls.clipboardWrites.length,duringPrompt,'save dialog blocks background shortcuts');
+  await controls.paste('{bad');assert.equal(controls.clipboardWrites.length,duringPrompt);
+  await controlKey('Escape');assert.equal(controls.els['file-save-dialog'].open,false);
+  controls.els['copy-videos'].click();await controls.settle();
+  const failedSaveCopy=controls.clipboardWrites.at(-1);
+  controls.els['file-save-confirm'].click();
+  controls.context.Blob=class { constructor(){throw Error('Download unavailable');} };
+  controls.els['file-save-confirm'].click();
+  assert.equal(controls.els['file-save-dialog'].open,true);
+  assert.match(controls.els['file-save-error'].textContent,/clipboard copy is unchanged/);
+  assert.equal(controls.clipboardWrites.at(-1),failedSaveCopy);
+  controls.context.Blob=Blob;
+  controls.els['file-save-cancel'].click();
+  controls.els['options-toggle'].click();
+  controls.els.list.querySelectorAll('.main')[0].focus();
+  await controlKey('c');assert.equal(controls.els['file-save-dialog'].open,false,'single-row copy is outside the global JSON offer');
+  await controlKey('C');assert.equal(controls.els['file-save-dialog'].open,true,'uppercase C offers the all-bookmark file');
+  controls.els['file-save-cancel'].click();
+  controls.els['options-toggle'].click();
+  controls.els['offer-save-file'].checked=false;controls.els['offer-save-file'].events.change();await controls.settle();
+  controls.els['copy-videos'].click();await controls.settle();
+  assert.equal(controls.els['file-save-dialog'].open,false,'turning the shared option off suppresses JSON offers');
+  controls.els['copy-transcript'].click();await controls.settle();
+  assert.equal(controls.els['file-save-dialog'].open,false,'turning the shared option off suppresses transcript offers');
+  controls.els['offer-save-file'].checked=true;controls.els['offer-save-file'].events.change();await controls.settle();
+  const reopenedFormats=await popup(controls.data,'https://example.com/');
+  assert.equal(reopenedFormats.els['transcript-format-toggle'].textContent,'JSON with timed segments');
+  assert.equal(reopenedFormats.els['offer-save-file'].checked,true);
+  const invalidFormat=await popup({settings:{autoBookmark:false,transcriptFormat:'bad'}},'https://example.com/');
+  assert.equal(invalidFormat.els['transcript-format-toggle'].textContent,'Markdown with linked timestamps');
+  invalidFormat.els['options-toggle'].click();assert.equal(invalidFormat.els['copy-transcript'].disabled,true);
+  const failedClipboard=await popup({settings:{autoBookmark:false,offerSaveFile:true},videos:{[controlsId]:{id:controlsId,title:'Saved',t:0}}},'https://example.com/',{
+    tabs:[{id:7,url:`https://www.youtube.com/watch?v=${controlsId}`}],failClipboard:true,failLegacyClipboard:true,
+    executeScript:async()=>[{result:timedTranscript}],
+  });
+  failedClipboard.els['copy-videos'].click();await failedClipboard.settle();
+  assert.ok(!failedClipboard.els['file-save-dialog'].open);assert.match(failedClipboard.els.status.textContent,/Could not copy JSON/);
+  failedClipboard.els.list.querySelectorAll('.main')[0].focus();
+  failedClipboard.doc.listeners.keydown({key:'T',preventDefault(){}});await failedClipboard.settle();
+  assert.ok(!failedClipboard.els['file-save-dialog'].open);assert.match(failedClipboard.els.status.textContent,/Could not copy transcript/);
+  for(const timer of controls.timers)timer();
+  console.log('PASS: default linked Markdown, dropdown hover/focus, keyboard commit/Escape, persistent preferences, transcript/global JSON clipboard-first offers, filename validation, downloads and cancellation');
   const undo=await popup(initial);
   await vm.runInContext('deleteVideo("b")',undo.context);
   assert.equal(undo.els['restore-bookmark'].hidden,false);
@@ -215,7 +435,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   undo.els['restore-bookmark'].click();await undo.settle();
   assert.equal(undo.data.videos.b,undefined);assert.deepEqual(undo.data.videos.c,initial.videos.c);
   await vm.runInContext('deleteVideo("c")',undo.context);
-  undo.data.videos.c={...initial.videos.c,t:999};
+  await vm.runInContext('(async () => { const videos = await loadVideos(); videos.c = { id: "c", title: "Video animation tips", t: 999, updated: 1 }; await saveVideos(videos); })()', undo.context);
   undo.els['restore-bookmark'].click();await undo.settle();
   assert.equal(undo.data.videos.c.t,999,'undo must not overwrite a newly saved entry');
   console.log('PASS: deletion shows restore button, undo preserves original bookmark, latest deletion wins, slash returns to search, options hide button, newer saves preserved');
@@ -344,22 +564,22 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   channels.els['include-channel-names'].events.change();await channels.settle();
   assert.deepEqual(channelRows(),['a','b']);
   assert.deepEqual(channels.data.videos,channelData.videos,'search preference never edits bookmarks');
-  const legacy={settings:{autoBookmark:false},videos:{test:{id:'test',title:'Original title',t:42,duration:1000,updated:123}}};
-  const metadata={id:'test',title:'Page title',t:900,duration:1000,channelName:'Bloomberg',channelUrl:'https://www.youtube.com/@Bloomberg'};
+  const legacy={settings:{autoBookmark:false},videos:{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Original title',t:42,duration:1000,updated:123}}};
+  const metadata={id:'aaaaaaaaaaa',title:'Page title',t:900,duration:1000,channelName:'Bloomberg',channelUrl:'https://www.youtube.com/@Bloomberg'};
   const enriched=await popup(legacy,undefined,{metadata});
-  assert.equal(enriched.data.videos.test.channelName,'Bloomberg');
-  assert.equal(enriched.data.videos.test.t,42);assert.equal(enriched.data.videos.test.updated,123);
-  assert.equal(enriched.data.videos.test.title,'Original title');
+  assert.equal(enriched.data.videos.aaaaaaaaaaa.channelName,'Bloomberg');
+  assert.equal(enriched.data.videos.aaaaaaaaaaa.t,42);assert.equal(enriched.data.videos.aaaaaaaaaaa.updated,123);
+  assert.equal(enriched.data.videos.aaaaaaaaaaa.title,'Original title');
   assert.equal(enriched.writes(),1);
   const present=await popup(enriched.data,undefined,{metadata});assert.equal(present.writes(),0);
-  const unavailable=await popup(enriched.data);assert.equal(unavailable.data.videos.test.channelName,'Bloomberg');
+  const unavailable=await popup(enriched.data);assert.equal(unavailable.data.videos.aaaaaaaaaaa.channelName,'Bloomberg');
   const wrong=await popup(legacy,undefined,{metadata:{...metadata,id:'previous'}});
-  assert.equal(wrong.data.videos.test.channelName,undefined);assert.equal(wrong.writes(),0);
+  assert.equal(wrong.data.videos.aaaaaaaaaaa.channelName,undefined);assert.equal(wrong.writes(),0);
   const newBookmark=await popup({settings:{autoBookmark:false}},undefined,{metadata});
   newBookmark.els['restore-bookmark'].click();await newBookmark.settle();
-  assert.equal(newBookmark.data.videos.test.channelName,'Bloomberg');
+  assert.equal(newBookmark.data.videos.aaaaaaaaaaa.channelName,'Bloomberg');
   console.log('PASS: case-insensitive title/channel search, default on, persisted off toggle, missing channel tolerated, channel capture/backfill preserves saved time and recency');
-  const seekData={settings:{autoBookmark:false,scrubSeconds:7,shiftMultiplier:4},videos:{test:{id:'test',title:'Scrub me',t:100,duration:1000,updated:123}}};
+  const seekData={settings:{autoBookmark:false,scrubSeconds:7,shiftMultiplier:4},videos:{aaaaaaaaaaa:{id:'aaaaaaaaaaa',title:'Scrub me',t:100,duration:1000,updated:123}}};
   const drag=await popup(seekData,'https://example.com/');
   const findSlider=()=>{
     const walk=el=>el.className==='bar'?el:el.children.map(walk).find(Boolean);
@@ -369,39 +589,96 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   let stopped=false;slider.events.click({stopPropagation(){stopped=true;}});assert.equal(stopped,true);
   slider.events.pointerdown({button:0,pointerId:1,stopPropagation(){}});
   slider.value='650';slider.events.input();
-  assert.equal(drag.data.videos.test.t,100,'drag only previews before release');assert.equal(drag.writes(),0);
+  assert.equal(drag.data.videos.aaaaaaaaaaa.t,100,'drag only previews before release');assert.equal(drag.writes(),0);
   assert.equal(slider.style['--progress'],'65%');
-  drag.data.videos.extra={id:'extra',title:'Concurrent bookmark',t:5,duration:60,updated:1};
-  drag.data.videos.test.t=105;
+  await vm.runInContext('(async () => { const videos = await loadVideos(); videos.extra = {id: "extra",title: "Concurrent bookmark",t:5,duration:60,updated:1}; videos.aaaaaaaaaaa.t = 105; await saveVideos(videos); })()', drag.context);
+  const writesBeforeDragCommit = drag.writes();
   await vm.runInContext('render()',drag.context);
   assert.equal(findSlider(),slider,'autosave rerender keeps the native dragging element');
   assert.equal(slider.value,'650');
   slider.events.pointerup();slider.events.change();await drag.settle();
-  assert.equal(drag.data.videos.test.t,650);assert.equal(drag.data.videos.test.updated,123);
-  assert.equal(drag.writes(),1,'pointerup/change commits once');assert.ok(drag.data.videos.extra);
+  assert.equal(drag.data.videos.aaaaaaaaaaa.t,650);assert.equal(drag.data.videos.aaaaaaaaaaa.updated,123);
+  assert.equal(drag.writes(),writesBeforeDragCommit+1,'pointerup/change commits once');assert.ok(drag.data.videos.extra);
   assert.equal(drag.navigation.length,0);assert.equal(drag.closed(),0);
   slider=findSlider();slider.events.pointerdown({button:0,pointerId:2,stopPropagation(){}});
   slider.value='850';slider.events.input();slider.events.pointercancel();slider.events.change();await drag.settle();
-  assert.equal(drag.data.videos.test.t,650,'cancelled drag restores original saved position');
-  assert.equal(findSlider().value,'650');assert.equal(drag.writes(),1);
+  assert.equal(drag.data.videos.aaaaaaaaaaa.t,650,'cancelled drag restores original saved position');
+  assert.equal(findSlider().value,'650');assert.equal(drag.writes(),writesBeforeDragCommit+1);
   slider=findSlider();slider.events.pointerdown({button:0,pointerId:3,stopPropagation(){}});slider.events.pointerup();await drag.settle();
-  assert.equal(drag.writes(),1,'clicking an unchanged position cannot freeze rendering or write');
+  assert.equal(drag.writes(),writesBeforeDragCommit+1,'clicking an unchanged position cannot freeze rendering or write');
   slider=findSlider();slider.focus();slider.events.keydown({key:'ArrowRight',shiftKey:true,preventDefault(){},stopPropagation(){}});await drag.settle();
-  assert.equal(drag.data.videos.test.t,678,'slider keyboard follows configured Shift multiplier');
+  assert.equal(drag.data.videos.aaaaaaaaaaa.t,678,'slider keyboard follows configured Shift multiplier');
   const live=await popup(seekData,'https://example.com/',{
-    tabs:[{id:7,windowId:1,url:'https://www.youtube.com/watch?v=test'}],
+    tabs:[{id:7,windowId:1,url:'https://www.youtube.com/watch?v=aaaaaaaaaaa'}],
     executeScript:async(request,data)=>{
       data.videos.late={id:'late',title:'Added while seeking',t:2,duration:50};
-      return [{result:{t:750,duration:1000,paused:true}}];
+      return [{result:{id:'aaaaaaaaaaa',t:750,duration:1000,paused:true}}];
     },
   });
   const liveSlider=live.els.list.querySelectorAll('.main')[0].children.find(c=>c.className==='details').children.find(c=>c.className==='bar');
   liveSlider.value='750';liveSlider.events.input();liveSlider.events.change();await live.settle();
-  assert.equal(live.data.videos.test.t,750);assert.ok(live.data.videos.late);
-  assert.deepEqual(live.executions.at(-1),{operation:'seekTo',args:[750],tabId:7});
+  assert.equal(live.data.videos.aaaaaaaaaaa.t,750);assert.ok(live.data.videos.late);
+  assert.deepEqual(live.executions.at(-1),{operation:'seekTo',args:[750,'aaaaaaaaaaa'],tabId:7});
   assert.equal(live.navigation.length,0);assert.equal(live.closed(),0);
   assert.ok(live.els.status.textContent.includes('Paused'));
   console.log('PASS: drag preview/commit/cancel, no row-open click, active drag survives autosave, single commit, configured keyboard steps, live seek and saved-only seek preserve other bookmarks');
+  // Deliver the same key through document capture and then the focused target.
+  // Calling only slider.events.keydown misses the original duplicate-seek bug.
+  async function dispatchKey(popup, target, key, extra = {}) {
+    let stopped = false;
+    const event = { key, target, defaultPrevented: false,
+      preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() { stopped = true; }, ...extra };
+    target.focus();
+    popup.doc.listeners.keydown(event);
+    if (!stopped) target.events.keydown?.(event);
+    await popup.settle();
+    return event;
+  }
+  const barOf = popup => {
+    const walk = element => element.className === 'bar' ? element : element.children.map(walk).find(Boolean);
+    return walk(popup.els.list);
+  };
+  for (const [key, shiftKey, expected] of [
+    ['ArrowRight', false, 107], ['ArrowLeft', false, 93],
+    ['ArrowRight', true, 128], ['ArrowLeft', true, 72],
+  ]) {
+    const keyboardSlider = await popup(seekData, 'https://example.com/', {
+      tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' }],
+      executeScript: async request => [{ result: {
+        id: 'aaaaaaaaaaa', t: request.func.name === 'seek' ? 700 + request.args[0] : request.args[0],
+        duration: 1000, paused: true,
+      } }],
+    });
+    const event = await dispatchKey(keyboardSlider, barOf(keyboardSlider), key, { shiftKey });
+    assert.deepEqual(keyboardSlider.executions.map(call => call.operation), ['seekTo'], 'one slider arrow must issue exactly one absolute seek');
+    assert.deepEqual(keyboardSlider.executions[0].args, [expected,'aaaaaaaaaaa']);
+    assert.equal(keyboardSlider.data.videos.aaaaaaaaaaa.t, expected);
+    assert.equal(keyboardSlider.writes(), 1);
+    assert.equal(event.defaultPrevented, true, 'prevent the native extra range step');
+    assert.equal(keyboardSlider.doc.activeElement, barOf(keyboardSlider), 'keep keyboard focus on the updated slider');
+    await dispatchKey(keyboardSlider, keyboardSlider.doc.activeElement, key, { shiftKey, repeat: true });
+    assert.deepEqual(keyboardSlider.executions.map(call => call.operation), ['seekTo', 'seekTo']);
+  }
+  const guardedSlider = await popup(seekData, 'https://example.com/');
+  for (const extra of [{ ctrlKey: true }, { altKey: true }, { metaKey: true }, { isComposing: true }]) {
+    const event = await dispatchKey(guardedSlider, barOf(guardedSlider), 'ArrowRight', extra);
+    assert.equal(event.defaultPrevented, false, 'modified/composition keys remain native');
+  }
+  assert.equal(guardedSlider.writes(), 0);
+  assert.equal(guardedSlider.data.videos.aaaaaaaaaaa.t, 100);
+  const closedSlider = await popup(seekData, 'https://example.com/');
+  await dispatchKey(closedSlider, barOf(closedSlider), 'ArrowRight', { shiftKey: true });
+  assert.equal(closedSlider.data.videos.aaaaaaaaaaa.t, 128);
+  assert.equal(closedSlider.writes(), 1);
+  assert.equal(closedSlider.executions.length, 0);
+  const rowArrows = await popup(seekData, 'https://example.com/', {
+    tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=aaaaaaaaaaa' }],
+    executeScript: async () => [{ result: { id: 'aaaaaaaaaaa', t: 707, duration: 1000, paused: true } }],
+  });
+  await dispatchKey(rowArrows, rowArrows.els.list.querySelectorAll('.main')[0], 'ArrowRight');
+  assert.deepEqual(rowArrows.executions.map(call => call.operation), ['seek'], 'row arrows retain relative playback scrubbing');
+  console.log('PASS: capture/target keyboard ownership, one seek per slider arrow, Shift/repeat/focus, native modifier/composition keys, closed-video updates, and row-relative arrows');
   const a='aaaaaaaaaaa',b='bbbbbbbbbbb',c='ccccccccccc',d='ddddddddddd';
   const record=(id,t,updated)=>({id,title:'Video '+id,t,duration:1000,updated});
   const local={settings:{autoBookmark:false,showThumbnails:false,includeChannelNames:false},videos:{[a]:record(a,10,100),[b]:record(b,80,300),[d]:record(d,1,9)}};
@@ -514,7 +791,7 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
   assert.equal(JSON.stringify(strict.data),stored);assert.equal(strict.writes(),strictWrites);
   const activeImport=await popup({settings:{autoBookmark:false},videos:{[a]:record(a,85,1793659999999)}},'https://example.com/',{
     tabs:[{id:7,windowId:1,url:'https://www.youtube.com/watch?v='+a}],
-    executeScript:async()=>[{result:{t:796,duration:1000,paused:true}}],
+    executeScript:async()=>[{result:{id:a,t:796,duration:1000,paused:true}}],
   });
   await activeImport.paste(JSON.stringify({videos:{[a]:record(a,796,1793656321686)}}));
   assert.equal(activeImport.data.videos[a].t,796);
@@ -526,4 +803,283 @@ async function popup(initial = {}, url = 'https://www.youtube.com/watch?v=test',
 
 
 
+
+  // Trash is hidden by default, searchable on request, and restorable by a toggle.
+  const trashSeed = { settings: { autoBookmark: false, showThumbnails: false }, videos: {
+    [a]: { ...record(a, 120, 2), title: 'Private deleted chapter notes', channelName: 'Sample channel' },
+    [b]: { ...record(b, 240, 1), title: 'Current interview' },
+  } };
+  const trashUI = await popup(trashSeed, 'https://example.com/');
+  assert.equal(trashUI.els['deletion-mode'].value, 'timed');
+  assert.equal(trashUI.els['trash-days'].value, '7');
+  assert.equal(trashUI.els['show-trash'].checked, false);
+  await vm.runInContext(`deleteVideo("${a}")`, trashUI.context);
+  assert.equal(trashUI.data.videos[a], undefined);
+  assert.ok((await trashUI.context.WAYPOINTS_STORAGE.read()).trash[a]);
+  assert.deepEqual(trashUI.els.list.querySelectorAll('.main').map(row => row.dataset.id), [b]);
+  await vm.runInContext('copyVideos()', trashUI.context);
+  assert.deepEqual(Object.keys(JSON.parse(trashUI.clipboardWrites.at(-1)).videos), [b], 'all-current export excludes hidden trash');
+  const noRebookmark = await popup({ ...trashUI.data, settings: { ...trashUI.data.settings, autoBookmark: true } }, 'https://www.youtube.com/watch?v=' + a);
+  assert.equal(noRebookmark.data.videos[a], undefined, 'opening a trashed video does not auto-bookmark it');
+  assert.equal(noRebookmark.executions.length, 0);
+  trashUI.els['show-trash'].checked = true;
+  trashUI.els['show-trash'].events.change(); await trashUI.settle();
+  assert.equal(trashUI.els.list.querySelectorAll('.main').length, 2);
+  assert.deepEqual(trashUI.els.list.querySelectorAll('.main').map(row => row.dataset.id), [b, a], 'current bookmarks precede newer trash');
+  let trashRow = trashUI.els.list.children.find(row => row.className === 'trash-row');
+  assert.ok(trashRow);
+  const trashMeta = trashRow.children[0].children.find(el => el.className === 'details').children.find(el => el.className === 'meta');
+  assert.ok(trashMeta.textContent.startsWith('Trash ·'));
+  trashUI.doc.listeners.keydown({ key: '/', preventDefault() {} });
+  trashUI.els.search.value = 'private deleted'; trashUI.els.search.events.input();
+  assert.deepEqual(trashUI.els.list.querySelectorAll('.main').map(row => row.dataset.id), [a]);
+  trashUI.els.search.value = 'Sample channel'; trashUI.els.search.events.input();
+  assert.equal(trashUI.els.list.querySelectorAll('.main').length, 1, 'trash participates in channel search too');
+  trashRow = trashUI.els.list.children.find(row => row.className === 'trash-row');
+  const restoreToggle = trashRow.children.find(el => el.className === 'trash-restore').children[0];
+  restoreToggle.focus();
+  trashUI.doc.listeners.keydown({ key: ' ', preventDefault() { throw Error('restore checkbox key intercepted'); } });
+  restoreToggle.checked = true; restoreToggle.events.change(); await trashUI.settle();
+  assert.equal(trashUI.data.videos[a].t, 120);
+  assert.equal(trashUI.doc.activeElement.dataset.id, a, 'restore returns focus to the current row');
+  assert.equal((await trashUI.context.WAYPOINTS_STORAGE.read()).trash[a], undefined);
+  assert.equal(trashUI.els.list.children.some(row => row.className === 'trash-row'), false);
+  console.log('PASS: timed default, hidden/searchable tinted trash, restore toggle, current-only JSON, no automatic re-bookmarking');
+
+  trashUI.els['deletion-mode'].value = 'permanent'; trashUI.els['deletion-mode'].events.change(); await trashUI.settle();
+  await vm.runInContext(`deleteVideo("${a}")`, trashUI.context);
+  assert.equal(trashUI.data.videos[a], undefined);
+  assert.equal(JSON.stringify(trashUI.data).includes('Private deleted chapter notes'), false);
+  assert.equal(vm.runInContext('deletedBookmark', trashUI.context), null, 'permanent deletion has no recoverable header copy');
+  assert.equal(trashUI.els['restore-bookmark'].hidden, true);
+  const permanentlyReopened = await popup({ ...trashUI.data, settings: { ...trashUI.data.settings, autoBookmark: true } }, 'https://www.youtube.com/watch?v=' + a);
+  assert.equal(permanentlyReopened.data.videos[a], undefined, 'a permanent deletion is not silently re-bookmarked');
+  assert.equal(permanentlyReopened.executions.length, 0);
+  assert.equal(permanentlyReopened.els['restore-bookmark'].hidden, false, 'explicit Add bookmark remains available');
+  trashUI.els['deletion-mode'].value = 'timed'; trashUI.els['deletion-mode'].events.change(); await trashUI.settle();
+  await vm.runInContext(`deleteVideo("${b}")`, trashUI.context);
+  trashUI.els['empty-trash'].click(); await trashUI.settle();
+  assert.deepEqual(Object.keys((await trashUI.context.WAYPOINTS_STORAGE.read()).trash), []);
+  assert.equal(JSON.stringify(trashUI.data).includes('Current interview'), false);
+  console.log('PASS: permanent deletion physically purges stored content and Undo; Empty trash purges trashed rows');
+
+  const retention = await popup(trashSeed, 'https://example.com/');
+  retention.els['trash-days'].value = '2'; retention.els['trash-days'].events.change(); await retention.settle();
+  assert.equal(retention.data.settings.trashDays, 2);
+  const reopenedTrash = await popup(retention.data, 'https://example.com/');
+  assert.equal(reopenedTrash.els['trash-days'].value, '2');
+  for (const value of ['', '0', '1.5', '366']) {
+    const before = retention.writes();
+    retention.els['trash-days'].value = value; retention.els['trash-days'].events.change(); await retention.settle();
+    assert.equal(retention.writes(), before); assert.equal(retention.els['trash-days'].value, '2');
+  }
+  await vm.runInContext(`deleteVideo("${a}")`, retention.context);
+  const expiredSeed = retention.data;
+  for (const entry of Object.values(expiredSeed)) {
+    if (entry?.version === 2 && entry.records?.[a]?.life.status === 'trash') entry.records[a].life.trashedAt -= 3 * 86400000;
+  }
+  const expiredPopup = await popup(expiredSeed, 'https://example.com/');
+  assert.equal((await expiredPopup.context.WAYPOINTS_STORAGE.read()).trash[a], undefined, 'popup opening runs overdue cleanup');
+  assert.equal(JSON.stringify(expiredPopup.data).includes('Private deleted chapter notes'), false);
+  console.log('PASS: retained/validated trash settings, existing-trash expiry, and overdue cleanup on popup open');
+
+  const delayed = await popup(trashSeed, 'https://example.com/');
+  const delayedApi = delayed.context.browser || delayed.context.chrome;
+  const originalSettingsSet = delayedApi.storage.local.set;
+  let releaseSettings;
+  delayedApi.storage.local.set = async value => {
+    if (value.settings) {
+      delayedApi.storage.local.set = originalSettingsSet;
+      await new Promise(resolve => releaseSettings = resolve);
+    }
+    return originalSettingsSet(value);
+  };
+  delayed.els['include-channel-names'].checked = false;
+  delayed.els['include-channel-names'].events.change(); await delayed.settle();
+  delayed.els['show-trash'].checked = true; delayed.els['show-trash'].events.change();
+  delayed.els['trash-days'].value = '14'; delayed.els['trash-days'].events.change();
+  releaseSettings(); await delayed.settle();
+  assert.equal(delayed.data.settings.includeChannelNames, false);
+  assert.equal(delayed.data.settings.showTrash, true);
+  assert.equal(delayed.data.settings.trashDays, 14);
+  console.log('PASS: delayed settings saves preserve later visibility and retention changes');
+
+
+  const cleanupFailure = { failStorageRemove: true };
+  const retryCleanup = await popup(expiredSeed, 'https://example.com/', cleanupFailure);
+  assert.equal(retryCleanup.els['empty-trash'].disabled, false, 'expiry failure does not disable cleanup controls');
+  assert.ok(retryCleanup.els.status.textContent.includes('cleanup failed'));
+  assert.equal(JSON.stringify(retryCleanup.data).includes('Private deleted chapter notes'), true, 'failed removal retains recovery sources');
+  cleanupFailure.failStorageRemove = false;
+  retryCleanup.els['empty-trash'].click(); await retryCleanup.settle();
+  assert.equal(JSON.stringify(retryCleanup.data).includes('Private deleted chapter notes'), false);
+  console.log('PASS: startup cleanup failure is reported without blocking controls; Empty trash retries physical removal');
+
+
+  const hostileId = 'zzzzzzzzzzz';
+  const originalHostileVideo = { id: hostileId, title: 'Preserve my bookmark', t: 100, duration: 1000, updated: 1 };
+  const hostilePlayer = await popup({ settings: { autoBookmark: false }, videos: { [hostileId]: originalHostileVideo } }, 'https://example.com/', {
+    tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=' + hostileId }],
+    executeScript: async () => [{ frameId: 0, result: { id: hostileId, t: 'not-a-number', duration: 1000, paused: true, fps: 60 } }],
+  });
+  await vm.runInContext(`controlPlayback("${hostileId}", "frame", 1)`, hostilePlayer.context);
+  assert.deepEqual(hostilePlayer.data.videos[hostileId], originalHostileVideo, 'malformed page-world result must not overwrite the bookmark');
+  assert.equal(hostilePlayer.writes(), 0);
+  assert.match(hostilePlayer.els.status.textContent, /invalid.*response/i);
+
+  // Every persistence path must stop on invalid open-player data, with no
+  // saved-only fallback. Reuse one popup so writes must remain zero throughout.
+  let boundaryPayload;
+  let boundaryEnvelope;
+  let boundaryThrow;
+  const boundary = await popup({ settings: { autoBookmark: false }, videos: { [hostileId]: originalHostileVideo } }, 'https://example.com/', {
+    tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=' + hostileId }],
+    executeScript: async () => { if (boundaryThrow !== undefined) throw boundaryThrow; return boundaryEnvelope || [{ frameId: 0, result: boundaryPayload }]; },
+  });
+  const good = { id: hostileId, t: 101, duration: 1000, paused: true };
+  for (const command of [`scrub("${hostileId}", 10)`, `seekTo("${hostileId}", 300)`, `togglePlay("${hostileId}")`, `controlPlayback("${hostileId}", "frame", 1)`]) {
+    for (const bad of [null, 'wrong', [], { ...good, t: 'bad' }, { ...good, t: NaN },
+      { ...good, t: Infinity }, { ...good, t: -1 }, { ...good, t: 1001 },
+      { ...good, duration: -1 }, { ...good, duration: Infinity },
+      { ...good, paused: 'yes' }, { ...good, id: 'yyyyyyyyyyy' }, { t: 101 },
+      { ...good, unexpected: 'x'.repeat(10000) }]) {
+      boundaryPayload = command.startsWith('controlPlayback') && bad && typeof bad === 'object' && !Array.isArray(bad) ? { ...bad, fps: 60 } : bad;
+      await vm.runInContext(command, boundary.context);
+      assert.deepEqual(boundary.data.videos[hostileId], originalHostileVideo);
+      assert.equal(boundary.writes(), 0, 'invalid player response must not write, including fallback');
+      assert.match(boundary.els.status.textContent, /response|no result/i);
+    }
+  }
+  boundaryPayload = { ...good, fps: 60 };
+  for (const envelope of [[], [{ frameId: 1, result: boundaryPayload }],
+    [{ frameId: 0, result: boundaryPayload }, { frameId: 0, result: boundaryPayload }],
+    [{ frameId: 0, error: new Error('Page script failed') }], { result: boundaryPayload }]) {
+    boundaryEnvelope = envelope;
+    await vm.runInContext(`controlPlayback("${hostileId}", "frame", 1)`, boundary.context);
+    assert.equal(boundary.writes(), 0);
+    assert.deepEqual(boundary.data.videos[hostileId], originalHostileVideo);
+  }
+  boundaryEnvelope = null;
+  for (const thrown of [new Error(''), new Error('   '), '', 'Permission denied']) {
+    boundaryThrow = thrown;
+    await vm.runInContext(`controlPlayback("${hostileId}", "frame", 1)`, boundary.context);
+    assert.equal(boundary.writes(), 0, 'even an empty thrown error must stop persistence');
+    assert.deepEqual(boundary.data.videos[hostileId], originalHostileVideo);
+    assert.ok(boundary.els.status.textContent);
+  }
+  boundaryThrow = undefined;
+  boundaryEnvelope = null;
+  for (const rate of ['1.25', Infinity, NaN, 0, -1, 17]) {
+    boundaryPayload = { id: hostileId, rate };
+    await vm.runInContext(`controlPlayback("${hostileId}", "rate", 1)`, boundary.context);
+    assert.match(boundary.els.status.textContent, /invalid player response/i);
+    assert.equal(boundary.writes(), 0);
+  }
+  boundaryPayload = { ...good, fps: 60 };
+  await vm.runInContext(`controlPlayback("${hostileId}", "frame", 1)`, boundary.context);
+  assert.equal(boundary.data.videos[hostileId].t, 101);
+  assert.equal(boundary.writes(), 1);
+  boundaryPayload = { id: hostileId, rate: 1.25 };
+  await vm.runInContext(`controlPlayback("${hostileId}", "rate", 1)`, boundary.context);
+  assert.match(boundary.els.status.textContent, /1.25/);
+  assert.equal(boundary.writes(), 1, 'speed responses do not mutate bookmarks');
+  console.log('PASS: malformed/wrong-video/oversized results and injection envelopes preserve bookmarks across all playback paths; valid frame/rate responses work');
+
+  for (const metadata of [
+    { id: hostileId, title: 'Wrong position', t: '100', duration: 1000 },
+    { id: 'yyyyyyyyyyy', title: 'Wrong video', t: 100, duration: 1000 },
+    { id: hostileId, title: 'x'.repeat(1001), t: 100, duration: 1000 },
+    { id: hostileId, title: 'Unsafe owner', t: 100, duration: 1000, channelUrl: 'https://evil.example/@Fake' },
+  ]) {
+    const invalidMetadata = await popup({ settings: { autoBookmark: false }, videos: { [hostileId]: originalHostileVideo } }, 'https://www.youtube.com/watch?v=' + hostileId, { metadata });
+    await vm.runInContext('bookmarkCurrent()', invalidMetadata.context);
+    assert.equal(invalidMetadata.writes(), 0);
+    assert.deepEqual(invalidMetadata.data.videos[hostileId], originalHostileVideo);
+    assert.match(invalidMetadata.els.status.textContent, /invalid player response/i);
+  }
+  console.log('PASS: invalid page metadata cannot create/enrich/overwrite a saved bookmark');
+
+  // Valid responses update duration too, preserving the stored t <= duration invariant.
+  boundaryPayload = { id: hostileId, t: 1500, duration: 2000, paused: true, fps: 60 };
+  await vm.runInContext(`controlPlayback("${hostileId}", "frame", 1)`, boundary.context);
+  assert.equal(boundary.data.videos[hostileId].t, 1500);
+  assert.equal(boundary.data.videos[hostileId].duration, 2000);
+  for (const command of [`controlPlayback("${hostileId}", "frame", 1)`, `seekTo("${hostileId}", 300)`]) {
+    let releaseResult;
+    const delayedPlayer = await popup({ settings: { autoBookmark: false }, videos: { [hostileId]: originalHostileVideo } }, 'https://example.com/', {
+      tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=' + hostileId }],
+      executeScript: async request => {
+        await new Promise(resolve => releaseResult = resolve);
+        return [{ frameId: 0, result: { ...good, ...(request.func.name === 'playback' ? { fps: 60 } : {}) } }];
+      },
+    });
+    const pending = vm.runInContext(command, delayedPlayer.context);
+    await delayedPlayer.settle();
+    assert.equal(typeof releaseResult, 'function');
+    await delayedPlayer.context.WAYPOINTS_STORAGE.importVideos({ [hostileId]: { ...originalHostileVideo, t: 796 } });
+    releaseResult(); await pending; await delayedPlayer.settle();
+    assert.equal(delayedPlayer.data.videos[hostileId].t, 796, 'a valid but delayed response cannot overwrite a newer import lifetime');
+  }
+  console.log('PASS: accepted positions retain matching duration; delayed valid frame/slider results cannot overwrite a newer import');
+
+  for (const transcript of [
+    { id: 'yyyyyyyyyyy', duration: 1000, segments: [{ start: 0, text: 'Wrong video' }] },
+    { id: hostileId, duration: 1000, segments: [{ start: 0, text: 'x'.repeat(10001) }] },
+    { id: hostileId, duration: 1000, segments: [{ start: 9999, text: 'Outside duration' }] },
+  ]) {
+    boundaryPayload = transcript;
+    const copies = boundary.clipboardWrites.length;
+    const before = JSON.stringify(boundary.data.videos);
+    await vm.runInContext(`exportTranscript("${hostileId}")`, boundary.context);
+    assert.equal(boundary.clipboardWrites.length, copies);
+    assert.equal(JSON.stringify(boundary.data.videos), before);
+    assert.match(boundary.els.status.textContent, /invalid player response/i);
+  }
+  console.log('PASS: invalid transcript identity, timing, and text limits preserve clipboard and bookmarks');
+
+  const partialTranscript = { id: hostileId, duration: 3600, segments: [{ start: 0, end: 5, text: 'Only a mounted row' }] };
+  const partialExport = await popup({ settings: { autoBookmark: false, offerSaveFile: true }, videos: { [hostileId]: originalHostileVideo } }, 'https://example.com/', {
+    tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=' + hostileId }],
+    executeScript: async request => {
+      assert.equal(request.world, 'MAIN', 'transcript page data is read in MAIN with the existing legacy fallback');
+      return [{ frameId: 0, result: partialTranscript }];
+    },
+  });
+  partialExport.clipboardWrites.push('Keep my clipboard');
+  for (const format of ['markdown-linked', 'markdown', 'text-timed', 'text', 'srt', 'vtt', 'json']) {
+    await vm.runInContext(`settings.transcriptFormat = "${format}"; exportTranscript("${hostileId}")`, partialExport.context);
+    assert.deepEqual(partialExport.clipboardWrites, ['Keep my clipboard']);
+    assert.ok(!partialExport.els['file-save-dialog'].open);
+    assert.equal(partialExport.downloads.length, 0);
+    assert.equal(partialExport.writes(), 0);
+    assert.match(partialExport.els.status.textContent, /completeness/i);
+  }
+  console.log('PASS: all seven export paths reject unverified partial transcripts without changing clipboard/bookmarks or offering a file');
+  const modernTranscript = { id: hostileId, duration: 1500, complete: true, source: 'youtube-panel-response',
+    language: 'YouTube panel (language not supplied)', segments: [
+      { start: 3, end: null, text: 'First modern passage' }, { start: 1419, end: null, text: 'Last modern passage' },
+    ] };
+  const modernExport = await popup({ settings: { autoBookmark: false, offerSaveFile: true }, videos: { [hostileId]: originalHostileVideo } }, 'https://example.com/', {
+    tabs: [{ id: 7, url: 'https://www.youtube.com/watch?v=' + hostileId }],
+    executeScript: async () => [{ frameId: 0, result: modernTranscript }],
+  });
+  for (const format of ['srt', 'vtt']) {
+    const before = JSON.stringify(modernExport.data.videos);
+    await vm.runInContext(`settings.transcriptFormat = "${format}"; exportTranscript("${hostileId}")`, modernExport.context);
+    assert.equal(modernExport.clipboardWrites.length, 0);
+    assert.equal(JSON.stringify(modernExport.data.videos), before);
+    assert.ok(!modernExport.els['file-save-dialog'].open);
+    assert.equal(modernExport.downloads.length, 0);
+    assert.match(modernExport.els.status.textContent, /choose Markdown, plain text, or JSON/);
+  }
+  for (const format of ['markdown-linked', 'markdown', 'text-timed', 'text', 'json']) {
+    await vm.runInContext(`settings.transcriptFormat = "${format}"; exportTranscript("${hostileId}")`, modernExport.context);
+    assert.match(modernExport.clipboardWrites.at(-1), /First modern passage/);
+    assert.match(modernExport.clipboardWrites.at(-1), /Last modern passage/);
+    assert.ok(modernExport.els['file-save-dialog'].open);
+    modernExport.els['file-save-cancel'].click();
+    await modernExport.settle();
+  }
+  assert.equal(modernExport.writes(), 0);
+  console.log('PASS: modern panel copies all text in five formats; subtitle rejection preserves clipboard/bookmarks and suppresses file offers');
 })().catch(e=>{console.error(e);process.exitCode=1;});

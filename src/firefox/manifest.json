@@ -28,6 +28,8 @@
       ],
       "js": [
         "metadata.js",
+        "player-results.js",
+        "storage.js",
         "content.js"
       ],
       "run_at": "document_idle"

@@ -1,7 +1,11 @@
 <!doctype html>
-<html>
+<html data-theme="light">
 <head>
   <meta charset="utf-8">
+  <script src="theme.js"></script>
+  <link rel="stylesheet" href="styles/tokens.css">
+  <link rel="stylesheet" href="themes/light.css">
+  <link rel="stylesheet" href="themes/dark.css">
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
@@ -13,12 +17,18 @@
       </div>
       <button id="restore-bookmark" type="button" hidden>Add bookmark</button>
       <button id="options-toggle" aria-expanded="false" aria-controls="options-panel" disabled>Show options</button>
+      <button id="about-toggle" type="button" aria-haspopup="dialog" aria-controls="about-dialog">About</button>
     </div>
     <div id="status" role="status"></div>
     <div id="hint"><span>/ search · space play · ↵ open · </span><button id="help-toggle" type="button" aria-haspopup="dialog" aria-controls="help-dialog">h / ? toggle help</button></div>
   </header>
   <ul id="list"></ul>
   <section id="options-panel" aria-label="Options" hidden>
+    <label class="setting" for="theme-select">
+      <span class="setting-title">Theme</span>
+      <select id="theme-select" aria-describedby="theme-help"></select>
+      <p id="theme-help">System follows your device’s light or dark appearance.</p>
+    </label>
     <label class="setting">
       <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
       <p id="thumbnail-help">On by default. Loads images from YouTube’s image server using the video IDs. Your bookmarks stay local. Press t outside search to toggle.</p>
@@ -41,37 +51,102 @@
       <p id="shift-preview"></p>
       <input id="shift-multiplier" type="range" min="1" max="10" step="1" value="3">
     </label>
+    <div class="setting trash-settings">
+      <label class="setting-title" for="deletion-mode">Deletion mode</label>
+      <select id="deletion-mode" aria-describedby="deletion-help" disabled>
+        <option value="timed">Timed: move to trash</option>
+        <option value="permanent">Permanent: delete now</option>
+      </select>
+      <p id="deletion-help">Timed deletion keeps bookmarks in trash for restoration. Permanent deletion removes their stored content immediately.</p>
+      <label class="retention-control" for="trash-days">Permanently delete trash after <input id="trash-days" type="number" min="1" max="365" step="1" value="7" aria-describedby="trash-expiry-help" disabled> days</label>
+      <p id="trash-expiry-help">Default: 7 days (one week). Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.</p>
+      <label class="setting-title"><span>Show trash in the list and search</span><input id="show-trash" type="checkbox" disabled></label>
+      <p>Current bookmarks always show. Trash is tinted red and has a Restore toggle.</p>
+      <button id="empty-trash" class="secondary-button" type="button" aria-describedby="trash-count" disabled>Empty trash</button>
+      <p id="trash-count"></p>
+    </div>
     <p id="shortcut-help"></p>
     <div class="setting export-videos">
       <div class="export-heading"><strong>Export saved videos</strong><button id="copy-videos" type="button" aria-describedby="export-help">Copy JSON</button></div>
-      <p id="export-help">Copy all videos. Paste into another Waypoints popup to merge.</p>
+      <p id="export-help">Copy all current videos. Trash is excluded. Paste into another Waypoints popup to merge.</p>
     </div>
+    <div class="setting transcript-setting">
+      <label id="transcript-format-label" class="setting-title">Transcript format</label>
+      <p>Used when copying or saving a transcript.</p>
+      <div id="transcript-format-picker">
+        <button id="transcript-format-toggle" type="button" role="combobox" aria-labelledby="transcript-format-label transcript-format-toggle" aria-haspopup="listbox" aria-controls="transcript-format-list" aria-expanded="false"></button>
+        <div id="transcript-format-menu" hidden>
+          <div id="transcript-format-list" role="listbox" aria-labelledby="transcript-format-label"></div>
+          <div id="transcript-format-detail" aria-live="polite" aria-atomic="true">
+            <strong id="transcript-format-use"></strong>
+            <p id="transcript-format-description"></p>
+            <pre id="transcript-format-example"></pre>
+          </div>
+        </div>
+      </div>
+      <p id="transcript-target">Select a bookmark before opening Options, or open a YouTube video.</p>
+      <div class="transcript-actions">
+        <button id="copy-transcript" class="secondary-button" type="button">Copy transcript</button>
+      </div>
+      <p>Uses an open YouTube tab.</p>
+    </div>
+    <label class="setting">
+      <span class="setting-title"><span>Offer to save to file</span><input id="offer-save-file" type="checkbox" aria-describedby="offer-save-help"></span>
+      <p id="offer-save-help">Off by default. After copying a transcript or all bookmarks as JSON, ask whether to save a file too. You can choose its filename. Copying always happens first.</p>
+    </label>
   </section>
+  <dialog id="file-save-dialog" aria-labelledby="file-save-title" aria-describedby="file-save-description">
+    <strong id="file-save-title">Also save to file?</strong>
+    <p id="file-save-description"></p>
+    <div id="file-name-fields" hidden>
+      <label for="file-save-name">Filename</label>
+      <input id="file-save-name" type="text" autocomplete="off" spellcheck="false" maxlength="180" aria-describedby="file-save-error">
+      <p id="file-save-error" role="alert"></p>
+    </div>
+    <div class="file-save-actions">
+      <button id="file-save-cancel" class="secondary-button" type="button" autofocus>No thanks</button>
+      <button id="file-save-confirm" class="secondary-button" type="button">Yes</button>
+    </div>
+  </dialog>
+  <dialog id="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
+    <div class="help-heading"><strong id="about-title">YT Waypoints</strong><button id="about-close" class="secondary-button" type="button" autofocus>Close</button></div>
+    <p id="about-version"></p>
+    <p id="about-description">Save, search, and resume your place in YouTube videos. Bookmarks stay in this browser.</p>
+    <p class="support-footer"><a href="https://ko-fi.com/dansmithcreativetech" target="_blank" rel="noopener noreferrer">Support development on Ko-fi ↗</a></p>
+  </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title">
     <div class="help-heading"><strong id="help-title">Keyboard shortcuts</strong><button id="help-close" type="button" autofocus>Close</button></div>
     <table class="help-table">
       <thead><tr><th scope="col">Key</th><th scope="col">Action</th></tr></thead>
       <tbody>
-        <tr><td>← / → or &lt; / &gt;</td><td id="help-scrub"></td></tr>
-        <tr><td>Shift + scrub key</td><td id="help-multiplier"></td></tr>
+        <tr><td>← / →</td><td id="help-scrub"></td></tr>
+        <tr><td>Shift + ← / →</td><td id="help-multiplier"></td></tr>
+        <tr><td>, / .</td><td>Previous / next frame (pauses automatically)</td></tr>
+        <tr><td>&lt; / &gt; (Shift + , / .)</td><td>Decrease / increase playback speed</td></tr>
         <tr><td>Space</td><td>Play / pause</td></tr>
-        <tr><td>Delete / Backspace</td><td>Remove selected row</td></tr>
+        <tr><td>Delete / Backspace</td><td>Use deletion mode on current rows; permanently delete trash rows</td></tr>
         <tr><td>Enter</td><td>Open / play selected video</td></tr>
         <tr><td>↑ / ↓</td><td>Move between rows</td></tr>
         <tr><td>/</td><td>Search</td></tr>
         <tr><td>t</td><td>Toggle thumbnails</td></tr>
+        <tr><td>T (Shift + t)</td><td>Copy selected video's transcript (open tab required)</td></tr>
         <tr><td>u</td><td>Copy selected video URL</td></tr>
         <tr><td>c</td><td>Copy selected row as JSON</td></tr>
-        <tr><td>C (Shift + c)</td><td>Copy all videos as JSON</td></tr>
+        <tr><td>C (Shift + c)</td><td>Copy all current videos as JSON</td></tr>
         <tr><td>h / ?</td><td>Toggle help</td></tr>
         <tr><td>Escape</td><td id="help-escape">Close popup</td></tr>
       </tbody>
     </table>
+    <p class="support-footer"><a href="https://ko-fi.com/dansmithcreativetech" target="_blank" rel="noopener noreferrer">Support on Ko-fi ↗</a></p>
   </dialog>
   <script src="platform.js"></script>
   <script src="transfer.js"></script>
+  <script src="storage.js"></script>
   <script src="metadata.js"></script>
+  <script src="transcript-reader.js"></script>
   <script src="player.js"></script>
+  <script src="player-results.js"></script>
+  <script src="transcript.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

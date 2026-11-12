@@ -1,0 +1,16 @@
+/* Shared typography and dimensions. Colors belong in themes/*.css. */
+:root {
+  --font-ui: 13px/1.35 system-ui, -apple-system, sans-serif;
+  --font-mono: 11px/1.5 ui-monospace, monospace;
+  --text-secondary: 12px;
+  --text-small: 11px;
+  --radius-control: 4px;
+  --radius-toolbar: 6px;
+  --radius-dialog: 8px;
+  --radius-small: 3px;
+  --popup-width: 360px;
+  --popup-width-expanded: 640px;
+  --panel-height: 420px;
+  --panel-height-expanded: 520px;
+  --disabled-opacity: .6;
+}
