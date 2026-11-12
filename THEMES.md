@@ -12,7 +12,7 @@ is local to this browser and is not part of bookmark JSON transfers.
 | `src/shared/themes/dark.css` | Complete dark palette and native `color-scheme` |
 | `src/shared/styles/tokens.css` | Shared fonts, text sizes, radii, and popup/panel dimensions |
 | `src/shared/popup.css` | Component layout, interaction states, and references to theme tokens |
-| `src/shared/popup.html` | Loads the initializer and stylesheets; declares the theme selector |
+| `src/entrypoints/popup.html` | Loads the initializer and stylesheets; declares the theme selector |
 
 Edit `src/shared/`, then rebuild. The generated browser folders are replaced
 by the build. No CSS framework or preprocessor is required.

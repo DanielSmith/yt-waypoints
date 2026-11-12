@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 """Assemble self-contained Firefox/Chrome folders and deterministic store ZIPs.
 
-No download, bundler, or minification. Run from any working directory.
+Build with WXT/Vite, validate, then package deterministically. Run npm ci first.
 """
 import argparse
 from html.parser import HTMLParser
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import tempfile
 import zipfile
 
@@ -47,6 +48,8 @@ def validate(package):
 
     Page().feed((package / manifest['action']['default_popup']).read_text())
     for ref in refs:
+        if ref.startswith('/') and not ref.startswith('//'):
+            ref = ref[1:]  # WXT/Vite uses extension-root asset URLs.
         item = package / ref
         if not item.is_file() or not item.resolve().is_relative_to(package.resolve()):
             raise ValueError(f'Missing or invalid extension resource: {ref}')
@@ -72,14 +75,14 @@ def write_zip(package, destination):
 def build(browser):
     version = json.loads((ROOT / 'package.json').read_text())['version']
     output = ROOT / f'yt-waypoints-{browser}'
-    source = ROOT / 'src'
     # Build and check everything before changing the loadable extension.
     with tempfile.TemporaryDirectory(prefix='.waypoints-build-', dir=ROOT) as td:
         staged = Path(td)
-        shutil.copytree(source / 'shared', staged, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
-        shutil.copytree(source / browser, staged, dirs_exist_ok=True,
-                        ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
+        subprocess.run(['node', str(ROOT / 'scripts/build-wxt.mjs'), browser, str(staged)],
+                       cwd=ROOT, check=True)
+        for script in staged.rglob('*.js'):
+            if script.stat().st_size > 5_000_000:
+                raise ValueError(f'JavaScript exceeds conservative 5 MB package limit: {script.name}')
         manifest = json.loads((staged / 'manifest.json').read_text())
         manifest['version'] = version
         (staged / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
@@ -87,6 +90,7 @@ def build(browser):
             'Generated extension. Edit src/shared/ and src/' + browser + '/, then rebuild.\n'
         )
         shutil.copy2(ROOT / "LICENSE", staged / "LICENSE")
+        shutil.copy2(ROOT / "THIRD-PARTY-NOTICES.md", staged / "THIRD-PARTY-NOTICES.md")
         validate(staged)
         artifacts = ROOT / 'artifacts'
         artifacts.mkdir(exist_ok=True)
@@ -121,7 +125,8 @@ def write_sources():
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
         (stage / 'scripts').mkdir()
         shutil.copy2(ROOT / 'scripts/build.py', stage / 'scripts/build.py')
-        for name in ('package.json', 'README.md', 'PRIVACY.md', 'LICENSE', 'THEMES.md', 'CHANGELOG.md'):
+        shutil.copy2(ROOT / 'scripts/build-wxt.mjs', stage / 'scripts/build-wxt.mjs')
+        for name in ('package.json', 'package-lock.json', 'wxt.config.mjs', 'BUILDING.md', '.prettierrc.json', 'README.md', 'PRIVACY.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'THEMES.md', 'CHANGELOG.md'):
             shutil.copy2(ROOT / name, stage / name)
         write_zip(stage, artifacts / f'yt-waypoints-source-{version}.zip')
     print(f'Reviewer sources: artifacts/yt-waypoints-source-{version}.zip')

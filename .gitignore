@@ -1,5 +1,8 @@
 backups/
 artifacts/
+node_modules/
+.wxt/
+.output/
 yt-waypoints-firefox/
 yt-waypoints-chrome/
 __pycache__/

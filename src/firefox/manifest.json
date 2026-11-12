@@ -21,20 +21,6 @@
   "host_permissions": [
     "*://*.youtube.com/*"
   ],
-  "content_scripts": [
-    {
-      "matches": [
-        "*://*.youtube.com/*"
-      ],
-      "js": [
-        "metadata.js",
-        "player-results.js",
-        "storage.js",
-        "content.js"
-      ],
-      "run_at": "document_idle"
-    }
-  ],
   "action": {
     "default_title": "YT Waypoints",
     "default_popup": "popup.html",

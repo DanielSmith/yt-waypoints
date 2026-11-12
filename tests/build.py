@@ -2,6 +2,7 @@
 """Check generated packages, isolated rebuilds, and failure-before-replacement."""
 import hashlib
 import json
+import re
 from pathlib import Path
 import struct
 import subprocess
@@ -18,6 +19,7 @@ for browser in ('firefox', 'chrome'):
     assert manifest['version'] == version
     assert manifest['name'] == 'YT Waypoints'
     assert (package / 'LICENSE').read_bytes() == (ROOT / 'LICENSE').read_bytes()
+    assert (package / 'THIRD-PARTY-NOTICES.md').read_bytes() == (ROOT / 'THIRD-PARTY-NOTICES.md').read_bytes()
     assert manifest['permissions'] == ['storage', 'activeTab', 'scripting']
     assert all(p.endswith('.png') for p in manifest['icons'].values())
     for size in (16,32,48,96,128):
@@ -26,11 +28,32 @@ for browser in ('firefox', 'chrome'):
         assert struct.unpack('>II',image[16:24]) == (size,size)
     assert not (package / 'icon.svg').exists()
     for item in shared.rglob('*'):
-        if item.is_file() and item.name != ".DS_Store" and "__pycache__" not in item.parts and item.suffix != ".pyc":
+        if item.is_file() and item.name != ".DS_Store" and "__pycache__" not in item.parts and item.suffix not in ('.pyc', '.js'):
             assert item.read_bytes() == (package / item.relative_to(shared)).read_bytes(), item
     assert 'background' not in manifest
     assert 'web_accessible_resources' not in manifest
-    assert manifest['content_scripts'][0]['js'] == ['metadata.js', 'player-results.js', 'storage.js', 'content.js']
+    assert manifest['content_scripts'][0]['js'] == ['content-scripts/content.js']
+    popup = (package / 'popup.html').read_text()
+    scripts = re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', popup)
+    assert len(scripts) == 2 and scripts[0] == '/theme.js'
+    assert 'type="module"' in popup
+    popup_script = scripts[1].lstrip('/')
+    expected_scripts = ['theme.js', 'content-scripts/content.js', popup_script]
+    assert sorted(str(p.relative_to(package)) for p in package.rglob('*.js')) == sorted(expected_scripts)
+    for entry in expected_scripts:
+        script = package / entry
+        assert script.stat().st_size < 5_000_000
+        assert f'//# sourceMappingURL={script.name}.map' in script.read_text()
+        mapping = json.loads(script.with_suffix('.js.map').read_text())
+        assert mapping['sources'] and len(mapping['sources']) == len(mapping['sourcesContent'])
+        for name, content in zip(mapping['sources'], mapping['sourcesContent']):
+            assert not name.startswith('/') and str(ROOT) not in name, name
+            original = (script.parent / name).resolve()
+            if original.is_relative_to(ROOT / 'src'):
+                assert original.read_text() == content, name
+        if entry == popup_script:
+            assert any(f'src/{browser}/platform.js' in name for name in mapping['sources'])
+            assert not any(f'src/{"chrome" if browser == "firefox" else "firefox"}/' in name for name in mapping['sources'])
     assert set(manifest['commands']) == {'_execute_action'}
     for removed in ('overlay.js', 'background.js', 'bridge.js', 'worker.js'):
         assert not (package / removed).exists(), removed
@@ -53,7 +76,7 @@ for browser in ('firefox', 'chrome'):
         assert not any('__pycache__' in p or '.DS_Store' in p for p in z.namelist())
         for name in z.namelist():
             assert z.read(name) == (package / name).read_bytes()
-print('PASS: shared file parity, popup-only manifests (no worker/overlay), identities, root manifests, ZIP contents match loadable folders')
+print('PASS: static-file parity, bundled scripts/maps, popup-only manifests, identities, ZIP contents match loadable folders')
 
 source_zip = ROOT / 'artifacts' / f'yt-waypoints-source-{version}.zip'
 with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
@@ -63,10 +86,19 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
         assert all(not p.startswith('/') and '..' not in Path(p).parts for p in names)
         assert z.read('LICENSE') == (ROOT / 'LICENSE').read_bytes()
         assert json.loads(z.read('package.json'))['license'] == 'Apache-2.0'
-        assert 'src/shared/popup.js' in names and 'scripts/build.py' in names and 'README.md' in names
+        assert 'src/shared/popup.js' in names and 'src/entrypoints/popup.html' in names
+        assert 'scripts/build.py' in names and 'README.md' in names
+        assert z.read('.prettierrc.json') == (ROOT / '.prettierrc.json').read_bytes()
+        for name in ('package-lock.json', 'scripts/build-wxt.mjs', 'wxt.config.mjs', 'BUILDING.md'):
+            assert z.read(name) == (ROOT / name).read_bytes()
         assert 'STORE-SUBMISSION.md' not in names
         assert not any(p.startswith(('artifacts/', 'backups/', 'yt-waypoints-')) for p in names)
         z.extractall(clone)
+    # Use the lockfile and a clean node_modules directory, without network. npm
+    # ci in the parent project must have cached the pinned packages first.
+    install = subprocess.run(['npm', 'ci', '--offline', '--no-audit', '--no-fund'],
+                             cwd=clone, capture_output=True, text=True)
+    assert install.returncode == 0, install.stderr
     result = subprocess.run(['python3', str(clone / 'scripts/build.py')], cwd=td, capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     for browser in ('firefox', 'chrome', 'source'):

@@ -2,6 +2,20 @@
 
 ## Unreleased — 2026-11-12
 
+- Begin the marker/annotation data foundation: independently versioned marker
+  properties, video-start notes, retained chapter removals, and validated
+  version-2 JSON transfer. Marker controls and shortcuts are still in progress.
+- Build readable popup, content-script, and early-theme bundles using pinned
+  WXT/Vite and ES-import entry points. Include local source maps, a dependency
+  lockfile, and reproducible reviewer-source build instructions.
+- Expand compressed JavaScript and test fixtures into consistent readable
+  formatting. Clarify private storage/version helpers and subtitle time formatting;
+  preserve storage fields, exported data, and playback behavior.
+- Split popup coordination into focused player-client, settings, bookmark,
+  export, list, input, and dialog modules. Preserve the shared action queue,
+  storage lifetime guards, injected-function serialization, and established UI.
+- Popup regressions now load the production HTML script order and call the
+  owning modules. Existing behavior assertions remain in place.
 - Group visible trash below current bookmarks, retaining newest-first ordering
   within each group. Only the focused row has a colored outline: green for
   current bookmarks, red for trash. Inactive rows retain neutral dividers.
