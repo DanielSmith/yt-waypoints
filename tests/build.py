@@ -29,7 +29,7 @@ for browser in ('firefox', 'chrome'):
         assert struct.unpack('>II',image[16:24]) == (size,size)
     assert not (package / 'icon.svg').exists()
     for item in shared.rglob('*'):
-        if item.is_file() and item.name != ".DS_Store" and "__pycache__" not in item.parts and item.suffix not in ('.pyc', '.js'):
+        if item.is_file() and item.name != ".DS_Store" and "__pycache__" not in item.parts and item.suffix not in ('.pyc', '.js', '.mjs'):
             assert item.read_bytes() == (package / item.relative_to(shared)).read_bytes(), item
     assert 'background' not in manifest
     assert 'web_accessible_resources' not in manifest
@@ -53,6 +53,8 @@ for browser in ('firefox', 'chrome'):
             if original.is_relative_to(ROOT / 'src'):
                 assert original.read_text() == content, name
         if entry == popup_script:
+            assert any(name.endswith('/popup-refresh.mjs') for name in mapping['sources'])
+            assert not (package / 'popup-refresh.mjs').exists()
             assert any(f'src/{browser}/platform.js' in name for name in mapping['sources'])
             assert not any(f'src/{"chrome" if browser == "firefox" else "firefox"}/' in name for name in mapping['sources'])
     assert set(manifest['commands']) == {'_execute_action'}

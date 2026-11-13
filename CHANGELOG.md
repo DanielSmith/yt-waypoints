@@ -2,6 +2,10 @@
 
 ## Unreleased — 2026-11-13
 
+- Serialize and coalesce popup refreshes. Discard reads invalidated by newer
+  requests, preserve awaited action refreshes, and reuse them for their storage
+  notifications. Keep external updates and recovery after read failures working.
+
 - Expand the single on-demand annotation editor beneath its source bookmark
   instead of above the list. Use 500ms easing in both directions and follow
   expansion with list scrolling so the row and editor actions remain visible.

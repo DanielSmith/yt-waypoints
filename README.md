@@ -305,6 +305,7 @@ popup bundle:
 | --- | --- |
 | `popup.js` | Startup, module wiring, shared action queue, header state, and storage refresh |
 | `player-client.js` | Tab navigation and validated injected requests, including Firefox fallback |
+| `popup-refresh.mjs` | Orders and coalesces popup reads so stale snapshots cannot replace newer views |
 | `popup-settings.js` | Settings normalization, captured field changes, persistence, and grouped Settings controls |
 | `popup-disclosures.js` | Shared reversible disclosure motion for Settings and Help |
 | `popup-bookmarks.js` | Bookmark/import/trash actions and lifetime-bound playback-position saves |

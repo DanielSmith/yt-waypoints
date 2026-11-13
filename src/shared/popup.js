@@ -1,6 +1,12 @@
+import { createPopupRefresh } from "./popup-refresh.mjs";
+
 const api = globalThis.browser ?? globalThis.chrome;
 const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
 let queue = Promise.resolve();
+const refreshCoordinator = createPopupRefresh({
+  read: () => WAYPOINTS_STORAGE.read(),
+  commit: renderSnapshot,
+});
 
 const playerClient = WAYPOINTS_CREATE_PLAYER_CLIENT({
   api,
@@ -266,8 +272,11 @@ function updateHeaderMode() {
   }
 }
 
-async function render() {
-  const snapshot = await WAYPOINTS_STORAGE.read();
+function render() {
+  return refreshCoordinator.refresh();
+}
+
+function renderSnapshot(snapshot) {
   markers.sync(snapshot);
   savedVideos = snapshot.videos;
   bookmarks.rememberSnapshot(snapshot);
@@ -361,7 +370,7 @@ api.storage.onChanged.addListener((changes, area) => {
     updateSettingsUI();
   }
   if (WAYPOINTS_STORAGE.changed(changes) || changes.settings)
-    render().catch((e) => setStatus(e.message));
+    refreshCoordinator.schedule(queue).catch((e) => setStatus(e.message));
 });
 if (typeof setInterval === "function") {
   setInterval(refreshOpenChapters, 5000);
