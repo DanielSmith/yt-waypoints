@@ -12,6 +12,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
   fmt,
   focusRow,
 }) => {
+  const MARKER_PROXIMITY_SECONDS = 2;
   const current = new Map();
   let editor = null;
   const editorEl = document.getElementById("annotation-editor");
@@ -30,8 +31,20 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     const inputHeight = noteEl.getBoundingClientRect().height;
     const rowHeight = row.height - editorEl.getBoundingClientRect().height;
     const otherEditorHeight = content.getBoundingClientRect().height - inputHeight;
+    // Read the pixel tokens that also constrain the native input; CSS owns the
+    // dimensions, while this calculation only fits them into the current row.
+    const layout = globalThis.getComputedStyle(noteEl);
+    const minimumInputHeight = parseFloat(layout.getPropertyValue("--annotation-input-min-height"));
+    const maximumInputHeight = parseFloat(layout.getPropertyValue("--annotation-input-max-height"));
+    const scrollClearance = parseFloat(layout.getPropertyValue("--annotation-scroll-clearance"));
     const inputLimit = Math.floor(
-      Math.max(40, Math.min(160, viewport.height - rowHeight - otherEditorHeight - 8)),
+      Math.max(
+        minimumInputHeight,
+        Math.min(
+          maximumInputHeight,
+          viewport.height - rowHeight - otherEditorHeight - 2 * scrollClearance,
+        ),
+      ),
     );
     // Leave room for the source row, actions and validation text. Long notes
     // scroll within the textarea rather than pushing Save/Cancel offscreen.
@@ -40,8 +53,10 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
       noteEl.style.setProperty("--annotation-input-max", limit);
     // Follow the growing row as it reveals. Reserving a few pixels also keeps
     // the bottom border and control focus rings off the scrollport edge.
-    if (row.bottom > viewport.bottom - 4) listEl.scrollTop += row.bottom - viewport.bottom + 4;
-    else if (row.top < viewport.top + 4) listEl.scrollTop += row.top - viewport.top - 4;
+    if (row.bottom > viewport.bottom - scrollClearance)
+      listEl.scrollTop += row.bottom - viewport.bottom + scrollClearance;
+    else if (row.top < viewport.top + scrollClearance)
+      listEl.scrollTop += row.top - viewport.top - scrollClearance;
   }
 
   function revealEditor() {
@@ -72,6 +87,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     ensureEditorVisible();
   }
   const noteEl = document.getElementById("annotation-text");
+  noteEl.maxLength = data.MAX_NOTE_CHARACTERS;
   const saveEl = document.getElementById("annotation-save");
   const cancelEl = document.getElementById("annotation-cancel");
   const errorEl = document.getElementById("annotation-error");
@@ -114,7 +130,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     await stillCurrent(snapshot, id);
     const video = snapshot.videos[id];
     const nearby = points(video)
-      .filter((marker) => Math.abs(marker.t - actual.t) <= 2)
+      .filter((marker) => Math.abs(marker.t - actual.t) <= MARKER_PROXIMITY_SECONDS)
       .sort(
         (a, b) =>
           Number(b.id === current.get(id)?.markerId) - Number(a.id === current.get(id)?.markerId) ||
@@ -185,11 +201,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     const available = points(snapshot.videos[id]);
     const index = available.findIndex((point) => point.id === current.get(id)?.markerId);
     const marker =
-      index >= 0 && Math.abs(available[index].t - actual.t) <= 2
+      index >= 0 && Math.abs(available[index].t - actual.t) <= MARKER_PROXIMITY_SECONDS
         ? available[index + direction]
         : direction > 0
-          ? available.find((point) => point.t > actual.t + 2)
-          : available.filter((point) => point.t < actual.t - 2).at(-1);
+          ? available.find((point) => point.t > actual.t + MARKER_PROXIMITY_SECONDS)
+          : available.filter((point) => point.t < actual.t - MARKER_PROXIMITY_SECONDS).at(-1);
     if (!marker) return setStatus(direction > 0 ? "No next marker." : "No previous marker.");
     await select(id, marker.id, snapshot, actual);
   }

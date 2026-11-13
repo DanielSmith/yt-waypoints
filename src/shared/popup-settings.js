@@ -13,6 +13,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   setStatus,
   closeFormatMenu,
 }) => {
+  const policy = WAYPOINTS_SETTINGS_POLICY;
+  const { defaults, numeric } = policy;
   let thumbnailChangePending = false;
   const optionsPanel = document.getElementById("options-panel");
   const groups = [...optionsPanel.querySelectorAll(".option-group")];
@@ -67,22 +69,26 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   const offerSaveFileEl = document.getElementById("offer-save-file");
 
   function normalizeSettings(saved = {}) {
-    const bounded = (value, fallback, max) =>
-      Number.isInteger(value) && value >= 1 && value <= max ? value : fallback;
     return {
-      autoBookmark: typeof saved?.autoBookmark === "boolean" ? saved.autoBookmark : true,
+      autoBookmark:
+        typeof saved?.autoBookmark === "boolean" ? saved.autoBookmark : defaults.autoBookmark,
       includeChannelNames:
-        typeof saved?.includeChannelNames === "boolean" ? saved.includeChannelNames : true,
-      showThumbnails: typeof saved?.showThumbnails === "boolean" ? saved.showThumbnails : true,
-      showMarkers: typeof saved?.showMarkers === "boolean" ? saved.showMarkers : true,
-      scrubSeconds: bounded(saved?.scrubSeconds, 10, 60),
-      shiftMultiplier: bounded(saved?.shiftMultiplier, 3, 10),
+        typeof saved?.includeChannelNames === "boolean"
+          ? saved.includeChannelNames
+          : defaults.includeChannelNames,
+      showThumbnails:
+        typeof saved?.showThumbnails === "boolean" ? saved.showThumbnails : defaults.showThumbnails,
+      showMarkers:
+        typeof saved?.showMarkers === "boolean" ? saved.showMarkers : defaults.showMarkers,
+      scrubSeconds: policy.normalizeInteger(saved?.scrubSeconds, numeric.scrubSeconds),
+      shiftMultiplier: policy.normalizeInteger(saved?.shiftMultiplier, numeric.shiftMultiplier),
       transcriptFormat: formats.get(saved?.transcriptFormat).id,
-      offerSaveFile: saved?.offerSaveFile === true,
+      offerSaveFile:
+        typeof saved?.offerSaveFile === "boolean" ? saved.offerSaveFile : defaults.offerSaveFile,
       theme: themeService.normalize(saved?.theme),
-      deletionMode: saved?.deletionMode === "permanent" ? "permanent" : "timed",
+      deletionMode: saved?.deletionMode === "permanent" ? "permanent" : defaults.deletionMode,
       trashDays: storage.retentionDays(saved?.trashDays),
-      showTrash: saved?.showTrash === true,
+      showTrash: typeof saved?.showTrash === "boolean" ? saved.showTrash : defaults.showTrash,
     };
   }
 
@@ -153,6 +159,18 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   function initControls() {
+    for (const [control, rule] of [
+      [scrubSecondsEl, numeric.scrubSeconds],
+      [shiftMultiplierEl, numeric.shiftMultiplier],
+      [trashDaysEl, numeric.trashDays],
+    ]) {
+      control.min = String(rule.min);
+      control.max = String(rule.max);
+      control.step = "1";
+      control.defaultValue = String(rule.defaultValue);
+    }
+    document.getElementById("trash-expiry-help").textContent =
+      `Default: ${numeric.trashDays.defaultValue} days${numeric.trashDays.defaultValue === 7 ? " (one week)" : ""}. Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.`;
     optionsPanel.addEventListener("keydown", navigateGroups);
     for (const group of groups) {
       group.querySelector("summary").addEventListener("click", (event) => {
@@ -190,9 +208,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     showTrashEl.addEventListener("change", () => changeSetting("showTrash", showTrashEl.checked));
     trashDaysEl.addEventListener("change", () => {
       const days = Number(trashDaysEl.value);
-      if (!Number.isInteger(days) || days < 1 || days > 365) {
+      if (!policy.isIntegerInRange(days, numeric.trashDays)) {
         updateSettingsUI();
-        return setStatus("Choose a trash retention time from 1 to 365 days.");
+        return setStatus(
+          `Choose a trash retention time from ${numeric.trashDays.min} to ${numeric.trashDays.max} days.`,
+        );
       }
       changeSetting("trashDays", days);
     });

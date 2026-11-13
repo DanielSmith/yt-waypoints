@@ -1,6 +1,6 @@
 # Creating a YT Waypoints theme
 
-Choose **Show options → Theme** to use System, Light, or Dark. The preference
+Choose **Settings (gear) → Appearance → Theme** to use System, Light, or Dark. The preference
 is local to this browser and is not part of bookmark JSON transfers.
 
 ## Files and responsibilities
@@ -16,6 +16,24 @@ is local to this browser and is not part of bookmark JSON transfers.
 
 Edit `src/shared/`, then rebuild. The generated browser folders are replaced
 by the build. No CSS framework or preprocessor is required.
+
+## Shared dimensions and clearances
+
+`styles/tokens.css` owns structural dimensions separately from palette colors:
+
+- `--popup-frame-height` is 520px for Settings, Help and inline annotation editing.
+  The Help dialog reserves `--dialog-viewport-clearance` (20px total), giving it
+  a default 500px height with the existing viewport cap.
+- `--popup-bottom-clearance` keeps 16px below list/Settings content, clear of the
+  browser popup's bottom corners. Normal bookmark lists retain their 420px cap.
+- `--annotation-control-clearance` reserves 6px around editor controls for full
+  focus outlines. `--annotation-scroll-clearance` reserves a 4px scroll target.
+- Annotation input height defaults to 80px, with 40px minimum and 160px maximum.
+  JavaScript reads the input bounds and scroll-clearance tokens when fitting the
+  source row and editor into the list viewport; keep those tokens as pixel values.
+
+Change these defaults in the shared token file when the change should apply to
+every theme. Theme-specific palette values remain in `themes/*.css`.
 
 ## Theme contract
 
@@ -67,21 +85,21 @@ indicators/control boundaries at least 3:1 against the main surface.
    ```
 
 4. Add `{ id: "my-theme", label: "My theme" }` to `choices` in `theme.js`.
-   Options populates its selector from this list; no popup-handler changes
+   Settings populates its selector from this list; no popup-handler changes
    are needed. System continues to use the built-in light/dark themes.
-5. Run `npm test`, then reload the extension. Select your theme in Options.
+5. Run `npm test`, then reload the extension. Select your theme in Settings.
    Extend the palette/contrast checks in `tests/theme.cjs` to cover it.
 
 For a color-only theme, component rules in `popup.css` need no changes. Themes
 may also override shared variables such as `--font-ui`, `--radius-control`, or
-`--popup-width`; keep the expanded transcript dropdown within browser popup
+`--popup-width`; keep expanded controls and dialogs within browser popup
 size limits. Change shared defaults in `styles/tokens.css` only when the change
 should apply to every theme.
 
 ## Verify a theme
 
 Check the bookmark list (including focus, progress sliders, and Add bookmark),
-Options and native inputs, transcript format hover/focus previews, help, and
+Settings and native inputs, transcript format hover/focus previews, help, and
 both stages of the optional file-save dialog. Check keyboard focus, disabled
 controls, empty results, validation errors, and long titles in both browsers.
 

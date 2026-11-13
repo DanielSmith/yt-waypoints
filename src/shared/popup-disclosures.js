@@ -1,5 +1,7 @@
 // One motion contract for Help, Settings and the on-demand annotation editor.
 globalThis.WAYPOINTS_ANIMATE_HEIGHT = (content, from, to) => {
+  const DISCLOSURE_DURATION_MS = 500;
+  const DISCLOSURE_EASING = "cubic-bezier(0.22, 1, 0.36, 1)";
   if (
     globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
     typeof content.animate !== "function" ||
@@ -7,8 +9,8 @@ globalThis.WAYPOINTS_ANIMATE_HEIGHT = (content, from, to) => {
   )
     return null;
   return content.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-    duration: 500,
-    easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+    duration: DISCLOSURE_DURATION_MS,
+    easing: DISCLOSURE_EASING,
     fill: "both",
   });
 };

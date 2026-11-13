@@ -3,7 +3,11 @@
   // Structural safety ceiling; the existing 5-million-character transfer and
   // browser storage quotas constrain real payloads well before this count.
   const MAX_MARKERS = 100000;
-  const MAX_TIME = 315576000;
+  const MAX_TIME_SECONDS = 315576000;
+  const MAX_NOTE_CHARACTERS = 10000;
+  const MAX_TITLE_CHARACTERS = 1000;
+  const MAX_LABEL_CHARACTERS = 200;
+  const MILLISECOND_PRECISION_EPSILON = 0.000001;
   const own = (object, key) => {
     const descriptor = Object.getOwnPropertyDescriptor(object, key);
     if (!descriptor) return undefined;
@@ -21,7 +25,7 @@
     return value;
   }
   function note(value) {
-    return text(value, "annotation", 10000);
+    return text(value, "annotation", MAX_NOTE_CHARACTERS);
   }
   function chapterId(t) {
     return `c:${Math.round(t * 1000)}`;
@@ -48,8 +52,8 @@
         typeof t !== "number" ||
         !Number.isFinite(t) ||
         t < 0 ||
-        t > MAX_TIME ||
-        Math.abs(t * 1000 - Math.round(t * 1000)) > 0.000001
+        t > MAX_TIME_SECONDS ||
+        Math.abs(t * 1000 - Math.round(t * 1000)) > MILLISECOND_PRECISION_EPSILON
       ) {
         throw new Error("Invalid marker timestamp.");
       }
@@ -64,9 +68,9 @@
       seen.add(id);
       const clean = { id, t, origin };
       for (const [key, limit] of [
-        ["title", 1000],
-        ["label", 200],
-        ["note", 10000],
+        ["title", MAX_TITLE_CHARACTERS],
+        ["label", MAX_LABEL_CHARACTERS],
+        ["note", MAX_NOTE_CHARACTERS],
       ]) {
         const value = own(marker, key);
         if (value !== undefined) clean[key] = text(value, `marker ${key}`, limit);
@@ -127,5 +131,6 @@
     annotation,
     refreshChapters,
     MAX_MARKERS,
+    MAX_NOTE_CHARACTERS,
   });
 })();

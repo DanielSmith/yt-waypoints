@@ -51,9 +51,42 @@ body {
   font: var(--font-ui);
 }
 
+/* All expanded views reserve the same outer frame; content scrolls inside. */
+html.options-open,
+body.options-open,
+html.annotation-open,
+body.annotation-open,
+html.help-open,
+body.help-open {
+  height: var(--popup-frame-height);
+  min-height: var(--popup-frame-height);
+  max-height: var(--popup-frame-height);
+  overflow: hidden;
+}
+
+/* Settings and inline editing use the normal shell; Help keeps its own dialog. */
+body.options-open,
+body.annotation-open {
+  display: flex;
+  flex-direction: column;
+}
+
+body.options-open header,
+body.annotation-open header {
+  flex: none;
+}
+
+#options-panel,
+body.annotation-open #list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 /* Keep the final row above the browser popup's rounded bottom corners. */
 body:has(#list:not([hidden])) {
-  padding-bottom: 16px;
+  padding-bottom: var(--popup-bottom-clearance);
 }
 
 header {
@@ -80,10 +113,6 @@ header {
 
 .actions.options-open {
   grid-template-columns: minmax(0, 1fr) auto auto;
-}
-
-.actions.options-open #options-toggle {
-  grid-column: auto;
 }
 
 .actions #help-toggle,
@@ -189,35 +218,16 @@ button:disabled {
   display: none !important;
 }
 
-/* Options and preferences */
-
-/* Like Help, Options owns a fixed frame rather than sizing to its contents. */
-html.options-open,
-body.options-open {
-  height: 520px;
-  min-height: 520px;
-  max-height: 520px;
-  overflow: hidden;
-}
-
-body.options-open {
-  display: flex;
-  flex-direction: column;
-}
+/* Settings and preferences */
 
 body.options-open header {
-  flex: none;
   max-height: 140px;
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
 
 #options-panel {
-  flex: 1;
-  min-height: 0;
-  padding: 8px 10px 16px;
-  overflow-y: auto;
-  scrollbar-gutter: stable;
+  padding: 8px 10px var(--popup-bottom-clearance);
 }
 
 .options-intro {
@@ -355,10 +365,6 @@ output {
   gap: 8px;
 }
 
-.export-videos {
-  padding-top: 0;
-}
-
 button:focus-visible,
 a:focus-visible,
 input:focus-visible,
@@ -399,25 +405,8 @@ select:focus-visible {
   font-size: var(--text-secondary);
   margin: 6px 0;
 }
-html.annotation-open,
-body.annotation-open {
-  height: 520px;
-  min-height: 520px;
-  max-height: 520px;
-  overflow: hidden;
-}
-body.annotation-open {
-  display: flex;
-  flex-direction: column;
-}
-body.annotation-open header {
-  flex: none;
-}
 body.annotation-open #list {
-  flex: 1;
-  min-height: 0;
   max-height: none;
-  scrollbar-gutter: stable;
 }
 #list > li:has(#annotation-editor:not([hidden])) {
   flex-wrap: wrap;
@@ -433,7 +422,7 @@ body.annotation-open #list {
 }
 .annotation-content {
   display: flow-root;
-  padding: 10px 6px 6px;
+  padding: 10px var(--annotation-control-clearance) var(--annotation-control-clearance);
   border-top: 1px solid var(--color-border);
 }
 #annotation-editor label {
@@ -441,20 +430,18 @@ body.annotation-open #list {
   margin: 8px 0 4px;
 }
 #annotation-text {
+  display: block;
+  resize: vertical;
   width: 100%;
+  height: var(--annotation-input-height);
+  min-height: var(--annotation-input-min-height);
+  max-height: var(--annotation-input-max, var(--annotation-input-max-height));
   padding: 8px;
   border: 1px solid var(--color-control-border);
   border-radius: var(--radius-control);
   background: var(--color-surface);
   color: var(--color-text);
   font: inherit;
-}
-#annotation-text {
-  display: block;
-  resize: vertical;
-  height: 80px;
-  min-height: 40px;
-  max-height: var(--annotation-input-max, 160px);
 }
 #annotation-text:focus-visible {
   outline: 2px solid var(--color-focus);
@@ -482,19 +469,11 @@ body.annotation-open #list {
 
 /* Shortcut-help dialog */
 
-html.help-open,
-body.help-open {
-  height: 520px;
-  min-height: 520px;
-  max-height: 520px;
-  overflow: hidden;
-}
-
 #help-dialog,
 #about-dialog {
   width: 340px;
-  max-width: calc(100% - 20px);
-  max-height: calc(100% - 20px);
+  max-width: calc(100% - var(--dialog-viewport-clearance));
+  max-height: calc(100% - var(--dialog-viewport-clearance));
   padding: 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-dialog);
@@ -555,7 +534,7 @@ body.about-open {
 #help-dialog {
   padding: 12px;
   /* Keep the top-layer dialog fixed too, rather than sizing it to its content. */
-  height: 500px;
+  height: calc(var(--popup-frame-height) - var(--dialog-viewport-clearance));
   /* Reserve the scrollbar's width even while all explanations are collapsed. */
   scrollbar-gutter: stable;
 }

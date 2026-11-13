@@ -139,11 +139,34 @@ async function exerciseKeyboard() {
     keyboardFixture.operations = [];
     keyboardFixture.position = 700;
   }
+  async function settleActions() {
+    const work = queue;
+    let completed = false;
+    work.then(
+      () => {
+        completed = true;
+      },
+      () => {
+        completed = true;
+      },
+    );
+    // Virtual time can finish before macOS headless compositor animations do.
+    // These keyboard cases test commands, not elapsed animation time. Explicit
+    // motion cases below still sample/finish their own native animations.
+    for (let attempt = 0; attempt < 40 && !completed; attempt++) {
+      await flush();
+      for (const motion of document.getElementById("annotation-editor").getAnimations())
+        motion.finish();
+    }
+    check(completed, "Queued action did not settle after editor motion completed");
+    await work;
+  }
+
   async function press(target, key, extra = {}) {
     target.focus();
     const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...extra });
     target.dispatchEvent(event); // Native DOM capture -> target -> bubble phases.
-    await queue;
+    await settleActions();
     await flush();
     return event;
   }
@@ -290,7 +313,7 @@ async function exerciseKeyboard() {
     "a did not open the existing annotation",
   );
   document.getElementById("annotation-cancel").click();
-  await queue;
+  await settleActions();
   cases.push("a opens existing annotation at current marker");
   await press(document.querySelector(".main"), "M", { shiftKey: true });
   check(!document.querySelector(".marker-overlay"), "M did not hide marker lines");
@@ -687,6 +710,24 @@ async function exerciseKeyboard() {
     document.activeElement === headings[0],
     "Up must navigate Settings immediately after opening without Tab",
   );
+  for (const [id, min, max, fallback] of [
+    ["scrub-seconds", "1", "60", "10"],
+    ["shift-multiplier", "1", "10", "3"],
+    ["trash-days", "1", "365", "7"],
+  ]) {
+    const control = document.getElementById(id);
+    check(
+      control.min === min &&
+        control.max === max &&
+        control.step === "1" &&
+        control.defaultValue === fallback,
+      "Settings policy did not initialize native input constraints: " + id,
+    );
+  }
+  check(
+    document.getElementById("annotation-text").maxLength === 10000,
+    "Annotation input limit differs from its stored-data contract",
+  );
   const panel = document.getElementById("options-panel");
   const geometry = () => [
     document.body.getBoundingClientRect().width,
@@ -888,6 +929,14 @@ async function exerciseKeyboard() {
   sourceRow.focus();
   sourceRow.scrollIntoView({ block: "end" });
   const startScroll = listEl.scrollTop;
+  check(
+    getComputedStyle(noteField).minHeight === "40px" &&
+      getComputedStyle(noteField).maxHeight === "160px",
+    "Default annotation input bounds changed",
+  );
+  document.documentElement.style.setProperty("--annotation-input-min-height", "48px");
+  document.documentElement.style.setProperty("--annotation-input-max-height", "72px");
+  document.documentElement.style.setProperty("--annotation-scroll-clearance", "6px");
   await markers.edit(scrollIds[0]);
   const inlineEditor = document.getElementById("annotation-editor");
   const inlineRow = sourceRow.parentElement;
@@ -953,6 +1002,12 @@ async function exerciseKeyboard() {
   };
   visibleEditor();
   check(
+    getComputedStyle(noteField).minHeight === "48px" &&
+      getComputedStyle(noteField).maxHeight === "72px",
+    "Inline sizing calculation does not follow the CSS input bounds",
+  );
+
+  check(
     listEl.scrollTop > startScroll,
     "Opening a bottom-row note did not scroll the source row upward",
   );
@@ -1008,6 +1063,12 @@ async function exerciseKeyboard() {
     document.activeElement?.dataset.id === scrollIds[0],
     "Closing did not restore source-row focus",
   );
+  for (const token of [
+    "--annotation-input-min-height",
+    "--annotation-input-max-height",
+    "--annotation-scroll-clearance",
+  ])
+    document.documentElement.style.removeProperty(token);
   // Restore the fixture's saved-only view before the existing preview driver.
   const cleanup = await WAYPOINTS_STORAGE.read();
   cleanup.videos = baseline.videos;

@@ -6,6 +6,7 @@ globalThis.WAYPOINTS_CREATE_PLAYER_CLIENT = ({
   legacyFallback,
   watchPattern,
 }) => {
+  const MAX_PLAYER_ERROR_CHARACTERS = 500;
   const WATCH_RE = watchPattern;
   // Clean link: only video id + time (drops tracking params like si=).
   function linkFor(v) {
@@ -54,7 +55,7 @@ globalThis.WAYPOINTS_CREATE_PLAYER_CLIENT = ({
         id = parts[1];
       }
     }
-    if (!/^[A-Za-z0-9_-]{11}$/.test(id || "")) return null;
+    if (!resultSchema.isId(id)) return null;
     const stamp =
       url.searchParams.get("t") ??
       url.searchParams.get("start") ??
@@ -93,7 +94,7 @@ globalThis.WAYPOINTS_CREATE_PLAYER_CLIENT = ({
     if (typeof message !== "string") message = "Unknown script failure";
     return (
       message
-        .slice(0, 500)
+        .slice(0, MAX_PLAYER_ERROR_CHARACTERS)
         .replace(/[\u0000-\u001f\u007f]/g, " ")
         .trim() || "Unknown script failure"
     );

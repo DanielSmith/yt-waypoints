@@ -1,6 +1,11 @@
 // JSON-only bookmark transfer. Imported fields are validated/whitelisted before
 // any storage write; browser settings and arbitrary URLs are never imported.
 (() => {
+  const { isVideoId, normalizeChannelUrl, CHANNEL_URL_ISSUE } = WAYPOINTS_YOUTUBE_VALUES;
+  const FORMAT_ID = "yt-waypoints";
+  const BOOKMARKS_FORMAT_VERSION = 1;
+  const MARKERS_FORMAT_VERSION = 2;
+  const MAX_IMPORT_CHARACTERS = 5_000_000;
   const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
   const fields = [
     "id",
@@ -45,11 +50,7 @@
   function normalize(record, key) {
     record = pick(record);
     const id = Object.hasOwn(record, "id") ? record.id : key;
-    if (
-      typeof id !== "string" ||
-      !/^[A-Za-z0-9_-]{11}$/.test(id) ||
-      (key !== undefined && id !== key)
-    ) {
+    if (!isVideoId(id) || (key !== undefined && id !== key)) {
       throw new Error("Invalid or mismatched YouTube video ID.");
     }
     const duration = number(record.duration, "duration", 0);
@@ -66,34 +67,15 @@
       if (name) video.channelName = name;
     }
     if (record.channelUrl !== undefined) {
-      if (
-        typeof record.channelUrl !== "string" ||
-        record.channelUrl.length > 2048 ||
-        /[\u0000-\u0020\u007f]/.test(record.channelUrl)
-      )
-        throw new Error("Invalid channel URL.");
-      let url, decodedPath;
-      try {
-        url = new URL(record.channelUrl);
-        decodedPath = decodeURIComponent(url.pathname);
-      } catch {
-        throw new Error("Invalid channel URL.");
+      const channel = normalizeChannelUrl(record.channelUrl);
+      if (channel.issue) {
+        throw new Error(
+          channel.issue === CHANNEL_URL_ISSUE.NOT_CHANNEL
+            ? "Only YouTube channel URLs can be imported."
+            : "Invalid channel URL.",
+        );
       }
-      if (
-        url.protocol !== "https:" ||
-        url.username ||
-        url.password ||
-        url.port ||
-        !["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname) ||
-        /[\u0000-\u0020\u007f]/.test(decodedPath) ||
-        !/^\/(?:@[^/\\?#\s]+|channel\/[^/\\?#\s]+|c\/[^/\\?#\s]+|user\/[^/\\?#\s]+)\/?$/.test(
-          decodedPath,
-        )
-      ) {
-        throw new Error("Only YouTube channel URLs can be imported.");
-      }
-      video.channelUrl = "https://www.youtube.com" + url.pathname.replace(/\/$/, "");
-      if (video.channelUrl.length > 2048) throw new Error("Invalid channel URL.");
+      video.channelUrl = channel.url;
     }
     if (record.markers !== undefined) video.markers = WAYPOINTS_MARKERS.normalize(record.markers);
     if (record.startNote !== undefined) video.startNote = WAYPOINTS_MARKERS.note(record.startNote);
@@ -101,8 +83,10 @@
   }
   function parse(text) {
     if (typeof text !== "string") throw new Error("Import must be JSON text.");
-    if (text.length > 5_000_000)
-      throw new Error("Import is too large (maximum 5 million characters).");
+    if (text.length > MAX_IMPORT_CHARACTERS)
+      throw new Error(
+        `Import is too large (maximum ${MAX_IMPORT_CHARACTERS / 1_000_000} million characters).`,
+      );
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -114,7 +98,8 @@
     if (
       isObject(parsed) &&
       Object.hasOwn(parsed, "format") &&
-      (parsed.format !== "yt-waypoints" || ![1, 2].includes(parsed.version))
+      (parsed.format !== FORMAT_ID ||
+        ![BOOKMARKS_FORMAT_VERSION, MARKERS_FORMAT_VERSION].includes(parsed.version))
     ) {
       throw new Error("Unsupported videos export format or version.");
     }
@@ -171,12 +156,12 @@
   function stringify(videos) {
     return JSON.stringify(
       {
-        format: "yt-waypoints",
+        format: FORMAT_ID,
         version: Object.values(videos).some(
           (video) => Object.hasOwn(video, "markers") || Object.hasOwn(video, "startNote"),
         )
-          ? 2
-          : 1,
+          ? MARKERS_FORMAT_VERSION
+          : BOOKMARKS_FORMAT_VERSION,
         videos: Object.fromEntries(
           Object.entries(videos)
             .sort(([a], [b]) => a.localeCompare(b))

@@ -4,12 +4,21 @@
   const MAX_SECONDS = Math.floor(Number.MAX_SAFE_INTEGER / 1000);
   const MAX_SEGMENTS = 50000;
   const MAX_TRANSCRIPT_TEXT = 2000000;
+  const MAX_TITLE_CHARACTERS = 1000;
+  const MAX_CHANNEL_NAME_CHARACTERS = 200;
+  const MAX_LANGUAGE_CHARACTERS = 200;
+  const MAX_CAPTION_CHARACTERS = 10000;
+  const MAX_ERROR_CHARACTERS = 500;
+  const MAX_CHAPTERS = 1000;
+  const MILLISECOND_PRECISION_EPSILON = 0.000001;
+  const MAX_PLAYBACK_RATE = 16;
+  const MAX_FRAME_RATE = 240;
   const invalid = (detail) => {
     throw new Error(
       "Invalid player response: " + detail + ". Reload the YouTube tab and try again.",
     );
   };
-  const isId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{11}$/.test(value);
+  const { isVideoId: isId, normalizeChannelUrl } = WAYPOINTS_YOUTUBE_VALUES;
 
   function fields(value, allowed) {
     if (!value || typeof value !== "object" || Array.isArray(value)) invalid("expected an object");
@@ -72,35 +81,19 @@
       id: result.id,
       t,
       duration,
-      title: text(result.title, "title", 1000, true) || result.id,
+      title: text(result.title, "title", MAX_TITLE_CHARACTERS, true) || result.id,
     };
     if (Object.hasOwn(result, "channelName"))
-      clean.channelName = text(result.channelName, "channel name", 200, true);
+      clean.channelName = text(
+        result.channelName,
+        "channel name",
+        MAX_CHANNEL_NAME_CHARACTERS,
+        true,
+      );
     if (Object.hasOwn(result, "channelUrl")) {
-      const value = result.channelUrl;
-      if (typeof value !== "string" || value.length > 2048 || /[\u0000-\u0020\u007f]/.test(value))
-        invalid("invalid channel URL");
-      let url, decodedPath;
-      try {
-        url = new URL(value);
-        decodedPath = decodeURIComponent(url.pathname);
-      } catch {
-        invalid("invalid channel URL");
-      }
-      if (
-        url.protocol !== "https:" ||
-        url.username ||
-        url.password ||
-        url.port ||
-        !["youtube.com", "www.youtube.com", "m.youtube.com"].includes(url.hostname) ||
-        /[\u0000-\u0020\u007f]/.test(decodedPath) ||
-        !/^\/(?:@[^/\\?#\s]+|channel\/[^/\\?#\s]+|c\/[^/\\?#\s]+|user\/[^/\\?#\s]+)\/?$/.test(
-          decodedPath,
-        )
-      )
-        invalid("invalid channel URL");
-      clean.channelUrl = "https://www.youtube.com" + url.pathname.replace(/\/$/, "");
-      if (clean.channelUrl.length > 2048) invalid("invalid channel URL");
+      const channel = normalizeChannelUrl(result.channelUrl);
+      if (channel.issue) invalid("invalid channel URL");
+      clean.channelUrl = channel.url;
     }
     return clean;
   }
@@ -114,7 +107,7 @@
     )
       invalid("transcript completeness is unverified");
     const startsOnly = result.source === "youtube-panel-response";
-    const language = text(result.language, "transcript language", 200);
+    const language = text(result.language, "transcript language", MAX_LANGUAGE_CHARACTERS);
     const duration = result.duration === null ? null : seconds(result.duration, "duration", false);
     if (
       duration === 0 ||
@@ -140,7 +133,7 @@
         (end !== null && (end <= start || (duration !== null && end > duration)))
       )
         invalid("invalid caption end");
-      const caption = text(segment.text, "caption text", 10000);
+      const caption = text(segment.text, "caption text", MAX_CAPTION_CHARACTERS);
       total += segment.text.length;
       if (
         total > MAX_TRANSCRIPT_TEXT ||
@@ -158,7 +151,7 @@
     // Page error messages are data too. Do not stringify arbitrary page objects.
     if (value && typeof value === "object" && Object.hasOwn(value, "error")) {
       const result = fields(value, ["error"]);
-      return { error: text(result.error, "error message", 500) };
+      return { error: text(result.error, "error message", MAX_ERROR_CHARACTERS) };
     }
     if (operation === "bookmark") return metadata(value, expectedId);
     if (operation === "chapters") {
@@ -169,7 +162,7 @@
         !duration ||
         typeof result.available !== "boolean" ||
         !Array.isArray(result.chapters) ||
-        result.chapters.length > 1000 ||
+        result.chapters.length > MAX_CHAPTERS ||
         (!result.available && result.chapters.length)
       )
         invalid("invalid chapter list");
@@ -177,10 +170,14 @@
       const chapters = Array.from(result.chapters, (item) => {
         const chapter = fields(item, ["t", "title"]);
         const t = seconds(chapter.t, "chapter timestamp", false);
-        if (t >= duration || t <= previous || Math.abs(t * 1000 - Math.round(t * 1000)) > 0.000001)
+        if (
+          t >= duration ||
+          t <= previous ||
+          Math.abs(t * 1000 - Math.round(t * 1000)) > MILLISECOND_PRECISION_EPSILON
+        )
           invalid("invalid chapter timing");
         previous = t;
-        return { t, title: text(chapter.title, "chapter title", 1000) };
+        return { t, title: text(chapter.title, "chapter title", MAX_TITLE_CHARACTERS) };
       });
       return { id: result.id, duration, available: result.available, chapters };
     }
@@ -195,7 +192,7 @@
     const result = fields(value, allowed);
     identity(result, expectedId);
     if (mode === "rate") {
-      if (!Number.isFinite(result.rate) || result.rate <= 0 || result.rate > 16)
+      if (!Number.isFinite(result.rate) || result.rate <= 0 || result.rate > MAX_PLAYBACK_RATE)
         invalid("invalid playback rate");
       return { id: result.id, rate: result.rate };
     }
@@ -204,7 +201,7 @@
       if (
         !Number.isFinite(result.fps) ||
         result.fps <= 0 ||
-        result.fps > 240 ||
+        result.fps > MAX_FRAME_RATE ||
         result.paused !== true
       )
         invalid("invalid frame-step state");

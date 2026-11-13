@@ -2,6 +2,8 @@ import { createPopupRefresh } from "./popup-refresh.mjs";
 
 const api = globalThis.browser ?? globalThis.chrome;
 const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
+const CHAPTER_REFRESH_INTERVAL_MS = 5000;
+const TRASH_CLEANUP_INTERVAL_MS = 60000;
 let queue = Promise.resolve();
 const refreshCoordinator = createPopupRefresh({
   read: () => WAYPOINTS_STORAGE.read(),
@@ -373,7 +375,10 @@ api.storage.onChanged.addListener((changes, area) => {
     refreshCoordinator.schedule(queue).catch((e) => setStatus(e.message));
 });
 if (typeof setInterval === "function") {
-  setInterval(refreshOpenChapters, 5000);
-  setInterval(() => WAYPOINTS_STORAGE.expire().catch((error) => setStatus(error.message)), 60000);
+  setInterval(refreshOpenChapters, CHAPTER_REFRESH_INTERVAL_MS);
+  setInterval(
+    () => WAYPOINTS_STORAGE.expire().catch((error) => setStatus(error.message)),
+    TRASH_CLEANUP_INTERVAL_MS,
+  );
 }
 init().catch((e) => setStatus(`Couldn't open YT Waypoints: ${e.message}`));

@@ -6,7 +6,9 @@ export function startAutosave(context) {
   // Auto-save: while a *bookmarked* video plays, keep its saved time current.
   // Videos you haven't bookmarked are never recorded.
   const api = globalThis.browser ?? globalThis.chrome;
-  const INTERVAL_MS = 5000; // Also refreshes popup progress through storage.onChanged.
+  const AUTOSAVE_INTERVAL_MS = 5000; // Also refreshes popup progress through storage.onChanged.
+  const MIN_AUTOSAVE_POSITION_SECONDS = 5;
+  const NAVIGATION_DURATION_TOLERANCE_SECONDS = 2;
   let lastSaved = { id: null, t: -1 };
 
   function currentVideoId() {
@@ -90,7 +92,7 @@ export function startAutosave(context) {
     if (document.querySelector(".html5-video-player.ad-showing")) return;
     if (!Number.isFinite(video.currentTime) || video.currentTime < 0) return;
     const t = Math.floor(video.currentTime);
-    if (t < 5) return;
+    if (t < MIN_AUTOSAVE_POSITION_SECONDS) return;
     let info;
     try {
       info = WAYPOINTS_PLAYER_RESULTS.metadata(WAYPOINTS_READ_METADATA(id), id);
@@ -113,7 +115,12 @@ export function startAutosave(context) {
     if ((duration || entry.duration) && t > (duration || entry.duration)) return;
     // On YouTube's in-page navigation, the <video> may briefly still hold the
     // previous video. A duration mismatch means it isn't this one yet.
-    if (entry.duration && duration && Math.abs(entry.duration - duration) > 2) return;
+    if (
+      entry.duration &&
+      duration &&
+      Math.abs(entry.duration - duration) > NAVIGATION_DURATION_TOLERANCE_SECONDS
+    )
+      return;
 
     const channel = info.channelName
       ? { channelName: info.channelName, channelUrl: info.channelUrl }
@@ -136,8 +143,8 @@ export function startAutosave(context) {
     if (video && !video.paused) autosave().catch(() => {});
   }
 
-  if (context) context.setInterval(tick, INTERVAL_MS);
-  else setInterval(tick, INTERVAL_MS);
+  if (context) context.setInterval(tick, AUTOSAVE_INTERVAL_MS);
+  else setInterval(tick, AUTOSAVE_INTERVAL_MS);
   function listen(target, type, callback, capture = false) {
     target.addEventListener(type, callback, capture);
     context?.onInvalidated(() => target.removeEventListener(type, callback, capture));

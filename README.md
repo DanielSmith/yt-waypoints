@@ -306,6 +306,8 @@ popup bundle:
 | `popup.js` | Startup, module wiring, shared action queue, header state, and storage refresh |
 | `player-client.js` | Tab navigation and validated injected requests, including Firefox fallback |
 | `popup-refresh.mjs` | Orders and coalesces popup reads so stale snapshots cannot replace newer views |
+| `youtube-values.js` | Pure video-ID and channel-URL validation shared by extension-side consumers |
+| `settings-policy.js` | Immutable Settings defaults/ranges shared by controls, normalization and trash retention |
 | `popup-settings.js` | Settings normalization, captured field changes, persistence, and grouped Settings controls |
 | `popup-disclosures.js` | Shared reversible disclosure motion for Settings and Help |
 | `popup-bookmarks.js` | Bookmark/import/trash actions and lifetime-bound playback-position saves |

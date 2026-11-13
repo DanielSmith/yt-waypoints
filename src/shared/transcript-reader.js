@@ -4,6 +4,28 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
   const PANEL_ID = "engagement-panel-searchable-transcript";
   const MODERN_PANEL_ID = "PAmodern_transcript_view";
   const MAX_BYTES = 16000000;
+  const MAX_TOKEN_CHARACTERS = 20000;
+  const MAX_VARINT_BYTES = 8;
+  const MAX_MODEL_DEPTH = 35;
+  const MAX_MODEL_NODES = 150000;
+  const MAX_EXPANDED_PANELS = 20;
+  const MAX_SELECTION_KEY_CHARACTERS = 100000;
+  const MAX_LANGUAGE_CHOICES = 200;
+  const MAX_LANGUAGE_CHARACTERS = 200;
+  const MAX_LIST_ITEMS = 50000;
+  const MAX_SEGMENTS = 50000;
+  const MAX_CAPTION_PARTS = 1000;
+  const MAX_CAPTION_CHARACTERS = 10000;
+  const MAX_TRANSCRIPT_CHARACTERS = 2000000;
+  const MAX_TIMESTAMP_SECONDS = Math.floor(Number.MAX_SAFE_INTEGER / 1000);
+  const MAX_CLIENT_NAME_CHARACTERS = 50;
+  const MAX_CLIENT_VERSION_CHARACTERS = 100;
+  const MAX_CLIENT_FIELD_CHARACTERS = 8192;
+  const MAX_CONTEXT_CHARACTERS = 100000;
+  const SELECTION_POLL_ATTEMPTS = 40;
+  const SELECTION_POLL_INTERVAL_MS = 200;
+  const REQUEST_TIMEOUT_MS = 8000;
+  const MAX_ERROR_CHARACTERS = 450;
   const fail = (message) => {
     throw new Error(message);
   };
@@ -32,7 +54,8 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
   // The selected language token contains the video ID and caption-track key.
   // Decode only the bounded top-level protobuf fields; never synthesize a token.
   const tokenIdentity = (token, modern = false, videoOnly = false) => {
-    if (!string(token, 20000)) fail("The selected transcript request is unavailable.");
+    if (!string(token, MAX_TOKEN_CHARACTERS))
+      fail("The selected transcript request is unavailable.");
     let bytes;
     try {
       bytes = atob(decodeURIComponent(token).replace(/-/g, "+").replace(/_/g, "/"));
@@ -43,7 +66,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     const varint = () => {
       let value = 0,
         multiplier = 1;
-      for (let index = 0; index < 8 && offset < bytes.length; index++) {
+      for (let index = 0; index < MAX_VARINT_BYTES && offset < bytes.length; index++) {
         const byte = bytes.charCodeAt(offset++);
         value += (byte & 127) * multiplier;
         if (!Number.isSafeInteger(value)) break;
@@ -92,11 +115,11 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     let count = 0;
     const visit = (value, depth) => {
       if (!value || typeof value !== "object" || seen.has(value)) return;
-      if (depth > 35) {
+      if (depth > MAX_MODEL_DEPTH) {
         if (pageDiscovery) return;
         fail("The transcript response structure exceeds supported limits.");
       }
-      if (++count > 150000)
+      if (++count > MAX_MODEL_NODES)
         fail(
           pageDiscovery
             ? "YouTube page request discovery exceeds supported limits."
@@ -112,7 +135,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
 
   const modernSelection = (panels) => {
     const visible = [];
-    for (let index = 0; index < Math.min(panels.length, 20); index++) {
+    for (let index = 0; index < Math.min(panels.length, MAX_EXPANDED_PANELS); index++) {
       const data = asPageObject(panels[index])?.data;
       const list = data?.content?.sectionListRenderer;
       if (list && findModels([list.contents], "transcriptSegmentViewModel").length)
@@ -146,7 +169,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     const chips =
       data.header?.engagementPanelTitleHeaderRenderer?.subheader?.chipBarViewModel?.chips;
     const selectionKey = JSON.stringify([data.identifier, chips]);
-    if (selectionKey.length > 100000)
+    if (selectionKey.length > MAX_SELECTION_KEY_CHARACTERS)
       fail("The modern transcript selection exceeds supported limits.");
     return {
       modern: true,
@@ -161,12 +184,12 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     const items =
       search?.footer?.transcriptFooterRenderer?.languageMenu?.sortFilterSubMenuRenderer
         ?.subMenuItems;
-    if (!Array.isArray(items) || !items.length || items.length > 200) return null;
+    if (!Array.isArray(items) || !items.length || items.length > MAX_LANGUAGE_CHOICES) return null;
     let selection = null;
     for (let index = 0; index < items.length; index++) {
       const item = items[index];
       if (item?.selected !== true) continue;
-      if (selection || !string(item.title, 200))
+      if (selection || !string(item.title, MAX_LANGUAGE_CHARACTERS))
         fail("The transcript language selection is ambiguous.");
       const params =
         item.serviceEndpoint?.getTranscriptEndpoint?.params ||
@@ -182,7 +205,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     const panels = document.querySelectorAll('[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]');
     const modern = modernSelection(panels);
     if (modern) return modern;
-    for (let index = 0; index < Math.min(panels.length, 20); index++) {
+    for (let index = 0; index < Math.min(panels.length, MAX_EXPANDED_PANELS); index++) {
       const panel = panels[index];
       if (
         panel.getAttribute("target-id") !== PANEL_ID &&
@@ -296,7 +319,11 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     if (Object.keys(list).some((key) => !allowed.includes(key)))
       fail("The modern transcript contains unsupported content.");
     terminal(list);
-    if (!Array.isArray(list.contents) || !list.contents.length || list.contents.length > 50000)
+    if (
+      !Array.isArray(list.contents) ||
+      !list.contents.length ||
+      list.contents.length > MAX_LIST_ITEMS
+    )
       fail("The modern transcript is empty or too large.");
     const mediaDuration = document.querySelector("video")?.duration;
     const duration = Number.isFinite(mediaDuration) && mediaDuration > 0 ? mediaDuration : null;
@@ -324,7 +351,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       if (
         !Number.isFinite(start) ||
         start < 0 ||
-        start > Math.floor(Number.MAX_SAFE_INTEGER / 1000) ||
+        start > MAX_TIMESTAMP_SECONDS ||
         (duration !== null && start >= duration) ||
         (segments.length && start < segments.at(-1).start)
       )
@@ -332,7 +359,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       if (
         !Array.isArray(timeline.contentItems) ||
         !timeline.contentItems.length ||
-        timeline.contentItems.length > 1000
+        timeline.contentItems.length > MAX_CAPTION_PARTS
       )
         fail("The modern transcript contains unreadable captions.");
       const parts = [];
@@ -341,7 +368,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
           !content ||
           Object.keys(content).length !== 1 ||
           !content.transcriptSegmentViewModel ||
-          !string(content.transcriptSegmentViewModel.simpleText, 10000)
+          !string(content.transcriptSegmentViewModel.simpleText, MAX_CAPTION_CHARACTERS)
         )
           fail("The modern transcript contains unreadable captions.");
         parts.push(content.transcriptSegmentViewModel.simpleText);
@@ -349,7 +376,12 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       const rawText = parts.join(" ");
       characters += rawText.length;
       const text = rawText.replace(/\s+/g, " ").trim();
-      if (!text || rawText.length > 10000 || characters > 2000000 || segments.length >= 50000)
+      if (
+        !text ||
+        rawText.length > MAX_CAPTION_CHARACTERS ||
+        characters > MAX_TRANSCRIPT_CHARACTERS ||
+        segments.length >= MAX_SEGMENTS
+      )
         fail("The modern transcript is empty or too large.");
       // The modern panel has paragraph start times only. A null end is honest;
       // neither the last timestamp nor the media duration proves a cue end.
@@ -380,7 +412,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       if (
         !Array.isArray(section.contents) ||
         !section.contents.length ||
-        section.contents.length > 50000
+        section.contents.length > MAX_LIST_ITEMS
       )
         fail("The modern transcript contains empty or oversized sections.");
       for (const caption of section.contents) readMarker(caption);
@@ -458,7 +490,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       fail("YouTube has not provided a complete terminal transcript. Nothing was copied.");
     }
     const rows = list.initialSegments;
-    if (!Array.isArray(rows) || !rows.length || rows.length > 50000)
+    if (!Array.isArray(rows) || !rows.length || rows.length > MAX_LIST_ITEMS)
       fail("The complete transcript is empty or too large.");
     const videoDuration = document.querySelector("video")?.duration;
     const duration = Number.isFinite(videoDuration) && videoDuration > 0 ? videoDuration : null;
@@ -490,19 +522,22 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       let text = cue.snippet?.simpleText;
       if (text === undefined) {
         const runs = cue.snippet?.runs;
-        if (!Array.isArray(runs) || !runs.length || runs.length > 1000)
+        if (!Array.isArray(runs) || !runs.length || runs.length > MAX_CAPTION_PARTS)
           fail("The complete transcript contains unreadable captions.");
         text = "";
         for (const run of runs) {
-          if (typeof run.text !== "string" || text.length + run.text.length > 10000)
+          if (
+            typeof run.text !== "string" ||
+            text.length + run.text.length > MAX_CAPTION_CHARACTERS
+          )
             fail("The complete transcript contains oversized captions.");
           text += run.text;
         }
       }
-      if (typeof text !== "string" || text.length > 10000)
+      if (typeof text !== "string" || text.length > MAX_CAPTION_CHARACTERS)
         fail("The complete transcript contains invalid captions.");
       characters += text.length;
-      if (characters > 2000000) fail("The complete transcript is too large.");
+      if (characters > MAX_TRANSCRIPT_CHARACTERS) fail("The complete transcript is too large.");
       text = text.replace(/\s+/g, " ").trim();
       if (!text) fail("The complete transcript contains empty captions.");
       segments.push({ start, end, text });
@@ -541,8 +576,8 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
         !document.querySelectorAll('[visibility="ENGAGEMENT_PANEL_VISIBILITY_EXPANDED"]').length
       )
         fail("No transcript found. Open Show transcript on YouTube and try again.");
-      for (let attempt = 0; attempt < 40 && !selection; attempt++) {
-        await new Promise((resolve) => setTimeout(resolve, 200));
+      for (let attempt = 0; attempt < SELECTION_POLL_ATTEMPTS && !selection; attempt++) {
+        await new Promise((resolve) => setTimeout(resolve, SELECTION_POLL_INTERVAL_MS));
         if (!matches()) fail("The video changed. Please try again.");
         selection = selectedTranscript();
       }
@@ -553,7 +588,10 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       );
     const originalContext = readConfig("INNERTUBE_CONTEXT");
     const originalClient = originalContext?.client;
-    if (!string(originalClient?.clientName, 50) || !string(originalClient?.clientVersion, 100))
+    if (
+      !string(originalClient?.clientName, MAX_CLIENT_NAME_CHARACTERS) ||
+      !string(originalClient?.clientVersion, MAX_CLIENT_VERSION_CHARACTERS)
+    )
       fail("YouTube transcript request details are unavailable. Reload the tab and try again.");
     const client = {
       clientName: originalClient.clientName,
@@ -561,13 +599,13 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
     };
     for (const key of ["hl", "gl", "visitorData"]) {
       if (originalClient[key] !== undefined) {
-        if (!string(originalClient[key], 8192))
+        if (!string(originalClient[key], MAX_CLIENT_FIELD_CHARACTERS))
           fail("YouTube transcript request details are invalid.");
         client[key] = originalClient[key];
       }
     }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       // Fixed same-origin endpoint, using the selected page token/context. No
       // third-party service, API key, arbitrary URL, or caption-language guess.
@@ -577,7 +615,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
       let context = { client };
       if (selection.modern) {
         const serialized = JSON.stringify(originalContext);
-        if (!string(serialized, 100000))
+        if (!string(serialized, MAX_CONTEXT_CHARACTERS))
           fail("YouTube transcript request details exceed supported limits.");
         context = JSON.parse(serialized);
       }
@@ -613,7 +651,7 @@ globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {
   } catch (error) {
     const message =
       typeof error?.message === "string"
-        ? error.message.slice(0, 450)
+        ? error.message.slice(0, MAX_ERROR_CHARACTERS)
         : "Could not establish a complete transcript. Nothing was copied.";
     return { error: message || "Could not establish a complete transcript. Nothing was copied." };
   }

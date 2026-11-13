@@ -3,7 +3,10 @@
 // deletion/import/re-add starts a new lifetime, so stale patches cannot revive it.
 (() => {
   const api = globalThis.browser ?? globalThis.chrome;
-  const PREFIX = "waypoints.bookmarks.v2:";
+  const STORAGE_SCHEMA_VERSION = 2;
+  const PREFIX = `waypoints.bookmarks.v${STORAGE_SCHEMA_VERSION}:`;
+  const COMPACTION_RETRIES = 2;
+  const MILLISECONDS_PER_DAY = 86400000;
   const LEGACY = [0, "legacy"];
   const COMPACT_AT = 64;
   const cloneJson = (value) => JSON.parse(JSON.stringify(value));
@@ -117,7 +120,7 @@
     let clock = 0;
     const keys = [];
     for (const [key, entry] of Object.entries(raw)) {
-      if (!key.startsWith(PREFIX) || entry?.version !== 2) continue;
+      if (!key.startsWith(PREFIX) || entry?.version !== STORAGE_SCHEMA_VERSION) continue;
       keys.push(key);
       clock = Math.max(clock, entry.clock);
       for (const [id, record] of Object.entries(entry.records)) {
@@ -196,7 +199,7 @@
     return snapshot;
   }
 
-  async function compact(force = false, retries = 2) {
+  async function compact(force = false, retries = COMPACTION_RETRIES) {
     const snapshot = await read();
     if (!force && snapshot.keys.length < COMPACT_AT && !snapshot.retiredPayload) return;
     // Durably checkpoint all live/trash data before removing its source keys,
@@ -204,7 +207,7 @@
     const key = PREFIX + crypto.randomUUID();
     await api.storage.local.set({
       [key]: {
-        version: 2,
+        version: STORAGE_SCHEMA_VERSION,
         kind: "checkpoint",
         clock: snapshot.clock,
         records: snapshot.records,
@@ -219,7 +222,7 @@
   async function write(records, clock, kind, purge = false) {
     if (!Object.keys(records).length) return;
     await api.storage.local.set({
-      [PREFIX + crypto.randomUUID()]: { version: 2, kind, clock, records },
+      [PREFIX + crypto.randomUUID()]: { version: STORAGE_SCHEMA_VERSION, kind, clock, records },
     });
     try {
       await compact(purge);
@@ -303,7 +306,7 @@
   }
 
   function retentionDays(value) {
-    return Number.isInteger(value) && value >= 1 && value <= 365 ? value : 7;
+    return WAYPOINTS_SETTINGS_POLICY.retentionDays(value);
   }
 
   async function move(id, toTrash) {
@@ -352,7 +355,7 @@
 
   async function expire(now = Date.now()) {
     const snapshot = await read();
-    const duration = retentionDays(snapshot.settings.trashDays) * 86400000;
+    const duration = retentionDays(snapshot.settings.trashDays) * MILLISECONDS_PER_DAY;
     const ids = Object.keys(snapshot.trash).filter(
       (id) => snapshot.trashTimes[id] + duration <= now,
     );

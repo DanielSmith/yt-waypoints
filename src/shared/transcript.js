@@ -1,5 +1,9 @@
 // Transcript output is independent of YouTube's changing page markup.
 globalThis.WAYPOINTS_TRANSCRIPT = (() => {
+  const { isVideoId } = WAYPOINTS_YOUTUBE_VALUES;
+  const DEFAULT_FORMAT_ID = "markdown-linked";
+  const TRANSCRIPT_FORMAT_VERSION = 1;
+  const MAX_FILENAME_SLUG_CHARACTERS = 80;
   const formats = [
     {
       id: "markdown-linked",
@@ -72,7 +76,9 @@ globalThis.WAYPOINTS_TRANSCRIPT = (() => {
       example: '{ "start": 90, "end": 94, "text": "The next topic." }',
     },
   ];
-  const get = (id) => formats.find((format) => format.id === id) || formats[0];
+  const get = (id) =>
+    formats.find((format) => format.id === id) ||
+    formats.find((format) => format.id === DEFAULT_FORMAT_ID);
   const escapeMarkdown = (text) => String(text).replace(/([\\`*_{}\[\]()<>#+.!|~-])/g, "\\$1");
   function timestamp(seconds) {
     const total = Math.floor(seconds);
@@ -95,11 +101,7 @@ globalThis.WAYPOINTS_TRANSCRIPT = (() => {
   function prepare(video, result) {
     if (result?.complete !== true)
       throw new Error("Transcript completeness could not be established. Nothing was copied.");
-    if (
-      !/^[A-Za-z0-9_-]{11}$/.test(video.id) ||
-      !Array.isArray(result?.segments) ||
-      !result.segments.length
-    ) {
+    if (!isVideoId(video.id) || !Array.isArray(result?.segments) || !result.segments.length) {
       throw new Error(
         "Could not read the timed transcript. Open Show transcript on YouTube and try again.",
       );
@@ -154,7 +156,7 @@ globalThis.WAYPOINTS_TRANSCRIPT = (() => {
           : (next ?? duration);
     });
     return {
-      version: 1,
+      version: TRANSCRIPT_FORMAT_VERSION,
       video: {
         id: video.id,
         title: video.title || video.id,
@@ -218,7 +220,7 @@ globalThis.WAYPOINTS_TRANSCRIPT = (() => {
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "")
-        .slice(0, 80)
+        .slice(0, MAX_FILENAME_SLUG_CHARACTERS)
         .replace(/-+$/g, "") || "transcript";
     return {
       text: text + "\n",

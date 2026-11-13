@@ -13,6 +13,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   headerControl,
   closeOtherDialogs,
 }) => {
+  const DOWNLOAD_URL_REVOKE_DELAY_MS = 30000;
   const copyVideosEl = document.getElementById("copy-videos");
   const formatToggle = document.getElementById("transcript-format-toggle");
   const formatMenu = document.getElementById("transcript-format-menu");
@@ -245,7 +246,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
         link.click();
       } finally {
         link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), 30000);
+        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
       }
       closeFileSave();
       setStatus(`Copied to clipboard. File download requested: ${filename}`);

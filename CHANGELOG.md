@@ -2,6 +2,21 @@
 
 ## Unreleased — 2026-11-13
 
+- Share pure extension-side video-ID and channel-URL validation. Preserve URL
+  normalization, caller-specific errors and strict field/accessor checks. Require
+  string IDs in direct transcript formatting calls rather than coercing objects.
+  Keep serialized page-reader checks independent and unchanged.
+
+- Consolidate Settings, Help and annotation frame CSS around shared dimension
+  and clearance tokens. Remove unused expanded-size tokens and the duplicate
+  annotation-input rule. Keep the existing frame, scrolling and focus geometry;
+  annotation sizing now reads its pixel bounds from the same CSS tokens.
+
+- Give Settings defaults and numeric ranges one shared policy owner; initialize
+  controls from those rules and the annotation limit from its data contract.
+  Name owner-specific timers, schema versions, safety limits and reader bounds
+  while preserving current values and self-contained injected functions.
+
 - Serialize and coalesce popup refreshes. Discard reads invalidated by newer
   requests, preserve awaited action refreshes, and reuse them for their storage
   notifications. Keep external updates and recovery after read failures working.

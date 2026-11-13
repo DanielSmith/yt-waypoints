@@ -1,6 +1,12 @@
 // Self-contained: executeScript serializes this reader into the YouTube page.
 // Only read chapter models already loaded for the requested watch video.
 globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {
+  const MAX_CHAPTERS = 1000;
+  const MAX_TITLE_CHARACTERS = 1000;
+  const MAX_TITLE_RUNS = 100;
+  const MAX_PANELS = 100;
+  const MILLISECOND_PRECISION_EPSILON = 0.000001;
+  const MAX_ERROR_CHARACTERS = 500;
   try {
     const fail = (message) => {
       throw new Error(message);
@@ -22,16 +28,21 @@ globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {
     const duration = Math.floor(video.duration);
     const text = (value) => {
       let result = typeof value === "string" ? value : (value?.simpleText ?? value?.content);
-      if (result === undefined && Array.isArray(value?.runs) && value.runs.length <= 100) {
+      if (
+        result === undefined &&
+        Array.isArray(value?.runs) &&
+        value.runs.length <= MAX_TITLE_RUNS
+      ) {
         result = value.runs
           .map((run) =>
-            typeof run?.text === "string" && run.text.length <= 1000
+            typeof run?.text === "string" && run.text.length <= MAX_TITLE_CHARACTERS
               ? run.text
               : fail("Invalid chapter title."),
           )
           .join("");
       }
-      if (typeof result !== "string" || result.length > 1000) fail("Invalid chapter title.");
+      if (typeof result !== "string" || result.length > MAX_TITLE_CHARACTERS)
+        fail("Invalid chapter title.");
       result = result
         .replace(/[\u0000-\u001f\u007f]/g, " ")
         .replace(/\s+/g, " ")
@@ -49,14 +60,17 @@ globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {
       )
         fail("Invalid chapter timestamp.");
       const t = millis ? value / 1000 : value;
-      if (t >= duration || Math.abs(t * 1000 - Math.round(t * 1000)) > 0.000001)
+      if (
+        t >= duration ||
+        Math.abs(t * 1000 - Math.round(t * 1000)) > MILLISECOND_PRECISION_EPSILON
+      )
         fail("Chapter timestamp is outside the video.");
       return t;
     };
     const list = (items, read, continuations) => {
       if (continuations != null && (!Array.isArray(continuations) || continuations.length))
         fail("Chapter list is still loading.");
-      if (!Array.isArray(items) || !items.length || items.length > 1000)
+      if (!Array.isArray(items) || !items.length || items.length > MAX_CHAPTERS)
         fail("Invalid chapter list.");
       let previous = -1;
       return Array.from(items, (item) => {
@@ -96,7 +110,7 @@ globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {
       }
       const panels = root.engagementPanels;
       if (!Array.isArray(panels)) continue;
-      if (panels.length > 100) fail("Too many chapter panels.");
+      if (panels.length > MAX_PANELS) fail("Too many chapter panels.");
       for (const entry of panels) {
         const panel = entry?.engagementPanelSectionListRenderer;
         if (
@@ -159,6 +173,8 @@ globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {
       fail("The video changed while reading chapters.");
     return { id: expectedId, duration, available, chapters };
   } catch (error) {
-    return { error: String(error?.message || "Chapters are unavailable.").slice(0, 500) };
+    return {
+      error: String(error?.message || "Chapters are unavailable.").slice(0, MAX_ERROR_CHARACTERS),
+    };
   }
 };

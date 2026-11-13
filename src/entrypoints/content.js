@@ -1,4 +1,6 @@
 import { defineContentScript } from "wxt/utils/define-content-script";
+import "../shared/settings-policy.js";
+import "../shared/youtube-values.js";
 import "../shared/marker-data.js";
 import "../shared/metadata.js";
 import "../shared/player-results.js";

@@ -96,6 +96,10 @@ globalThis.WAYPOINTS_PLAYER_ACTIONS = {
   },
   // YouTube exposes frame rate and supported speeds on its page player.
   playback: (operation, direction, expectedId) => {
+    const MAX_FRAME_RATE = 240;
+    const RATE_STEPS_PER_UNIT = 4;
+    const RATE_COMPARISON_EPSILON = 0.001;
+    const FALLBACK_MAX_RATE = 2;
     try {
       const id = new URLSearchParams(location.search).get("v");
       if (id !== expectedId)
@@ -174,7 +178,7 @@ globalThis.WAYPOINTS_PLAYER_ACTIONS = {
             readPlayer("getVideoData")?.fps ??
             (matchingRates.size === 1 ? [...matchingRates][0] : null),
         );
-        if (!Number.isFinite(fps) || fps <= 0 || fps > 240) {
+        if (!Number.isFinite(fps) || fps <= 0 || fps > MAX_FRAME_RATE) {
           return { error: "Could not read this video's frame rate." };
         }
         if (!el.paused) el.pause();
@@ -196,7 +200,9 @@ globalThis.WAYPOINTS_PLAYER_ACTIONS = {
           if (
             Number.isFinite(rate) &&
             rate > 0 &&
-            (direction > 0 ? rate > el.playbackRate + 0.001 : rate < el.playbackRate - 0.001)
+            (direction > 0
+              ? rate > el.playbackRate + RATE_COMPARISON_EPSILON
+              : rate < el.playbackRate - RATE_COMPARISON_EPSILON)
           )
             choices.push(rate);
         }
@@ -206,9 +212,16 @@ globalThis.WAYPOINTS_PLAYER_ACTIONS = {
         // speed without assuming that a premium speed is available to everyone.
         const next =
           direction > 0
-            ? (Math.floor(el.playbackRate * 4 + 0.001) + 1) / 4
-            : (Math.ceil(el.playbackRate * 4 - 0.001) - 1) / 4;
-        choices.push(Math.min(Math.max(2, el.playbackRate), Math.max(0.25, next)));
+            ? (Math.floor(el.playbackRate * RATE_STEPS_PER_UNIT + RATE_COMPARISON_EPSILON) + 1) /
+              RATE_STEPS_PER_UNIT
+            : (Math.ceil(el.playbackRate * RATE_STEPS_PER_UNIT - RATE_COMPARISON_EPSILON) - 1) /
+              RATE_STEPS_PER_UNIT;
+        choices.push(
+          Math.min(
+            Math.max(FALLBACK_MAX_RATE, el.playbackRate),
+            Math.max(1 / RATE_STEPS_PER_UNIT, next),
+          ),
+        );
       }
       const rate = choices.length
         ? direction > 0

@@ -57,6 +57,9 @@ function fixture(seed = base()) {
   assert.deepEqual(plain(a.data.anchor([user("one", 60)], null)), { markerId: null, t: 0 });
   assert.deepEqual(plain(a.data.anchor([user("one", 60)], "u:one")), { markerId: "u:one", t: 60 });
   assert.equal(a.data.anchor([user("one", 60, { removed: true })], "u:one").t, 0);
+  assert.equal(a.data.MAX_NOTE_CHARACTERS, 10000);
+  assert.equal(a.data.note("x".repeat(10000)).length, 10000);
+  assert.throws(() => a.data.note("x".repeat(10001)), /Invalid annotation/);
   const note = "First line\n\n  Keep indentation and <plain text>.";
   assert.equal(a.data.note(note), note);
   assert.deepEqual(

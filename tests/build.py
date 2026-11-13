@@ -52,6 +52,11 @@ for browser in ('firefox', 'chrome'):
             original = (script.parent / name).resolve()
             if original.is_relative_to(ROOT / 'src'):
                 assert original.read_text() == content, name
+        if entry in (popup_script, 'content-scripts/content.js'):
+            assert any(name.endswith('/settings-policy.js') for name in mapping['sources'])
+            assert not (package / 'settings-policy.js').exists()
+            assert any(name.endswith('/youtube-values.js') for name in mapping['sources'])
+            assert not (package / 'youtube-values.js').exists()
         if entry == popup_script:
             assert any(name.endswith('/popup-refresh.mjs') for name in mapping['sources'])
             assert not (package / 'popup-refresh.mjs').exists()

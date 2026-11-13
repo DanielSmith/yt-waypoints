@@ -34,7 +34,7 @@
       <strong id="annotation-heading">Edit note</strong>
       <p id="annotation-target"></p>
       <label for="annotation-text">Annotation</label>
-      <textarea id="annotation-text" rows="3" maxlength="10000" aria-describedby="annotation-error"></textarea>
+      <textarea id="annotation-text" rows="3" aria-describedby="annotation-error"></textarea>
       <p id="annotation-error" role="alert"></p>
       <div class="annotation-actions">
         <button id="annotation-save" class="secondary-button" type="button" title="Save annotation (Ctrl/Command+Enter)">Save</button>
@@ -82,12 +82,12 @@
         <label class="setting" for="scrub-seconds">
           <span class="setting-title"><span>Arrow-key scrub</span><output id="scrub-value" for="scrub-seconds"></output></span>
           <p id="scrub-help">Seconds to move with ← or → on a bookmark. An open video seeks; a closed video updates its saved position.</p>
-          <input id="scrub-seconds" aria-describedby="scrub-help" type="range" min="1" max="60" step="1" value="10">
+          <input id="scrub-seconds" aria-describedby="scrub-help" type="range">
         </label>
         <label class="setting" for="shift-multiplier">
           <span class="setting-title"><span>Shift multiplier</span><output id="multiplier-value" for="shift-multiplier"></output></span>
           <p id="shift-preview"></p>
-          <input id="shift-multiplier" aria-describedby="shift-preview" type="range" min="1" max="10" step="1" value="3">
+          <input id="shift-multiplier" aria-describedby="shift-preview" type="range">
         </label>
         <p id="shortcut-help"></p>
       </div>
@@ -102,8 +102,8 @@
             <option value="permanent">Permanent: delete now</option>
           </select>
           <p id="deletion-help">Timed deletion keeps bookmarks in trash for restoration. Permanent deletion removes their stored content immediately.</p>
-          <label class="retention-control" for="trash-days">Permanently delete trash after <input id="trash-days" type="number" min="1" max="365" step="1" value="7" aria-describedby="trash-expiry-help" disabled> days</label>
-          <p id="trash-expiry-help">Default: 7 days (one week). Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.</p>
+          <label class="retention-control" for="trash-days">Permanently delete trash after <input id="trash-days" type="number" aria-describedby="trash-expiry-help" disabled> days</label>
+          <p id="trash-expiry-help"></p>
           <label class="setting-title"><span>Show trash in the list and search</span><input id="show-trash" type="checkbox" disabled></label>
           <p>Current bookmarks always show. Trash is tinted red and has a Restore toggle.</p>
           <button id="empty-trash" class="secondary-button" type="button" aria-describedby="trash-count" disabled>Empty trash</button>

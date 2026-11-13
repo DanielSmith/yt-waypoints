@@ -9,8 +9,15 @@
   --radius-dialog: 8px;
   --radius-small: 3px;
   --popup-width: 360px;
-  --popup-width-expanded: 640px;
   --panel-height: 420px;
-  --panel-height-expanded: 520px;
+  --popup-frame-height: 520px;
+  --popup-bottom-clearance: 16px;
+  --dialog-viewport-clearance: 20px;
+  /* Pixel dimensions shared by CSS and annotation sizing/scroll calculations. */
+  --annotation-control-clearance: 6px;
+  --annotation-scroll-clearance: 4px;
+  --annotation-input-height: 80px;
+  --annotation-input-min-height: 40px;
+  --annotation-input-max-height: 160px;
   --disabled-opacity: .6;
 }
