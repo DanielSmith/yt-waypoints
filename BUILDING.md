@@ -73,14 +73,14 @@ package.json version, and ZIP entries have stable ordering, timestamps, and
 permissions. No build timestamp, absolute workspace path, or environment version
 is embedded in the packages. Source map paths are relative and deterministic.
 
-For version `2.2.0`, the outputs are:
+For version `2.3.0`, the outputs are:
 
 ```text
 yt-waypoints-firefox/                 loadable Firefox extension
 yt-waypoints-chrome/                  loadable Chrome/Brave extension
-artifacts/yt-waypoints-firefox-2.2.0.zip
-artifacts/yt-waypoints-chrome-2.2.0.zip
-artifacts/yt-waypoints-source-2.2.0.zip  original sources for reviewers
+artifacts/yt-waypoints-firefox-2.3.0.zip
+artifacts/yt-waypoints-chrome-2.3.0.zip
+artifacts/yt-waypoints-source-2.3.0.zip  original sources for reviewers
 ```
 
 Tests compare rebuilt ZIP bytes with the originals, including source maps and

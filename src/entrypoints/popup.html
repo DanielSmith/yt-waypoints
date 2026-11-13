@@ -22,6 +22,17 @@
     <div id="status" role="status"></div>
     <div id="hint"><span>/ search · space play · ↵ open · </span><button id="help-toggle" type="button" aria-haspopup="dialog" aria-controls="help-dialog">h / ? toggle help</button></div>
   </header>
+  <section id="annotation-editor" aria-labelledby="annotation-heading" hidden>
+    <strong id="annotation-heading">Edit note</strong>
+    <p id="annotation-target"></p>
+    <label for="annotation-text">Annotation</label>
+    <textarea id="annotation-text" rows="3" maxlength="10000" aria-describedby="annotation-error"></textarea>
+    <p id="annotation-error" role="alert"></p>
+    <div class="annotation-actions">
+      <button id="annotation-save" class="secondary-button" type="button" title="Save annotation (Ctrl/Command+Enter)">Save</button>
+      <button id="annotation-cancel" class="secondary-button" type="button">Cancel</button>
+    </div>
+  </section>
   <ul id="list"></ul>
   <section id="options-panel" aria-label="Options" hidden>
     <label class="setting" for="theme-select">
@@ -32,6 +43,10 @@
     <label class="setting">
       <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
       <p id="thumbnail-help">On by default. Loads images from YouTube’s image server using the video IDs. Your bookmarks stay local. Press t outside search to toggle.</p>
+    </label>
+    <label class="setting">
+      <span class="setting-title"><span>Show markers</span><input id="show-markers" type="checkbox"></span>
+      <p>Press M to show or hide marker lines. Hidden markers and annotations are kept in storage and JSON exports.</p>
     </label>
     <label class="setting">
       <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox"></span>
@@ -116,28 +131,92 @@
   </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title">
     <div class="help-heading"><strong id="help-title">Keyboard shortcuts</strong><button id="help-close" type="button" autofocus>Close</button></div>
-    <table class="help-table">
-      <thead><tr><th scope="col">Key</th><th scope="col">Action</th></tr></thead>
-      <tbody>
-        <tr><td>← / →</td><td id="help-scrub"></td></tr>
-        <tr><td>Shift + ← / →</td><td id="help-multiplier"></td></tr>
-        <tr><td>, / .</td><td>Previous / next frame (pauses automatically)</td></tr>
-        <tr><td>&lt; / &gt; (Shift + , / .)</td><td>Decrease / increase playback speed</td></tr>
-        <tr><td>Space</td><td>Play / pause</td></tr>
-        <tr><td>Delete / Backspace</td><td>Use deletion mode on current rows; permanently delete trash rows</td></tr>
-        <tr><td>Enter</td><td>Open / play selected video</td></tr>
-        <tr><td>↑ / ↓</td><td>Move between rows</td></tr>
-        <tr><td>/</td><td>Search</td></tr>
-        <tr><td>t</td><td>Toggle thumbnails</td></tr>
-        <tr><td>T (Shift + t)</td><td>Copy selected video's transcript (open tab required)</td></tr>
-        <tr><td>u</td><td>Copy selected video URL</td></tr>
-        <tr><td>c</td><td>Copy selected row as JSON</td></tr>
-        <tr><td>C (Shift + c)</td><td>Copy all current videos as JSON</td></tr>
-        <tr><td>h / ?</td><td>Toggle help</td></tr>
-        <tr><td>Escape</td><td id="help-escape">Close popup</td></tr>
-      </tbody>
-    </table>
-    <p class="support-footer"><a href="https://ko-fi.com/dansmithcreativetech" target="_blank" rel="noopener noreferrer">Support on Ko-fi ↗</a></p>
+    <div class="shortcut-list">
+      <details class="shortcut">
+        <summary><span class="shortcut-key">m</span><span class="shortcut-name">Toggle marker</span></summary>
+        <div class="shortcut-explanation"><p>Toggle a marker at the live playback position, or the saved position when the video is closed. A marker within two seconds is removed instead. Removing a marker also deletes its annotation. Holding the key does not toggle repeatedly.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">M</span><span class="shortcut-name">Show/hide markers</span></summary>
+        <div class="shortcut-explanation"><p>Show or hide the marker lines over the timeline. The preference is saved locally. Hiding markers keeps their data and annotations, including in JSON exports.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">a</span><span class="shortcut-name">Add/edit annotation</span></summary>
+        <div class="shortcut-explanation"><p>Add or edit the current marker’s annotation. Without a current marker, use the video-start annotation at 0:00. Chapter titles are the default annotations until you edit or clear them.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Ctrl/⌘ + Enter</span><span class="shortcut-name">Save annotation</span></summary>
+        <div class="shortcut-explanation"><p>Save the open annotation editor. Use Ctrl+Enter on Windows/Linux or Command+Enter on macOS. Ordinary Enter adds a new line while editing.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">[ / ]</span><span class="shortcut-name">Previous/next marker</span></summary>
+        <div class="shortcut-explanation"><p>Move to the previous or next marker without wrapping at the ends. Near a selected marker, step through adjacent points, including overlapping markers. An open video seeks without changing playback state; a closed video updates its saved position.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">← / →</span><span class="shortcut-name" id="help-scrub">Scrub</span></summary>
+        <div class="shortcut-explanation"><p id="help-scrub-detail"></p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Shift + ← / →</span><span class="shortcut-name" id="help-multiplier">Larger scrub</span></summary>
+        <div class="shortcut-explanation"><p id="help-multiplier-detail"></p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">, / .</span><span class="shortcut-name">Previous/next frame</span></summary>
+        <div class="shortcut-explanation"><p>Step one frame backward or forward in an open video. A playing video pauses automatically and stays paused. Frame size comes from the player’s reported frame rate.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">&lt; / &gt;</span><span class="shortcut-name">Playback speed</span></summary>
+        <div class="shortcut-explanation"><p>Decrease or increase playback speed in an open video. These are Shift+comma and Shift+period on common keyboard layouts.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Space</span><span class="shortcut-name">Play/pause</span></summary>
+        <div class="shortcut-explanation"><p>Toggle playback for the selected video when it is open. If it is closed, open it at its saved position.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Delete / Backspace</span><span class="shortcut-name">Delete bookmark</span></summary>
+        <div class="shortcut-explanation"><p>Apply the selected deletion mode to a current bookmark. Timed mode moves it to trash; Permanent mode deletes it immediately. On an already trashed row, delete it permanently.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Enter</span><span class="shortcut-name">Open video</span></summary>
+        <div class="shortcut-explanation"><p>Open or switch to the selected video at its saved position. Existing YouTube tabs are reused when possible.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">↑ / ↓</span><span class="shortcut-name">Select video</span></summary>
+        <div class="shortcut-explanation"><p>Move focus between search and the visible video rows. These keys do not seek or change the saved position.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">/</span><span class="shortcut-name">Focus search</span></summary>
+        <div class="shortcut-explanation"><p>Reveal and focus search. When already typing in search, a slash is inserted normally.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">t</span><span class="shortcut-name">Show/hide thumbnails</span></summary>
+        <div class="shortcut-explanation"><p>Toggle video thumbnails and save the preference. Enabled thumbnails load from YouTube’s image server; bookmarks stay local.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">T</span><span class="shortcut-name">Copy transcript</span></summary>
+        <div class="shortcut-explanation"><p>Press Shift+t to copy the selected open video’s transcript in your chosen format. A complete supported transcript is required. The existing clipboard is kept if extraction fails.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">u</span><span class="shortcut-name">Copy video URL</span></summary>
+        <div class="shortcut-explanation"><p>Copy the selected video’s clean YouTube URL, including its saved timestamp.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">c</span><span class="shortcut-name">Copy video JSON</span></summary>
+        <div class="shortcut-explanation"><p>Copy only the selected current video as JSON, including its markers and annotations. Paste that JSON into another Waypoints popup to merge it.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">C</span><span class="shortcut-name">Copy all JSON</span></summary>
+        <div class="shortcut-explanation"><p>Press Shift+c to copy all current bookmarks, including rows hidden by search, with their markers and annotations. Trash and preferences are excluded. Also works in Options.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">h / ?</span><span class="shortcut-name">Toggle help</span></summary>
+        <div class="shortcut-explanation"><p>Open or close this shortcut reference. Up/Down or Tab moves through the rows; Enter or Space expands the focused explanation. Multiple explanations can stay open. Expanding a row does not run its shortcut.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">Escape</span><span class="shortcut-name" id="help-escape">Close help</span></summary>
+        <div class="shortcut-explanation"><p id="help-escape-detail"></p></div>
+      </details>
+    </div>
   </dialog>
   <script type="module" src="../entries/popup.js"></script>
 </body>

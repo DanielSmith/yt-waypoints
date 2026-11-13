@@ -76,6 +76,12 @@
         if (typeof removed !== "boolean") throw new Error("Invalid marker removal state.");
         clean.removed = removed;
       }
+      // Removal deletes annotations, including historical removed records and
+      // late note edits racing a deletion. Keep identity only for suppression.
+      if (clean.removed) {
+        delete clean.note;
+        delete clean.label;
+      }
       return clean;
     }).sort((a, b) => a.t - b.t || a.id.localeCompare(b.id));
   }
@@ -89,6 +95,16 @@
   function anchor(markers, currentId) {
     const marker = normalize(markers).find((item) => item.id === currentId && !item.removed);
     return marker ? { markerId: marker.id, t: marker.t } : { markerId: null, t: 0 };
+  }
+  function annotation(marker) {
+    if (!marker || marker.removed) return "";
+    // The source title supplies the default annotation in a separate field.
+    // A user's note, including an explicit empty string, always overrides it.
+    return Object.hasOwn(marker, "note")
+      ? marker.note
+      : marker.origin === "chapter"
+        ? marker.title || ""
+        : "";
   }
   function refreshChapters(local, chapters) {
     const markers = new Map(normalize(local).map((marker) => [marker.id, marker]));
@@ -108,6 +124,7 @@
     note,
     chapterId,
     anchor,
+    annotation,
     refreshChapters,
     MAX_MARKERS,
   });

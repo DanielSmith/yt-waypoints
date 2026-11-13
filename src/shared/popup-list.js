@@ -16,6 +16,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
   enqueue,
   setStatus,
   refresh,
+  markers,
 }) => {
   let activeScrubber = null;
   const { seekTo, deleteVideo, restoreTrashVideo } = actions;
@@ -205,7 +206,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
       details.append(meta);
 
       if (v.duration && !inTrash) {
-        details.append(makeScrubber(v, meta, when));
+        const timeline = document.createElement("div");
+        timeline.className = "timeline";
+        timeline.append(makeScrubber(v, meta, when));
+        markers.decorate(v, timeline);
+        details.append(timeline);
       }
       main.append(details);
 

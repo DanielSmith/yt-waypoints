@@ -161,9 +161,33 @@
       return { error: text(result.error, "error message", 500) };
     }
     if (operation === "bookmark") return metadata(value, expectedId);
+    if (operation === "chapters") {
+      const result = fields(value, ["id", "duration", "available", "chapters"]);
+      identity(result, expectedId);
+      const duration = seconds(result.duration, "duration");
+      if (
+        !duration ||
+        typeof result.available !== "boolean" ||
+        !Array.isArray(result.chapters) ||
+        result.chapters.length > 1000 ||
+        (!result.available && result.chapters.length)
+      )
+        invalid("invalid chapter list");
+      let previous = -1;
+      const chapters = Array.from(result.chapters, (item) => {
+        const chapter = fields(item, ["t", "title"]);
+        const t = seconds(chapter.t, "chapter timestamp", false);
+        if (t >= duration || t <= previous || Math.abs(t * 1000 - Math.round(t * 1000)) > 0.000001)
+          invalid("invalid chapter timing");
+        previous = t;
+        return { t, title: text(chapter.title, "chapter title", 1000) };
+      });
+      return { id: result.id, duration, available: result.available, chapters };
+    }
     if (operation === "transcript") return transcript(value, expectedId);
     const mode = operation === "playback" ? args[0] : operation;
-    if (!["seek", "seekTo", "toggle", "frame", "rate"].includes(mode)) invalid("unknown operation");
+    if (!["position", "seek", "seekTo", "toggle", "frame", "rate"].includes(mode))
+      invalid("unknown operation");
     const allowed =
       mode === "rate"
         ? ["id", "rate"]

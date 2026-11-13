@@ -7,6 +7,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   dialogs,
   exportsController,
   listController,
+  markers,
   getSettings,
   getVideos,
   getTrash,
@@ -20,6 +21,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   escapeClosesPopup,
   enqueue,
   setThumbnails,
+  toggleMarkers,
   setStatus,
   closePopup,
 }) => {
@@ -47,7 +49,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
       event.defaultPrevented ||
       dialogs.helpOpen ||
       dialogs.aboutOpen ||
-      exportsController.fileSaveOpen
+      exportsController.fileSaveOpen ||
+      markers.editorOpen
     )
       return;
     const text = event.clipboardData?.getData("text/plain").trim();
@@ -85,6 +88,38 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
     const savedVideos = getVideos();
     const trashVideos = getTrash();
     if (e.isComposing) return;
+    if (
+      markers.editorOpen &&
+      !dialogs.helpOpen &&
+      !dialogs.aboutOpen &&
+      !exportsController.fileSaveOpen
+    ) {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.repeat) {
+        e.preventDefault();
+        enqueue(markers.saveEditor);
+        return;
+      }
+      if (
+        e.key === "Escape" &&
+        !escapeClosesPopup &&
+        !document.getElementById("help-dialog").open &&
+        !document.getElementById("about-dialog").open
+      ) {
+        e.preventDefault();
+        markers.closeEditor();
+      }
+      return;
+    }
+    const active = document.activeElement;
+    const tag = (active?.tagName || active?.tag || "").toLowerCase();
+    if (
+      active?.isContentEditable ||
+      tag === "textarea" ||
+      (tag === "input" &&
+        active !== searchEl &&
+        !["range", "checkbox", "button", "submit"].includes(active.type))
+    )
+      return;
     if (dialogs.aboutOpen) {
       if (e.key === "Escape" && !escapeClosesPopup) {
         e.preventDefault();
@@ -124,6 +159,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
       return;
     }
     if (modified) return;
+    if (e.key === "M" && document.activeElement !== searchEl) {
+      e.preventDefault();
+      if (!e.repeat) toggleMarkers().catch((error) => setStatus(error.message));
+      return;
+    }
     if (helpKey && document.activeElement !== searchEl) {
       e.preventDefault();
       if (!e.repeat) openHelp();
@@ -181,6 +221,20 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
     }
     if (!row?.classList.contains("main")) return;
     const id = row.dataset.id;
+    if (!trashVideos[id] && ["m", "a", "[", "]"].includes(e.key)) {
+      const key = e.key;
+      e.preventDefault();
+      if (!e.repeat)
+        enqueue(() =>
+          key === "m"
+            ? markers.toggle(id)
+            : key === "a"
+              ? markers.edit(id)
+              : markers.navigate(id, key === "]" ? 1 : -1),
+        );
+      return;
+    }
+    if (tag === "button" && ["Enter", " "].includes(e.key)) return;
     if (trashVideos[id]) {
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();

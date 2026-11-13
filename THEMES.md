@@ -23,7 +23,9 @@ A theme defines its colors under `:root[data-theme="THEME-ID"]`. The initializer
 resolves System to `light` or `dark` and places that ID on the document root.
 There are no duplicated light/dark palettes in media queries or JavaScript.
 All UI palette values belong in these theme files, including status colors,
-trash backgrounds/hover states, and future marker colors. Component CSS uses
+trash backgrounds/hover states, and marker colors (`--color-marker-chapter`
+for blue chapter lines and `--color-marker-user` for green personal
+lines). Both marker roles meet 4.5:1 contrast on list surfaces. Component CSS uses
 `--color-*` references. `transparent`, `inherit`, and `currentColor` are neutral
 structural values, not additional palettes. Progress percentages and disabled
 opacity are shared interaction values, not literal color definitions.
@@ -91,12 +93,11 @@ check the built-in role sets, text/button/control contrast,
 selection persistence, System updates, storage failures, and startup races.
 Native Firefox/Chrome checks remain useful for browser-specific control styling.
 
-## Planned marker colors
+## Marker colors
 
-When markers are implemented, define chapter-marker blue and user-marker green
-as separate semantic roles in every theme (for example,
-`--color-marker-chapter` and `--color-marker-user`). Components must use those
-roles rather than hard-coded blue/green values or JavaScript color setters.
-Theme-specific shades may vary for contrast while retaining the confirmed
-blue/green origin distinction. These roles are planned, not unused palette
-tokens added ahead of the feature.
+`--color-marker-chapter` supplies blue chapter lines and
+`--color-marker-user` supplies green personal lines in every theme.
+Components reference these semantic roles; JavaScript sets positions, not colors.
+Theme-specific shades retain the blue/green distinction and meet 4.5:1 contrast
+against list/button surfaces. Both origins use thin vertical lines over the same timeline; there is no separate marker lane or list.
+Annotating a chapter marker preserves its origin and blue presentation.

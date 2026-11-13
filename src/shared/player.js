@@ -2,6 +2,31 @@
 // The popup uses these operations to read or control the YouTube player.
 globalThis.WAYPOINTS_PLAYER_ACTIONS = {
   bookmark: globalThis.WAYPOINTS_READ_METADATA,
+  chapters: globalThis.WAYPOINTS_READ_CHAPTERS,
+  position: (expectedId) => {
+    const id = new URLSearchParams(location.search).get("v");
+    if (id !== expectedId)
+      return { error: "This tab changed videos. Try again on the current video." };
+    const watch = document.querySelector("ytd-watch-flexy:not([hidden])");
+    if (watch?.getAttribute("video-id") && watch.getAttribute("video-id") !== id)
+      return { error: "The video is still changing. Wait for it to load." };
+    if (document.querySelector(".html5-video-player.ad-showing"))
+      return { error: "Wait for the YouTube ad to finish before using markers." };
+    const video = document.querySelector("video");
+    if (
+      !video ||
+      !Number.isFinite(video.currentTime) ||
+      !Number.isFinite(video.duration) ||
+      video.duration <= 0
+    )
+      return { error: "The video's duration is not ready. Wait for it to load." };
+    return {
+      id,
+      t: Math.floor(video.currentTime),
+      duration: Math.floor(video.duration),
+      paused: video.paused,
+    };
+  },
   seek: (delta, expectedId) => {
     const id = new URLSearchParams(location.search).get("v");
     if (id !== expectedId)

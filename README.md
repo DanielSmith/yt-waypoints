@@ -76,6 +76,43 @@ open in a YouTube tab and have an available transcript. The default output is
 **Markdown with linked timestamps**, including the video title and source URL.
 You can also select a video, open **Show options**, and click **Copy transcript**.
 
+### Markers and annotations (development build)
+
+Select a saved video row. Marker controls are keyboard driven:
+
+- **m** toggles a marker at the live playback position, or the saved position
+  for a closed video. A marker within two seconds is removed instead of creating
+  a duplicate. Removing a marker also deletes its annotation.
+- **[** / **]** navigate previous/next markers without wrapping. Playing/paused
+  state is preserved; a closed video's saved resume point changes. Navigation
+  requires a known duration.
+- **a** adds or edits the current marker's annotation. Without a current marker,
+  it uses **0:00**, even when markers exist elsewhere. Adding a marker or
+  navigating to one establishes the current marker for this popup.
+- **M** shows/hides marker lines. Hidden markers and notes stay stored and are
+  included in JSON exports. Visibility is also available in Options.
+
+Markers are thin vertical lines over the existing timeline, green for personal
+markers and blue for chapter markers. There are no extra marker buttons, lists,
+restoration controls, or additional row height. The lines leave slider dragging
+and clicking alone.
+
+The annotation editor appears only when requested. **Ctrl/⌘+Enter** or **Save**
+saves the note; **Cancel** discards the draft. **a** reopens the existing note
+instead of creating another. Notes preserve line breaks and are plain text.
+Removing a marker clears its note and personal label; creating another marker
+there does not restore the deleted annotation. A removal identity remains to
+prevent delayed edits or chapter refreshes from recreating it.
+
+Current selection resets when the popup closes or the bookmark lifetime changes.
+Chapter loading reads supported chapter models from open YouTube watch tabs
+when the popup opens, retrying every five seconds while it remains open. Chapters
+become blue markers. Navigate with **[** / **]**, then press **a**: the chapter
+title is the default annotation. Your edited or explicitly cleared note overrides
+that default and survives source-title refreshes. Missing/unsupported chapter
+models leave saved markers intact and do not block personal markers. Closed
+videos retain chapters previously saved or imported.
+
 ### Remove a waypoint and restore it
 
 Click **×** on a row or select it and press **Delete / Backspace**. By default,
@@ -173,7 +210,13 @@ appearance. Choose **Light** or **Dark** to keep a fixed appearance.
 ## Keyboard reference
 
 Press **h** or **?** outside search, or click **h / ? toggle help**, to open the
-shortcut table. Use the same keys or Close to dismiss it.
+compact shortcut list. Use **Up/Down** or **Tab** to focus a row, then **Enter**
+or **Space** (or click) to expand/collapse its explanation. Multiple rows can
+stay open. Toggles ease over one third of a second; expanded rows use the selected
+row background. Reduced-motion settings skip the animation. The help popup and
+dialog keep fixed heights, with reserved scrollbar space and internal scrolling
+as needed. Use **h**, **?**, or Close to dismiss help. Expanding a row does not
+run its shortcut.
 
 | Key | Action |
 | --- | --- |
@@ -188,6 +231,11 @@ shortcut table. Use the same keys or Close to dismiss it.
 | `/` | Search |
 | `t` | Toggle thumbnails |
 | `T` (Shift + t) | Copy the selected video's transcript in your chosen format (video must be open) |
+| `m` | Toggle a marker at the live or saved position |
+| `a` | Add/edit the current annotation, or the video-start note at 0:00 |
+| `M` | Show / hide marker lines |
+| `Ctrl/⌘ + Enter` | Save the open annotation |
+| `[` / `]` | Previous / next marker |
 | `u` | Copy the selected video's clean URL, including its saved position |
 | `c` | Copy just the selected row in the standard JSON transfer envelope |
 | `C` (Shift + c) | Copy all saved videos as JSON, including filtered-out rows |
@@ -225,12 +273,11 @@ playback details, transcript extraction, import validation, and storage handling
 
 ### Source and build outputs
 
-Marker/annotation implementation has begun with its data layer. The optional
-`markers` and video-start `startNote` fields persist and round-trip through JSON;
-exports containing them use transfer version 2. Bookmark-only exports stay at
-version 1, and older JSON imports preserve existing local marker data. Popup
-marker controls and shortcuts are not available yet. Keep a current JSON backup
-before downgrading, as older versions cannot preserve this new data.
+Markers and annotations use independently versioned storage fields and are
+included in single-row and all-row JSON transfers. Exports containing them use
+transfer version 2; bookmark-only exports stay at version 1. Older JSON imports
+preserve existing local marker data. Keep a current JSON backup before
+downgrading, as older versions cannot preserve the new data.
 
 The popup is assembled from focused scripts imported by `src/entries/popup.js`
 and built with WXT/Vite. `popup.html` loads the early theme script and the
@@ -244,6 +291,8 @@ popup bundle:
 | `popup-bookmarks.js` | Bookmark/import/trash actions and lifetime-bound playback-position saves |
 | `popup-exports.js` | Transcript format UI, copying, clipboard fallback, and optional file saving |
 | `popup-list.js` | Filtering, grouped sorting, rows, sliders, and focus restoration |
+| `popup-markers.js` | Keyboard marker operations, chapter refresh, selection, timeline overlays, and annotation editing |
+| `chapter-reader.js` | Self-contained read-only extraction from video-bound YouTube chapter models |
 | `popup-input.js` | Keyboard and paste routing, modal guards, and native editing behavior |
 | `popup-dialogs.js` | Help/About lifecycle and focus return |
 
@@ -365,7 +414,9 @@ node tests/keyboard-browser.cjs firefox
 ```
 
 Set `WAYPOINTS_CHROME_BINARY` if the browser executable is not in a standard
-location. This checks real DOM capture/target propagation; the Firefox argument
+location. This checks 32 real DOM keyboard cases per adapter, including help focus,
+independent disclosures, animation/reduced motion, fixed geometry, and markers,
+annotation editing, selection/focus, and capture/target propagation; the Firefox argument
 selects the Firefox adapter, not the Firefox browser engine. It does not replace
 native installed-extension testing on YouTube. It is separate from `npm test`
 so the standard suite does not require a browser installation.

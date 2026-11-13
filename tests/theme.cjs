@@ -251,6 +251,11 @@ function checkUiFiles(directory = extension) {
     for (const surface of ["--color-trash-surface", "--color-trash-hover", "--color-selected"])
       contrast("--color-trash-border", surface, 3);
     contrast("--color-danger", "--color-surface", 4.5);
+    for (const marker of ["--color-marker-chapter", "--color-marker-user"]) {
+      contrast(marker, "--color-surface", 4.5);
+      contrast(marker, "--color-surface-raised", 4.5);
+      contrast(marker, "--color-surface-hover", 4.5);
+    }
   }
   console.log(
     "PASS:",

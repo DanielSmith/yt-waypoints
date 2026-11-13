@@ -122,10 +122,17 @@ async function createPopupFixture(
     }
     click() {
       if (this.tag === "a") downloads.push({ filename: this.download, href: this.href });
-      this.events.click?.({ target: this });
+      this.events.click?.({ target: this, stopPropagation() {}, preventDefault() {} });
     }
   }
   const ids = [
+    "show-markers",
+    "annotation-editor",
+    "annotation-text",
+    "annotation-save",
+    "annotation-cancel",
+    "annotation-error",
+    "annotation-target",
     "offer-save-file",
     "file-save-dialog",
     "file-name-fields",
@@ -149,7 +156,10 @@ async function createPopupFixture(
     "help-toggle",
     "help-close",
     "help-scrub",
+    "help-scrub-detail",
     "help-multiplier",
+    "help-multiplier-detail",
+    "help-escape-detail",
     "copy-videos",
     "include-channel-names",
     "show-thumbnails",
@@ -250,6 +260,13 @@ async function createPopupFixture(
             ? responses.map((response) => ({ frameId: 0, ...response }))
             : responses;
         }
+        if (request.func.name === "chapters")
+          return [
+            {
+              frameId: 0,
+              result: { id: request.args[0], duration: 1000, available: false, chapters: [] },
+            },
+          ];
         if (
           request.func.name === "WAYPOINTS_READ_METADATA" ||
           request.func === context.WAYPOINTS_READ_METADATA
@@ -350,6 +367,366 @@ async function createPopupFixture(
 }
 (async () => {
   console.log("Popup target:", flavor);
+  const markerId = "aaaaaaaaaaa";
+  const markerSeed = (extra = {}) => ({
+    id: markerId,
+    title: "Marker fixture",
+    t: 15,
+    duration: 100,
+    updated: 1,
+    ...extra,
+  });
+  const markerPoint = (id, t, extra = {}) => ({ id: "u:" + id, t, origin: "user", ...extra });
+  const markerFixture = (video = markerSeed(), behavior = {}, settings = {}) =>
+    createPopupFixture(
+      { videos: { [markerId]: video }, settings: { autoBookmark: false, ...settings } },
+      "https://example.com/",
+      behavior,
+    );
+  let chapterTitle = "Introduction";
+  let chapterTime = 15;
+  let chapterAvailable = true;
+  const chapterSource = await markerFixture(
+    markerSeed({ markers: [{ id: "u:personal", t: 90, origin: "user", note: "Personal note" }] }),
+    {
+      tabs: [{ id: 4, url: `https://www.youtube.com/watch?v=${markerId}` }],
+      async executeScript(request) {
+        if (request.func.name === "chapters")
+          return [
+            {
+              result: {
+                id: markerId,
+                duration: 100,
+                available: chapterAvailable,
+                chapters: chapterAvailable
+                  ? [
+                      { t: 0, title: chapterTitle },
+                      { t: 40, title: "Deep dive" },
+                    ]
+                  : [],
+              },
+            },
+          ];
+        if (request.func.name === "seekTo") chapterTime = request.args[0];
+        return [{ result: { id: markerId, t: chapterTime, duration: 100, paused: false } }];
+      },
+    },
+  );
+  await chapterSource.settle();
+  assert.equal(
+    chapterSource.data.videos[markerId].markers.length,
+    3,
+    "open saved videos seed chapters automatically",
+  );
+  assert.equal(
+    chapterSource.data.videos[markerId].t,
+    15,
+    "chapter loading does not move resume time",
+  );
+  chapterSource.els.list.querySelectorAll(".main")[0].focus();
+  chapterSource.doc.listeners.keydown({ key: "[", preventDefault() {} });
+  await chapterSource.settle();
+  chapterSource.doc.listeners.keydown({ key: "a", preventDefault() {} });
+  await chapterSource.settle();
+  assert.equal(chapterSource.els["annotation-text"].value, "Introduction");
+  chapterSource.els["annotation-text"].value = "My edited introduction";
+  chapterSource.els["annotation-save"].click();
+  await chapterSource.settle();
+  chapterTitle = "Updated chapter title";
+  await vm.runInContext(`markers.refreshChapters("${markerId}")`, chapterSource.context);
+  let chapterRecord = chapterSource.data.videos[markerId].markers.find(
+    (point) => point.id === "c:0",
+  );
+  assert.equal(chapterRecord.title, chapterTitle);
+  assert.equal(chapterRecord.note, "My edited introduction");
+  chapterSource.doc.listeners.keydown({ key: "a", preventDefault() {} });
+  await chapterSource.settle();
+  chapterSource.els["annotation-text"].value = "";
+  chapterSource.els["annotation-save"].click();
+  await chapterSource.settle();
+  await vm.runInContext(`markers.refreshChapters("${markerId}")`, chapterSource.context);
+  chapterRecord = chapterSource.data.videos[markerId].markers.find((point) => point.id === "c:0");
+  assert.equal(chapterRecord.note, "", "chapter refresh preserves explicitly cleared annotations");
+  chapterSource.doc.listeners.keydown({ key: "m", preventDefault() {} });
+  await chapterSource.settle();
+  await vm.runInContext(`markers.refreshChapters("${markerId}")`, chapterSource.context);
+  chapterRecord = chapterSource.data.videos[markerId].markers.find((point) => point.id === "c:0");
+  assert.equal(chapterRecord.removed, true, "chapter refresh never restores a removed marker");
+  assert.equal(chapterRecord.note, undefined);
+  assert.equal(
+    chapterSource.data.videos[markerId].markers.find((point) => point.id === "u:personal").note,
+    "Personal note",
+  );
+  chapterAvailable = false;
+  const beforeUnavailable = JSON.stringify(chapterSource.data.videos[markerId].markers);
+  await vm.runInContext(`markers.refreshChapters("${markerId}")`, chapterSource.context);
+  assert.equal(JSON.stringify(chapterSource.data.videos[markerId].markers), beforeUnavailable);
+  let releaseChapters;
+  const delayedChapters = await markerFixture(markerSeed(), {
+    tabs: [{ id: 4, url: `https://www.youtube.com/watch?v=${markerId}` }],
+    executeScript: () =>
+      new Promise((resolve) => {
+        releaseChapters = resolve;
+      }),
+  });
+  await delayedChapters.settle();
+  await vm.runInContext(
+    `WAYPOINTS_STORAGE.importVideos({"${markerId}":{id:"${markerId}",t:50,duration:100}})`,
+    delayedChapters.context,
+  );
+  releaseChapters([
+    {
+      result: {
+        id: markerId,
+        duration: 100,
+        available: true,
+        chapters: [{ t: 0, title: "Stale source" }],
+      },
+    },
+  ]);
+  await delayedChapters.settle();
+  assert.equal(delayedChapters.data.videos[markerId].markers, undefined);
+  assert.equal(delayedChapters.data.videos[markerId].t, 50);
+  console.log(
+    "PASS: automatic chapter seeding, default title annotations, preservation of edits/clears/removals and delayed import lifetime safety",
+  );
+  async function markerKey(popup, key, extra = {}) {
+    popup.doc.listeners.keydown({ key, preventDefault() {}, stopPropagation() {}, ...extra });
+    await popup.settle();
+  }
+  const clustered = await markerFixture(
+    markerSeed({
+      t: 10,
+      markers: [
+        { id: "c:10000", t: 10, origin: "chapter", title: "A chapter" },
+        markerPoint("same", 10, { note: "Personal note" }),
+        markerPoint("near", 11),
+        markerPoint("later", 30),
+      ],
+    }),
+  );
+  clustered.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(clustered, "]"); // Establish a point beyond the cluster.
+  await markerKey(clustered, "[");
+  assert.equal(clustered.data.videos[markerId].t, 11);
+  await markerKey(clustered, "[");
+  assert.equal(clustered.data.videos[markerId].t, 10);
+  await markerKey(clustered, "a");
+  assert.equal(clustered.els["annotation-text"].value, "Personal note");
+  clustered.els["annotation-cancel"].click();
+  await markerKey(clustered, "m");
+  assert.equal(
+    clustered.data.videos[markerId].markers.find((point) => point.id === "u:same").removed,
+    true,
+  );
+  assert.equal(
+    clustered.data.videos[markerId].markers.find((point) => point.id === "c:10000").removed,
+    undefined,
+    "toggle removes the selected coincident marker",
+  );
+  await markerKey(clustered, "]");
+  await markerKey(clustered, "[");
+  await markerKey(clustered, "[");
+  await markerKey(clustered, "a");
+  assert.equal(
+    clustered.els["annotation-text"].value,
+    "A chapter",
+    "coincident chapter remains keyboard reachable",
+  );
+  clustered.els["annotation-cancel"].click();
+  const manualMarkers = await markerFixture();
+  manualMarkers.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(manualMarkers, "m");
+  assert.equal(manualMarkers.data.videos[markerId].markers[0].t, 15);
+  assert.equal(manualMarkers.data.videos[markerId].t, 15);
+  assert.equal(manualMarkers.data.settings?.showMarkers ?? true, true);
+  let markerWrites = manualMarkers.writes();
+  for (const extra of [
+    { repeat: true },
+    { ctrlKey: true },
+    { metaKey: true },
+    { altKey: true },
+    { isComposing: true },
+  ])
+    await markerKey(manualMarkers, "m", extra);
+  assert.equal(manualMarkers.writes(), markerWrites);
+  await markerKey(manualMarkers, "M", { shiftKey: true });
+  assert.equal(manualMarkers.data.settings.showMarkers, false);
+  const afterHide = manualMarkers.writes();
+  await markerKey(manualMarkers, "M", { repeat: true, shiftKey: true });
+  assert.equal(manualMarkers.writes(), afterHide);
+  await markerKey(manualMarkers, "M", { shiftKey: true });
+  assert.equal(manualMarkers.data.settings.showMarkers, true);
+  for (let index = 0; index < 2; index++)
+    manualMarkers.doc.listeners.keydown({ key: "M", shiftKey: true, preventDefault() {} });
+  await vm.runInContext("queue", manualMarkers.context);
+  await manualMarkers.settle();
+  assert.equal(manualMarkers.data.settings.showMarkers, true, "two fast M presses toggle twice");
+  markerWrites = manualMarkers.writes();
+  await markerKey(manualMarkers, "a");
+  assert.match(manualMarkers.els["annotation-target"].textContent, /Marker 0:15/);
+  manualMarkers.els["annotation-text"].value = "My marker note\nSecond line";
+  // Marker shortcuts, paste/import, and options cannot steal an active editor.
+  for (const key of ["m", "M", "a", "]", "[", "c", "C", "t", "h"])
+    await markerKey(manualMarkers, key);
+  assert.equal(await manualMarkers.paste('{"videos":{}}'), false);
+  manualMarkers.els["options-toggle"].click();
+  assert.equal(manualMarkers.els["options-panel"].hidden, true);
+  assert.equal(manualMarkers.writes(), markerWrites);
+  manualMarkers.els["annotation-save"].click();
+  await manualMarkers.settle();
+  assert.equal(manualMarkers.data.videos[markerId].markers[0].note, "My marker note\nSecond line");
+  assert.equal(manualMarkers.els["annotation-editor"].hidden, true);
+  await markerKey(manualMarkers, "m");
+  assert.equal(manualMarkers.data.videos[markerId].markers[0].removed, true);
+  assert.equal(manualMarkers.data.videos[markerId].markers[0].note, undefined);
+  await markerKey(manualMarkers, "m");
+  const freshMarker = manualMarkers.data.videos[markerId].markers.find((marker) => !marker.removed);
+  assert.equal(freshMarker.note, undefined, "re-adding a marker cannot restore its old annotation");
+  await markerKey(manualMarkers, "a");
+  assert.equal(manualMarkers.els["annotation-text"].value, "");
+  manualMarkers.els["annotation-text"].value = "New note";
+  await markerKey(manualMarkers, "Enter", { ctrlKey: true });
+  assert.equal(
+    manualMarkers.data.videos[markerId].markers.find((marker) => !marker.removed).note,
+    "New note",
+  );
+
+  const startNote = await markerFixture(markerSeed({ t: 88 }));
+  startNote.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(startNote, "a");
+  assert.match(startNote.els["annotation-target"].textContent, /Video start 0:00/);
+  startNote.els["annotation-text"].value = "A note at the start";
+  startNote.els["annotation-save"].click();
+  await startNote.settle();
+  assert.equal(startNote.data.videos[markerId].startNote, "A note at the start");
+  assert.equal(startNote.data.videos[markerId].t, 88);
+  assert.equal(startNote.data.videos[markerId].markers, undefined);
+  await markerKey(startNote, "a");
+  startNote.els["annotation-text"].value = "";
+  startNote.els["annotation-save"].click();
+  await startNote.settle();
+  assert.equal(startNote.data.videos[markerId].startNote, "");
+
+  const chapterMarker = { id: "c:30000", t: 30, origin: "chapter", title: "A chapter" };
+  const markerNav = await markerFixture(
+    markerSeed({ markers: [markerPoint("first", 10), markerPoint("second", 20), chapterMarker] }),
+  );
+  markerNav.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(markerNav, "a");
+  assert.match(markerNav.els["annotation-target"].textContent, /Video start 0:00/);
+  markerNav.els["annotation-cancel"].click();
+  await markerKey(markerNav, "[");
+  assert.equal(markerNav.data.videos[markerId].t, 10);
+  markerWrites = markerNav.writes();
+  await markerKey(markerNav, "[");
+  assert.equal(markerNav.writes(), markerWrites);
+  assert.match(markerNav.els.status.textContent, /No previous marker/);
+  await markerKey(markerNav, "]");
+  assert.equal(markerNav.data.videos[markerId].t, 20);
+  await markerKey(markerNav, "]");
+  assert.equal(markerNav.data.videos[markerId].t, 30);
+  await markerKey(markerNav, "]");
+  assert.match(markerNav.els.status.textContent, /No next marker/);
+  await markerKey(markerNav, "a");
+  markerNav.els["annotation-text"].value = "Chapter annotation";
+  markerNav.els["annotation-save"].click();
+  await markerNav.settle();
+  assert.equal(markerNav.data.videos[markerId].markers[2].origin, "chapter");
+  assert.equal(markerNav.data.videos[markerId].markers[2].note, "Chapter annotation");
+  markerNav.els["show-markers"].checked = false;
+  markerNav.els["show-markers"].events.change();
+  await markerNav.settle();
+  assert.equal(markerNav.data.settings.showMarkers, false);
+  assert.equal(markerNav.data.videos[markerId].markers.length, 3);
+  await markerKey(markerNav, "c");
+  assert.equal(
+    JSON.parse(markerNav.clipboardWrites.at(-1)).videos[markerId].markers[2].note,
+    "Chapter annotation",
+  );
+  const hiddenReopen = await createPopupFixture(markerNav.data, "https://example.com/");
+  assert.equal(hiddenReopen.els["show-markers"].checked, false);
+
+  const openMarkerTab = { id: 4, windowId: 1, url: `https://www.youtube.com/watch?v=${markerId}` };
+  const liveMarker = await markerFixture(markerSeed(), {
+    tabs: [openMarkerTab],
+    executeScript: async () => [{ result: { id: markerId, t: 70, duration: 100, paused: false } }],
+  });
+  liveMarker.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(liveMarker, "m");
+  assert.equal(liveMarker.data.videos[markerId].markers[0].t, 70);
+  assert.equal(liveMarker.data.videos[markerId].t, 15);
+  assert.equal(liveMarker.executions.at(-1).operation, "position");
+  for (const result of [
+    null,
+    { error: "Wait for the YouTube ad to finish." },
+    { id: "bbbbbbbbbbb", t: 70, duration: 100, paused: false },
+  ]) {
+    const invalid = await markerFixture(markerSeed(), {
+      tabs: [openMarkerTab],
+      executeScript: async () => [{ result }],
+    });
+    invalid.els.list.querySelectorAll(".main")[0].focus();
+    await markerKey(invalid, "m");
+    assert.equal(invalid.writes(), 0);
+    assert.equal(invalid.data.videos[markerId].markers, undefined);
+  }
+  // A delayed valid position cannot attach a new marker to an imported lifetime.
+  let releaseMarkerPosition;
+  const delayedMarker = await markerFixture(markerSeed(), {
+    tabs: [openMarkerTab],
+    executeScript: () =>
+      new Promise((resolve) => {
+        releaseMarkerPosition = resolve;
+      }),
+  });
+  const markerPending = vm.runInContext(`markers.toggle("${markerId}")`, delayedMarker.context);
+  await delayedMarker.settle();
+  await vm.runInContext(
+    `WAYPOINTS_STORAGE.importVideos({"${markerId}": {id:"${markerId}", t:90, duration:100}})`,
+    delayedMarker.context,
+  );
+  releaseMarkerPosition([{ result: { id: markerId, t: 70, duration: 100, paused: false } }]);
+  await assert.rejects(markerPending, /bookmark changed/);
+  assert.equal(delayedMarker.data.videos[markerId].markers, undefined);
+  assert.equal(delayedMarker.data.videos[markerId].t, 90);
+
+  // Concurrent note changes keep the unsaved draft visible and require reopening.
+  const conflictingNote = await markerFixture(markerSeed({ startNote: "Original" }));
+  conflictingNote.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(conflictingNote, "a");
+  conflictingNote.els["annotation-text"].value = "My draft";
+  await vm.runInContext(
+    `(async () => { const s=await WAYPOINTS_STORAGE.read(); s.videos["${markerId}"].startNote="Other editor"; await WAYPOINTS_STORAGE.save(s); })()`,
+    conflictingNote.context,
+  );
+  conflictingNote.els["annotation-save"].click();
+  await conflictingNote.settle();
+  assert.equal(conflictingNote.data.videos[markerId].startNote, "Other editor");
+  assert.equal(conflictingNote.els["annotation-text"].value, "My draft");
+  assert.match(conflictingNote.els["annotation-error"].textContent, /changed elsewhere/);
+  conflictingNote.els["annotation-cancel"].click();
+  await markerKey(conflictingNote, "a");
+  conflictingNote.els["annotation-text"].value = "Draft after import";
+  await vm.runInContext(
+    `WAYPOINTS_STORAGE.importVideos({"${markerId}": {id:"${markerId}", t:90}})`,
+    conflictingNote.context,
+  );
+  conflictingNote.els["annotation-save"].click();
+  await conflictingNote.settle();
+  assert.match(conflictingNote.els["annotation-error"].textContent, /bookmark changed/);
+  assert.equal(conflictingNote.els["annotation-text"].value, "Draft after import");
+  conflictingNote.els["annotation-cancel"].click();
+  const unknownMarker = await markerFixture(
+    markerSeed({ duration: 0, markers: [markerPoint("outside", 10)] }),
+  );
+  unknownMarker.els.list.querySelectorAll(".main")[0].focus();
+  await markerKey(unknownMarker, "[");
+  assert.match(unknownMarker.els.status.textContent, /read its duration/);
+  assert.equal(unknownMarker.data.videos[markerId].t, 15);
+  console.log(
+    "PASS: marker shortcuts, live/closed positions, selection, annotations/start fallback, editing guards, hide/export, navigation and delayed/conflicting lifetime safety",
+  );
   const markerVideo = {
     id: "aaaaaaaaaaa",
     title: "Marker export",
@@ -424,8 +801,39 @@ async function createPopupFixture(
       },
     },
   };
+  const chapterWatch = { getAttribute: () => id };
+  const originalQuery = page.document.querySelector;
+  page.document.querySelector = (selector) =>
+    selector === "ytd-watch-flexy:not([hidden])" ? chapterWatch : originalQuery(selector);
+  page.ytInitialData = {
+    currentVideoEndpoint: { watchEndpoint: { videoId: id } },
+    playerOverlays: {
+      playerOverlayRenderer: {
+        decoratedPlayerBarRenderer: {
+          decoratedPlayerBarRenderer: {
+            playerBar: {
+              chapteredPlayerBarRenderer: {
+                chapters: [
+                  {
+                    chapterRenderer: {
+                      timeRangeStartMillis: 0,
+                      title: { simpleText: "Bundled chapter" },
+                    },
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+  };
   const injected = (name, args) =>
     vm.runInNewContext(`(${bundledActions[name].toString()})(...args)`, { ...page, args });
+  assert.equal(injected("position", [id]).t, 10);
+  assert.equal(injected("chapters", [id]).chapters[0].title, "Bundled chapter");
+  assert.equal(video.currentTime, 10, "reading marker position does not seek");
+  assert.equal(video.paused, false, "reading marker position does not pause");
   assert.equal(injected("seek", [5, id]).t, 15);
   assert.equal(injected("seekTo", [30, id]).t, 30);
   assert.equal(injected("toggle", [id]).paused, true);
@@ -1451,10 +1859,7 @@ async function createPopupFixture(
       return [{ result: { id: "aaaaaaaaaaa", t: 750, duration: 1000, paused: true } }];
     },
   });
-  const liveSlider = live.els.list
-    .querySelectorAll(".main")[0]
-    .children.find((c) => c.className === "details")
-    .children.find((c) => c.className === "bar");
+  const liveSlider = live.els.list.querySelectorAll(".bar")[0];
   liveSlider.value = "750";
   liveSlider.events.input();
   liveSlider.events.change();
@@ -1520,11 +1925,16 @@ async function createPopupFixture(
     });
     const event = await dispatchKey(keyboardSlider, barOf(keyboardSlider), key, { shiftKey });
     assert.deepEqual(
-      keyboardSlider.executions.map((call) => call.operation),
+      keyboardSlider.executions
+        .filter((call) => call.operation !== "chapters")
+        .map((call) => call.operation),
       ["seekTo"],
       "one slider arrow must issue exactly one absolute seek",
     );
-    assert.deepEqual(keyboardSlider.executions[0].args, [expected, "aaaaaaaaaaa"]);
+    assert.deepEqual(keyboardSlider.executions.find((call) => call.operation === "seekTo").args, [
+      expected,
+      "aaaaaaaaaaa",
+    ]);
     assert.equal(keyboardSlider.data.videos.aaaaaaaaaaa.t, expected);
     assert.equal(keyboardSlider.writes(), 1);
     assert.equal(event.defaultPrevented, true, "prevent the native extra range step");
@@ -1538,7 +1948,9 @@ async function createPopupFixture(
       repeat: true,
     });
     assert.deepEqual(
-      keyboardSlider.executions.map((call) => call.operation),
+      keyboardSlider.executions
+        .filter((call) => call.operation !== "chapters")
+        .map((call) => call.operation),
       ["seekTo", "seekTo"],
     );
   }
@@ -1567,7 +1979,9 @@ async function createPopupFixture(
   });
   await dispatchKey(rowArrows, rowArrows.els.list.querySelectorAll(".main")[0], "ArrowRight");
   assert.deepEqual(
-    rowArrows.executions.map((call) => call.operation),
+    rowArrows.executions
+      .filter((call) => call.operation !== "chapters")
+      .map((call) => call.operation),
     ["seek"],
     "row arrows retain relative playback scrubbing",
   );
@@ -1619,8 +2033,8 @@ async function createPopupFixture(
   await key("?");
   assert.equal(shortcuts.els["help-dialog"].open, true);
   assert.equal(shortcuts.doc.activeElement, shortcuts.els["help-close"]);
-  assert.equal(shortcuts.els["help-scrub"].textContent, "Scrub 10 seconds");
-  assert.equal(shortcuts.els["help-multiplier"].textContent, "×3 (30 seconds)");
+  assert.equal(shortcuts.els["help-scrub"].textContent, "Scrub 10s");
+  assert.equal(shortcuts.els["help-multiplier"].textContent, "Scrub 30s");
   await key("?", { repeat: true });
   assert.equal(shortcuts.els["help-dialog"].open, true);
   for (const name of ["Delete", "t", "C", "ArrowRight", "Enter"]) await key(name);
@@ -1654,7 +2068,8 @@ async function createPopupFixture(
   if (flavor === "firefox") {
     assert.equal(escapePrevented, 0, "Firefox owns popup dismissal; do not pretend to suppress it");
     assert.equal(escapeStopped, 0);
-    assert.equal(shortcuts.els["help-escape"].textContent, "Close entire popup (Firefox)");
+    assert.equal(shortcuts.els["help-escape"].textContent, "Close popup");
+    assert.match(shortcuts.els["help-escape-detail"].textContent, /Firefox reserves Escape/);
     await key("h");
   } else {
     assert.equal(escapePrevented, 3, "consume Escape down, held repeats, and release");

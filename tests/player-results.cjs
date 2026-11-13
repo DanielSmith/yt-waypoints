@@ -15,7 +15,7 @@ function reject(operation, result, args = ["frame", 1, id]) {
   assert.throws(() => schema.validate(operation, result, id, args), /Invalid player response/);
   rejected++;
 }
-for (const operation of ["seek", "seekTo", "toggle"]) {
+for (const operation of ["position", "seek", "seekTo", "toggle"]) {
   const clean = schema.validate(operation, base, id);
   assert.deepEqual(JSON.parse(JSON.stringify(clean)), base);
   for (const result of [
@@ -41,7 +41,7 @@ for (const operation of ["seek", "seekTo", "toggle"]) {
   ])
     reject(operation, result);
 }
-for (const operation of ["seek", "seekTo"]) reject(operation, { ...base, duration: 0 });
+for (const operation of ["position", "seek", "seekTo"]) reject(operation, { ...base, duration: 0 });
 assert.equal(schema.validate("toggle", { ...base, duration: 0 }, id).duration, 0);
 for (const fps of [24, 29.97, 30, 60, 240])
   assert.equal(schema.validate("playback", { ...frame, fps }, id, ["frame"]).fps, fps);

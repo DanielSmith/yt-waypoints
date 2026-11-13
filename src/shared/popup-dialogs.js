@@ -16,15 +16,98 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   const aboutToggle = document.getElementById("about-toggle");
   let helpPreviousFocus = null;
   let helpPreviousRowId = null;
+  const helpMotions = new Map();
+  const disclosureDuration = 1000 / 3;
+
+  function settleHelpMotions() {
+    for (const [row, motion] of helpMotions) {
+      motion.animation.cancel();
+      row.open = motion.open;
+    }
+    helpMotions.clear();
+  }
+
+  function toggleExplanation(row) {
+    const content = row.querySelector(".shortcut-explanation");
+    const previous = helpMotions.get(row);
+    const open = previous ? !previous.open : !row.open;
+    const from = content.getBoundingClientRect().height;
+    previous?.animation.cancel();
+    helpMotions.delete(row);
+    row.open = true;
+    const to = open ? content.scrollHeight : 0;
+    if (
+      globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
+      typeof content.animate !== "function" ||
+      from === to
+    ) {
+      row.open = open;
+      return;
+    }
+    // The content stays clipped during the height reveal, including when a
+    // second click reverses an in-flight animation from its current height.
+    const animation = content.animate([{ height: `${from}px` }, { height: `${to}px` }], {
+      duration: disclosureDuration,
+      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+      fill: "both",
+    });
+    helpMotions.set(row, { animation, open });
+    animation.finished.then(
+      () => {
+        if (helpMotions.get(row)?.animation !== animation) return;
+        row.open = open;
+        helpMotions.delete(row);
+        animation.cancel();
+      },
+      () => {
+        /* A rapid toggle or closing help intentionally cancels motion. */
+      },
+    );
+  }
+
+  function navigateHelp(event) {
+    if (
+      !helpDialog.open ||
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      !["ArrowDown", "ArrowUp"].includes(event.key)
+    )
+      return;
+    const rows = [...helpDialog.querySelectorAll(".shortcut > summary")];
+    if (!rows.length) return;
+    const index = rows.indexOf(document.activeElement);
+    const down = event.key === "ArrowDown";
+    const next =
+      index < 0
+        ? down
+          ? 0
+          : rows.length - 1
+        : Math.max(0, Math.min(rows.length - 1, index + (down ? 1 : -1)));
+    event.preventDefault();
+    event.stopPropagation();
+    rows[next].focus();
+    rows[next].scrollIntoView({ block: "nearest" });
+  }
 
   function updateHint() {
     const settings = getSettings();
     document.getElementById("help-escape").textContent = escapeClosesPopup
-      ? "Close entire popup (Firefox)"
+      ? "Close popup"
       : "Close help";
-    document.getElementById("help-scrub").textContent = `Scrub ${settings.scrubSeconds} seconds`;
+    document.getElementById("help-escape-detail").textContent = escapeClosesPopup
+      ? "Firefox reserves Escape for closing the entire toolbar popup. Use Close, h, or ? to close only this help and return to your selected row."
+      : "Close this help and return focus to the selected row or control. In the annotation editor, Escape cancels the draft. Outside these views, the browser can close the popup.";
+    document.getElementById("help-scrub").textContent = `Scrub ${settings.scrubSeconds}s`;
+    document.getElementById("help-scrub-detail").textContent =
+      `Move the selected video's live or saved position by ${settings.scrubSeconds} seconds. On a progress slider, arrows change that slider once; playing or paused state is preserved.`;
     document.getElementById("help-multiplier").textContent =
-      `×${settings.shiftMultiplier} (${settings.scrubSeconds * settings.shiftMultiplier} seconds)`;
+      `Scrub ${settings.scrubSeconds * settings.shiftMultiplier}s`;
+    document.getElementById("help-multiplier-detail").textContent =
+      `Hold Shift with the scrub arrows to apply your ×${settings.shiftMultiplier} multiplier, moving ${settings.scrubSeconds * settings.shiftMultiplier} seconds. Configure both values in Options.`;
   }
 
   function openHelp() {
@@ -33,13 +116,16 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     helpPreviousRowId = helpPreviousFocus?.dataset?.id;
     updateHint();
     document.body.classList.add("help-open");
+    document.documentElement.classList.add("help-open");
     helpDialog.showModal();
   }
 
   function closeHelp() {
     if (!helpDialog.open) return;
+    settleHelpMotions();
     helpDialog.close();
     document.body.classList.remove("help-open");
+    document.documentElement.classList.remove("help-open");
     const row =
       helpPreviousRowId &&
       listEl.querySelector(`.main[data-id="${CSS.escape(helpPreviousRowId)}"]`);
@@ -63,6 +149,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   }
 
   function init() {
+    helpDialog.addEventListener("keydown", navigateHelp);
+    for (const row of helpDialog.querySelectorAll(".shortcut")) {
+      row.querySelector("summary").addEventListener("click", (event) => {
+        event.preventDefault();
+        toggleExplanation(row);
+      });
+    }
     helpToggle.addEventListener("click", openHelp);
     aboutToggle.addEventListener("click", openAbout);
     document.getElementById("about-close").addEventListener("click", closeAbout);

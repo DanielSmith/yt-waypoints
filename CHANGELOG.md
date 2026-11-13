@@ -1,10 +1,20 @@
 # Changelog
 
-## Unreleased — 2026-11-12
+## 2.3.0 — 2026-11-12
 
-- Begin the marker/annotation data foundation: independently versioned marker
-  properties, video-start notes, retained chapter removals, and validated
-  version-2 JSON transfer. Marker controls and shortcuts are still in progress.
+- Compact shortcut help into one-line summaries with independently expandable
+  explanations. Add Up/Down focus, 333ms eased toggles, selected-row backgrounds,
+  and reduced-motion support. Fix the help frame height and reserve scrollbar
+  width so toggles scroll internally without resizing or shifting the popup.
+- Add keyboard-driven markers (`m`, `[` / `]`), annotation editing (`a`), and
+  visibility toggle (`M`). Thin blue/green lines overlay the existing timeline
+  without adding row height or marker buttons/lists. Deleting a marker also
+  deletes its annotation. Ctrl/Command+Enter saves the requested note editor.
+  Read chapters from supported open YouTube page models and use chapter titles
+  as default annotations, preserving personal overrides, clears, and removals.
+  No new browser permissions or OAuth flow.
+- Add independently versioned marker properties, video-start notes, retained
+  chapter-removal identities, and validated version-2 JSON transfer.
 - Build readable popup, content-script, and early-theme bundles using pinned
   WXT/Vite and ES-import entry points. Include local source maps, a dependency
   lockfile, and reproducible reviewer-source build instructions.

@@ -111,7 +111,7 @@ globalThis.WAYPOINTS_CREATE_PLAYER_CLIENT = ({
     try {
       const request = { target: { tabId, frameIds: [0] }, func: actions[operation], args };
       let results;
-      if (operation === "playback" || operation === "transcript") {
+      if (["playback", "transcript", "chapters"].includes(operation)) {
         try {
           results = await api.scripting.executeScript({ ...request, world: "MAIN" });
         } catch (error) {

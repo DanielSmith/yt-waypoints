@@ -21,6 +21,7 @@ for browser in ('firefox', 'chrome'):
     assert (package / 'LICENSE').read_bytes() == (ROOT / 'LICENSE').read_bytes()
     assert (package / 'THIRD-PARTY-NOTICES.md').read_bytes() == (ROOT / 'THIRD-PARTY-NOTICES.md').read_bytes()
     assert manifest['permissions'] == ['storage', 'activeTab', 'scripting']
+    assert manifest['host_permissions'] == ['*://*.youtube.com/*']
     assert all(p.endswith('.png') for p in manifest['icons'].values())
     for size in (16,32,48,96,128):
         image = (package / manifest['icons'][str(size)]).read_bytes()

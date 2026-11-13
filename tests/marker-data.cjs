@@ -59,6 +59,19 @@ function fixture(seed = base()) {
   assert.equal(a.data.anchor([user("one", 60, { removed: true })], "u:one").t, 0);
   const note = "First line\n\n  Keep indentation and <plain text>.";
   assert.equal(a.data.note(note), note);
+  assert.deepEqual(
+    plain(
+      a.data.normalize([
+        user("old-removal", 10, {
+          removed: true,
+          note: "Old retained annotation",
+          label: "Old label",
+        }),
+      ]),
+    ),
+    [user("old-removal", 10, { removed: true })],
+    "old removed records do not expose their deleted annotations",
+  );
   for (const markers of [
     null,
     {},
@@ -119,7 +132,11 @@ function fixture(seed = base()) {
   await Promise.all([a.storage.save(removal), b.storage.save(late)]);
   video = (await a.storage.read()).videos[ID];
   assert.equal(video.markers[1].removed, true);
-  assert.equal(video.markers[1].note, "Late note");
+  assert.equal(
+    video.markers[1].note,
+    undefined,
+    "a delayed edit cannot revive a deleted annotation",
+  );
   assert.equal(a.data.anchor(video.markers, "c:30000").t, 0);
   const refreshed = a.data.refreshChapters(video.markers, [
     chapter(30, { title: "New chapter title", note: "Page note" }),
@@ -127,7 +144,7 @@ function fixture(seed = base()) {
   ]);
   assert.equal(refreshed.length, 3);
   assert.equal(refreshed[1].title, "New chapter title");
-  assert.equal(refreshed[1].note, "Late note");
+  assert.equal(refreshed[1].note, undefined, "chapter refresh cannot revive a deleted annotation");
   assert.equal(refreshed[1].removed, true);
   assert.equal(refreshed[0].origin, "user");
   assert.throws(() => a.data.refreshChapters([], [user("not-chapter", 2)]));

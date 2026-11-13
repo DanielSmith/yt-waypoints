@@ -21,6 +21,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   const autoBookmarkEl = document.getElementById("auto-bookmark");
   const includeChannelsEl = document.getElementById("include-channel-names");
   const thumbnailsEl = document.getElementById("show-thumbnails");
+  const markersEl = document.getElementById("show-markers");
   const scrubSecondsEl = document.getElementById("scrub-seconds");
   const shiftMultiplierEl = document.getElementById("shift-multiplier");
   const offerSaveFileEl = document.getElementById("offer-save-file");
@@ -33,6 +34,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
       includeChannelNames:
         typeof saved?.includeChannelNames === "boolean" ? saved.includeChannelNames : true,
       showThumbnails: typeof saved?.showThumbnails === "boolean" ? saved.showThumbnails : true,
+      showMarkers: typeof saved?.showMarkers === "boolean" ? saved.showMarkers : true,
       scrubSeconds: bounded(saved?.scrubSeconds, 10, 60),
       shiftMultiplier: bounded(saved?.shiftMultiplier, 3, 10),
       transcriptFormat: formats.get(saved?.transcriptFormat).id,
@@ -54,6 +56,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     autoBookmarkEl.checked = settings.autoBookmark;
     includeChannelsEl.checked = settings.includeChannelNames;
     thumbnailsEl.checked = settings.showThumbnails;
+    markersEl.checked = settings.showMarkers;
     thumbnailsEl.disabled = thumbnailChangePending;
     offerSaveFileEl.checked = settings.offerSaveFile;
     updateFormatUI(settings.transcriptFormat);
@@ -68,6 +71,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   function changeSetting(name, value) {
     // Capture intent at the event, before an earlier save refreshes the form.
     return enqueue(() => persistSettings(normalizeSettings({ ...getSettings(), [name]: value })));
+  }
+  function toggleMarkers() {
+    return enqueue(async () => {
+      const showMarkers = !getSettings().showMarkers;
+      await persistSettings({ ...getSettings(), showMarkers });
+      setStatus(showMarkers ? "Markers shown." : "Markers hidden.");
+    });
   }
 
   async function persistSettings(next) {
@@ -92,6 +102,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   function initControls() {
+    markersEl.addEventListener("change", () => changeSetting("showMarkers", markersEl.checked));
     themeSelect.replaceChildren(
       ...themeService.choices.map((theme) => {
         const option = document.createElement("option");
@@ -153,6 +164,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     normalizeSettings,
     updateSettingsUI,
     changeSetting,
+    toggleMarkers,
     setThumbnails,
     initControls,
     enable,

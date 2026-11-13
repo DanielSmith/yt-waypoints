@@ -71,6 +71,7 @@ const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
 });
 const { closeFormatMenu } = exportsController;
 function setOptionsOpen(open) {
+  if (open && markers.editorOpen) return setStatus("Save or cancel the open note first.");
   if (open) {
     exportsController.captureTarget();
   } else closeFormatMenu(false);
@@ -128,6 +129,21 @@ const bookmarks = WAYPOINTS_CREATE_POPUP_BOOKMARKS({
 });
 const { bookmarkCurrent, refreshCurrentChannel, restoreBookmark, emptyTrash } = bookmarks;
 
+const markers = WAYPOINTS_CREATE_POPUP_MARKERS({
+  document,
+  storage: WAYPOINTS_STORAGE,
+  data: WAYPOINTS_MARKERS,
+  player: playerClient,
+  getSettings: () => settings,
+  enqueue,
+  refresh: () => render(),
+  setStatus,
+  fmt,
+  focusRow(id) {
+    (listEl.querySelector(`.main[data-id="${CSS.escape(id)}"]`) || headerControl()).focus();
+  },
+});
+
 const listController = WAYPOINTS_CREATE_POPUP_LIST({
   document,
   listEl,
@@ -145,6 +161,7 @@ const listController = WAYPOINTS_CREATE_POPUP_LIST({
   enqueue,
   setStatus,
   refresh: () => render(),
+  markers,
 });
 const { renderList } = listController;
 
@@ -156,6 +173,7 @@ const inputController = WAYPOINTS_CREATE_POPUP_INPUT({
   dialogs,
   exportsController,
   listController,
+  markers,
   getSettings: () => settings,
   getVideos: () => savedVideos,
   getTrash: () => trashVideos,
@@ -172,6 +190,7 @@ const inputController = WAYPOINTS_CREATE_POPUP_INPUT({
   },
   enqueue,
   setThumbnails,
+  toggleMarkers: settingsController.toggleMarkers,
   setStatus,
   closePopup: () => window.close(),
 });
@@ -239,6 +258,7 @@ function updateHeaderMode() {
 
 async function render() {
   const snapshot = await WAYPOINTS_STORAGE.read();
+  markers.sync(snapshot);
   savedVideos = snapshot.videos;
   bookmarks.rememberSnapshot(snapshot);
   trashVideos = snapshot.trash;
@@ -268,6 +288,7 @@ async function init() {
   exportsController.init();
   updateSettingsUI();
   dialogs.init();
+  markers.init();
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   inputController.initControls();
   optionsToggle.addEventListener("click", () => {
@@ -300,6 +321,22 @@ async function init() {
     headerControl().focus();
   }
   if (expiryError) setStatus(expiryError);
+  refreshOpenChapters();
+}
+
+let chapterRefreshPending = false;
+async function refreshOpenChapters() {
+  if (chapterRefreshPending) return;
+  chapterRefreshPending = true;
+  try {
+    const tabs = await playerClient.listVideoTabs();
+    const ids = new Set(tabs.map((tab) => videoIdOf(tab.url)).filter(Boolean));
+    for (const id of ids) await markers.refreshChapters(id);
+  } catch {
+    // Unavailable chapter models must not block manual markers or overwrite data.
+  } finally {
+    chapterRefreshPending = false;
+  }
 }
 
 inputController.installKeyboard();
@@ -317,6 +354,7 @@ api.storage.onChanged.addListener((changes, area) => {
     render().catch((e) => setStatus(e.message));
 });
 if (typeof setInterval === "function") {
+  setInterval(refreshOpenChapters, 5000);
   setInterval(() => WAYPOINTS_STORAGE.expire().catch((error) => setStatus(error.message)), 60000);
 }
 init().catch((e) => setStatus(`Couldn't open YT Waypoints: ${e.message}`));

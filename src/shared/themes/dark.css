@@ -17,6 +17,8 @@
   --color-on-positive: oklch(0.18 0.01 150);
   --color-checkbox: oklch(0.74 0.13 150);
   --color-track: oklch(0.48 0.008 27);
+  --color-marker-chapter: oklch(0.78 0.10 255);
+  --color-marker-user: oklch(0.75 0.12 150);
   --color-focus: oklch(0.78 0.14 26);
   --color-selected: oklch(0.31 0.022 27);
   --color-trash-surface: oklch(0.32 0.035 26);
