@@ -106,7 +106,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
         !document.getElementById("about-dialog").open
       ) {
         e.preventDefault();
-        markers.closeEditor();
+        enqueue(markers.closeEditor);
       }
       return;
     }
@@ -125,6 +125,23 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
         e.preventDefault();
         e.stopPropagation();
         closeAbout();
+      }
+      return;
+    }
+    if (
+      e.key === "*" &&
+      !e.ctrlKey &&
+      !e.altKey &&
+      !e.metaKey &&
+      active !== searchEl &&
+      !dialogs.helpOpen &&
+      !exportsController.fileSaveOpen
+    ) {
+      e.preventDefault();
+      if (!e.repeat) {
+        const open = !isOptionsOpen();
+        setOptionsOpen(open);
+        if (!open) optionsToggle.focus();
       }
       return;
     }

@@ -44,6 +44,7 @@ const settingsController = WAYPOINTS_CREATE_POPUP_SETTINGS({
   },
   refresh: () => render(),
   setStatus,
+  closeFormatMenu: (restoreFocus) => exportsController.closeFormatMenu(restoreFocus),
   updateFormatUI: (formatId) => exportsController.updateFormatUI(formatId),
 });
 const { normalizeSettings, updateSettingsUI, changeSetting, setThumbnails } = settingsController;
@@ -72,17 +73,26 @@ const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
 const { closeFormatMenu } = exportsController;
 function setOptionsOpen(open) {
   if (open && markers.editorOpen) return setStatus("Save or cancel the open note first.");
+  const opening = open && !optionsOpen;
   if (open) {
     exportsController.captureTarget();
+    if (!optionsOpen) settingsController.resetGroups();
   } else closeFormatMenu(false);
   optionsOpen = open;
   optionsPanel.hidden = !open;
+  document.body.classList.toggle("options-open", open);
+  document.documentElement.classList.toggle("options-open", open);
   updateHeaderMode();
   actionsEl.classList.toggle("options-open", open);
   listEl.hidden = open;
   hintEl.hidden = open;
-  optionsToggle.textContent = open ? "Hide options" : "Show options";
+  document.getElementById("settings-toggle-label").hidden = !open;
+  const toggleLabel = open ? "Hide settings" : "Settings";
+  optionsToggle.setAttribute("aria-label", toggleLabel);
+  optionsToggle.setAttribute("title", `${toggleLabel} (*)`);
   optionsToggle.setAttribute("aria-expanded", String(open));
+  // Capture the selected video first, then move into the now-visible headings.
+  if (opening) settingsController.focusFirstGroup();
 }
 // Factories expose methods first; init() binds controls after all wiring exists.
 const dialogs = WAYPOINTS_CREATE_POPUP_DIALOGS({

@@ -8,15 +8,21 @@ const assert = require("node:assert/strict");
 const { spawnSync } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
 const flavor = process.argv[2] || "chrome";
-const markerPreview = process.argv.includes("--preview-help-expanded")
-  ? "help-expanded"
-  : process.argv.includes("--preview-help")
-    ? "help"
-    : process.argv.includes("--preview-editor")
-      ? "editor"
-      : process.argv.includes("--preview")
-        ? "list"
-        : process.env.WAYPOINTS_MARKER_PREVIEW || "";
+const markerPreview = process.argv.includes("--preview-options-expanded")
+  ? "options-expanded"
+  : process.argv.includes("--preview-options-transcripts")
+    ? "options-transcripts"
+    : process.argv.includes("--preview-options")
+      ? "options"
+      : process.argv.includes("--preview-help-expanded")
+        ? "help-expanded"
+        : process.argv.includes("--preview-help")
+          ? "help"
+          : process.argv.includes("--preview-editor")
+            ? "editor"
+            : process.argv.includes("--preview")
+              ? "list"
+              : process.env.WAYPOINTS_MARKER_PREVIEW || "";
 const previewTheme = process.argv.includes("--dark")
   ? "dark"
   : process.env.WAYPOINTS_PREVIEW_THEME || "light";
@@ -284,6 +290,7 @@ async function exerciseKeyboard() {
     "a did not open the existing annotation",
   );
   document.getElementById("annotation-cancel").click();
+  await queue;
   cases.push("a opens existing annotation at current marker");
   await press(document.querySelector(".main"), "M", { shiftKey: true });
   check(!document.querySelector(".marker-overlay"), "M did not hide marker lines");
@@ -379,8 +386,8 @@ async function exerciseKeyboard() {
   dialogs.openHelp();
   const helpRows = [...document.querySelectorAll(".shortcut")];
   check(
-    helpRows.length === 21 && helpRows.every((row) => !row.open),
-    "Help must start with 21 collapsed rows",
+    helpRows.length === 22 && helpRows.every((row) => !row.open),
+    "Help must start with 22 collapsed rows",
   );
   for (const row of helpRows) {
     const summary = row.querySelector("summary");
@@ -457,16 +464,25 @@ async function exerciseKeyboard() {
     query === "(prefers-reduced-motion: reduce)"
       ? { matches: false }
       : originalMatchMedia.call(globalThis, query);
-  summaryOf(helpRows[0]).click();
   const content = helpRows[0].querySelector(".shortcut-explanation");
+  const measureContent = content.getBoundingClientRect;
+  content.getBoundingClientRect = function () {
+    return helpRows[0].open ? measureContent.call(this) : { height: 120 };
+  };
+  summaryOf(helpRows[0]).click();
+  delete content.getBoundingClientRect;
   const opening = content.getAnimations()[0];
   check(
-    opening && Math.abs(opening.effect.getTiming().duration - 1000 / 3) < 0.01,
-    "Help toggle duration must be one third second",
+    opening && Math.abs(opening.effect.getTiming().duration - 500) < 0.01,
+    "Help toggle duration must be 500ms",
   );
   check(opening.effect.getTiming().easing.includes("cubic-bezier"), "Help toggle easing missing");
+  check(
+    parseFloat(opening.effect.getKeyframes()[0].height) === 0,
+    "Help expansion must start at zero even when closed content reports its full height",
+  );
   opening.pause();
-  opening.currentTime = 1000 / 6;
+  opening.currentTime = 250;
   const midway = content.getBoundingClientRect().height;
   check(
     helpFrameGeometry().every(
@@ -484,12 +500,17 @@ async function exerciseKeyboard() {
     closing && Math.abs(parseFloat(closing.effect.getKeyframes()[0].height) - midway) < 1,
     "Rapid toggle did not reverse from current height",
   );
+  check(
+    closing.effect.getTiming().duration === 500 &&
+      parseFloat(closing.effect.getKeyframes().at(-1).height) === 0,
+    "Help collapse must ease to zero over 500ms",
+  );
   await finishExplanation(helpRows[0]);
   check(
     !helpRows[0].open && content.getAnimations().length === 0,
     "Closing animation did not clean up",
   );
-  cases.push("333ms eased disclosure animation with interruption and cleanup");
+  cases.push("500ms eased opening/closing animation with interruption and cleanup");
   helpRows[0].querySelector("summary").click();
   helpRows[1].querySelector("summary").click();
   await finishExplanation(helpRows[0]);
@@ -580,6 +601,419 @@ async function exerciseKeyboard() {
   );
   dialogs.closeHelp();
   cases.push("Help summaries and explanations reflect current settings");
+  const settingsButton = document.getElementById("options-toggle");
+  check(
+    settingsButton.getAttribute("aria-label") === "Settings" &&
+      settingsButton.title === "Settings (*)",
+    "Closed settings button lacks an accessible label or tooltip",
+  );
+  check(
+    settingsButton.querySelector("svg") &&
+      getComputedStyle(settingsButton.querySelector("svg")).display !== "none",
+    "Closed settings button must show a gear",
+  );
+  check(
+    document.getElementById("settings-toggle-label").hidden,
+    "Closed settings button shows text instead of its gear",
+  );
+  const shortcutRow = document.querySelector(".main");
+  const starOpen = await press(shortcutRow, "*", { shiftKey: true });
+  check(
+    starOpen.defaultPrevented && !document.getElementById("options-panel").hidden,
+    "Star must open Settings",
+  );
+  check(
+    document.activeElement === document.querySelector(".option-group > summary"),
+    "Star opening must focus the first Settings group",
+  );
+  await press(document.activeElement, "*", { shiftKey: true, repeat: true });
+  check(
+    !document.getElementById("options-panel").hidden,
+    "Held star must not repeatedly toggle Settings",
+  );
+  await press(document.activeElement, "*");
+  check(
+    document.getElementById("options-panel").hidden && document.activeElement === settingsButton,
+    "Star must close Settings and return focus to gear",
+  );
+  const typedStar = await press(searchEl, "*", { shiftKey: true });
+  check(
+    !typedStar.defaultPrevented && document.getElementById("options-panel").hidden,
+    "Star must remain typable in search",
+  );
+  for (const modifier of ["ctrlKey", "metaKey", "altKey"]) {
+    const event = await press(settingsButton, "*", { [modifier]: true });
+    check(
+      !event.defaultPrevented && document.getElementById("options-panel").hidden,
+      "Modified star must retain native behavior",
+    );
+  }
+  check(
+    helpRows.some(
+      (row) =>
+        row.querySelector(".shortcut-key").textContent === "*" &&
+        row.querySelector(".shortcut-name").textContent === "Toggle settings",
+    ),
+    "Help must document the Settings shortcut",
+  );
+  cases.push(
+    "Star toggles Settings with immediate focus, repeat guard, typing/modifier ownership and Help entry",
+  );
+  settingsButton.focus();
+  settingsButton.click();
+  check(
+    settingsButton.getAttribute("aria-label") === "Hide settings" &&
+      !document.getElementById("settings-toggle-label").hidden,
+    "Open settings button must say Hide settings",
+  );
+  check(
+    getComputedStyle(settingsButton.querySelector("svg")).display === "none",
+    "Open settings button still shows the gear",
+  );
+  cases.push("Settings gear, tooltip, accessible label and Hide settings toggle");
+  const groups = [...document.querySelectorAll(".option-group")];
+  const headings = groups.map((group) => group.querySelector("summary"));
+  check(
+    document.activeElement === headings[0],
+    "Opening Settings must focus its first group immediately",
+  );
+  await press(document.activeElement, "ArrowDown");
+  check(
+    document.activeElement === headings[1],
+    "Down must navigate Settings immediately after opening without Tab",
+  );
+  await press(document.activeElement, "ArrowUp");
+  check(
+    document.activeElement === headings[0],
+    "Up must navigate Settings immediately after opening without Tab",
+  );
+  const panel = document.getElementById("options-panel");
+  const geometry = () => [
+    document.body.getBoundingClientRect().width,
+    document.body.getBoundingClientRect().height,
+    panel.getBoundingClientRect().left,
+    panel.getBoundingClientRect().width,
+    panel.getBoundingClientRect().height,
+    headings[0].getBoundingClientRect().left,
+    headings[0].getBoundingClientRect().width,
+  ];
+  const fixedGeometry = geometry();
+  const stable = () =>
+    geometry().every((value, index) => Math.abs(value - fixedGeometry[index]) < 0.5);
+  check(
+    groups.length === 6 && groups.every((group) => !group.open),
+    "Options must start with six collapsed groups",
+  );
+  check(panel.scrollHeight <= panel.clientHeight + 1, "Collapsed groups do not fit in the panel");
+  check(
+    headings[5].getBoundingClientRect().bottom <= panel.getBoundingClientRect().bottom,
+    "Last Options group is below the viewport",
+  );
+  check(fixedGeometry[0] === 360 && fixedGeometry[1] === 520, "Options outer frame is not fixed");
+  cases.push("Six collapsed Options groups fit in the fixed viewport");
+  await press(headings[0], "ArrowDown");
+  check(document.activeElement === headings[1], "Options Down failed");
+  await press(headings[1], "ArrowUp");
+  check(document.activeElement === headings[0], "Options Up failed");
+  for (const key of ["Enter", " "]) {
+    const event = await press(headings[0], key);
+    check(!event.defaultPrevented, "Options blocks native summary activation");
+  }
+  const groupFocus = getComputedStyle(groups[0]);
+  check(
+    groupFocus.outlineWidth === "1px" &&
+      groupFocus.outlineOffset === "-1px" &&
+      groupFocus.borderBottomColor === groupFocus.outlineColor,
+    "Focused Settings group must have a complete inward outline including its bottom divider",
+  );
+  cases.push("Options heading arrows and native disclosure activation");
+  const finishGroup = async (index) => {
+    for (const animation of groups[index].querySelector(".option-group-content").getAnimations())
+      animation.finish();
+    await flush();
+  };
+  headings[0].click();
+  const optionsMotion = groups[0].querySelector(".option-group-content").getAnimations()[0];
+  check(
+    optionsMotion && Math.abs(optionsMotion.effect.getTiming().duration - 500) < 1,
+    "Options must share Help's eased disclosure",
+  );
+  check(
+    parseFloat(optionsMotion.effect.getKeyframes()[0].height) === 0,
+    "Settings expansion must start at zero",
+  );
+  optionsMotion.pause();
+  optionsMotion.currentTime = 250;
+  const optionsContent = groups[0].querySelector(".option-group-content");
+  check(
+    optionsContent.getBoundingClientRect().height > 0 &&
+      optionsContent.getBoundingClientRect().height < optionsContent.scrollHeight,
+    "Settings expansion must show an intermediate height",
+  );
+  check(stable(), "Options frame shifts during animation");
+  await finishGroup(0);
+  headings[2].click();
+  await finishGroup(2);
+  check(groups[0].open && groups[2].open, "Options groups must expand independently");
+  check(stable(), "Expanded Options changes frame geometry");
+  const operationsBefore = keyboardFixture.operations.length;
+  const scrubInput = document.getElementById("scrub-seconds");
+  const scrubEvent = await press(scrubInput, "ArrowRight");
+  check(
+    !scrubEvent.defaultPrevented && document.activeElement === scrubInput,
+    "Options intercepted slider arrows",
+  );
+  check(
+    keyboardFixture.operations.length === operationsBefore,
+    "Options slider ran video playback",
+  );
+  scrubInput.value = "12";
+  scrubInput.dispatchEvent(new Event("input", { bubbles: true }));
+  check(
+    document
+      .getElementById("shift-preview")
+      .textContent.includes(String(12 * settings.shiftMultiplier)),
+    "Scrub preview did not update",
+  );
+  scrubInput.dispatchEvent(new Event("change", { bubbles: true }));
+  await queue;
+  check(
+    (await api.storage.local.get("settings")).settings.scrubSeconds === 12,
+    "Options did not save scrub setting",
+  );
+  check(
+    document.getElementById("playback-summary").textContent.startsWith("12s"),
+    "Options setting summary is stale",
+  );
+  check(groups[0].open && groups[2].open, "Saving settings collapses Options groups");
+  cases.push(
+    "Independent Options groups, stable motion, native sliders and saved-setting summaries",
+  );
+  headings[0].click();
+  await finishGroup(0);
+  check(!groups[0].open && groups[2].open, "Collapsing one Options group closes another");
+  headings[4].click();
+  await finishGroup(4);
+  document.getElementById("transcript-format-toggle").click();
+  check(stable(), "Transcript picker resizes Options");
+  const formatBounds = document.getElementById("transcript-format-menu").getBoundingClientRect();
+  check(
+    formatBounds.right <= panel.getBoundingClientRect().right &&
+      formatBounds.left >= panel.getBoundingClientRect().left,
+    "Format picker overflows Options horizontally",
+  );
+  const formatChoices = [...document.querySelectorAll(".transcript-format-choice")];
+  const chosenFormat = formatChoices.find(
+    (choice) => choice.dataset.format !== settings.transcriptFormat,
+  );
+  chosenFormat.click();
+  await queue;
+  check(
+    settings.transcriptFormat === chosenFormat.dataset.format &&
+      document.getElementById("transcripts-summary").textContent === chosenFormat.textContent,
+    "Format choice does not save or update summary",
+  );
+  document.getElementById("transcript-format-toggle").click();
+  headings[4].click();
+  await finishGroup(4);
+  check(
+    document.getElementById("transcript-format-menu").hidden && !groups[4].open,
+    "Collapsed transcript group keeps picker active",
+  );
+  const afterCollapse = await press(headings[4], "ArrowDown");
+  check(
+    afterCollapse.defaultPrevented && document.activeElement === headings[5],
+    "Hidden picker steals group navigation",
+  );
+  cases.push(
+    "Transcript preview fits Options and saves formats without stealing focus after collapse",
+  );
+  globalThis.matchMedia = (query) =>
+    query === "(prefers-reduced-motion: reduce)"
+      ? { matches: true }
+      : originalMatchMedia.call(globalThis, query);
+  headings[1].click();
+  check(
+    groups[1].open && !groups[1].querySelector(".option-group-content").getAnimations().length,
+    "Reduced-motion Options still animates",
+  );
+  globalThis.matchMedia = originalMatchMedia;
+  cases.push("Options disclosures respect reduced motion");
+  // Check both palettes and the tallest content with every group expanded.
+  for (const theme of ["light", "dark"]) {
+    WAYPOINTS_THEME.apply(theme);
+    for (const group of groups) group.open = true;
+    document.getElementById("transcript-format-toggle").click();
+    check(stable(), "Options frame changes with all groups expanded");
+    check(panel.scrollHeight > panel.clientHeight, "Expanded Options must scroll internally");
+    check(document.documentElement.scrollHeight <= 520, "Options causes outer page scrolling");
+    check(panel.scrollWidth <= panel.clientWidth + 1, "Expanded Options has horizontal overflow");
+    closeFormatMenu(false);
+  }
+  cases.push("Both Options themes scroll internally without outer resizing or horizontal overflow");
+  setOptionsOpen(false);
+  setOptionsOpen(true);
+  check(
+    groups.every((group) => !group.open) && panel.scrollTop === 0,
+    "Reopened Options does not reset its overview",
+  );
+  check(
+    document.getElementById("scrub-seconds").value === "12",
+    "Reopening Options lost a saved setting",
+  );
+  check(stable(), "Collapsed Options changes frame after reopening");
+  check(
+    document.activeElement === headings[0],
+    "Reopening Settings must restore focus to its first group",
+  );
+  setOptionsOpen(false);
+  cases.push("Reopening Options restores the collapsed overview and preserves settings");
+  // A bottom-of-list bookmark must retain its row while the one shared editor
+  // expands below it, including during a storage refresh from another context.
+  const baseline = await WAYPOINTS_STORAGE.read();
+  const scrollIds = Array.from({ length: 12 }, (_, i) => `bbbbbbbbb${String(i).padStart(2, "0")}`);
+  const seeded = await WAYPOINTS_STORAGE.read();
+  for (const [index, id] of scrollIds.entries())
+    seeded.videos[id] = {
+      id,
+      title: `Scroll fixture bookmark ${index + 1}`,
+      t: 20,
+      duration: 1000,
+      updated: index + 1,
+      startNote: `Loaded on demand: ${index + 1}`,
+    };
+  await WAYPOINTS_STORAGE.save(seeded);
+  await render();
+  const sourceRow = listEl.querySelector(`.main[data-id="${scrollIds[0]}"]`);
+  sourceRow.focus();
+  sourceRow.scrollIntoView({ block: "end" });
+  const startScroll = listEl.scrollTop;
+  await markers.edit(scrollIds[0]);
+  const inlineEditor = document.getElementById("annotation-editor");
+  const inlineRow = sourceRow.parentElement;
+  check(
+    inlineEditor.parentElement === inlineRow && inlineRow.contains(sourceRow),
+    "Editor must be attached beneath its source bookmark",
+  );
+  check(
+    document.querySelectorAll("#annotation-editor").length === 1 &&
+      document.querySelectorAll("#annotation-text").length === 1,
+    "Editor must be one shared on-demand form",
+  );
+  check(
+    noteField.value === "Loaded on demand: 1",
+    "Opening did not dynamically load the selected note",
+  );
+  const reveal = inlineEditor.getAnimations()[0];
+  check(
+    reveal &&
+      reveal.effect.getTiming().duration === 500 &&
+      parseFloat(reveal.effect.getKeyframes()[0].height) === 0,
+    "Inline editor must ease open from zero over 500ms",
+  );
+  reveal.pause();
+  reveal.currentTime = 250;
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  check(
+    inlineEditor.getBoundingClientRect().height > 0 &&
+      inlineEditor.getBoundingClientRect().height < inlineEditor.scrollHeight,
+    "Inline editor opening has no intermediate height",
+  );
+  reveal.finish();
+  await flush();
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  const visibleEditor = () => {
+    const viewport = listEl.getBoundingClientRect();
+    const source = sourceRow.getBoundingClientRect();
+    const expanded = inlineEditor.getBoundingClientRect();
+    const actions = document.getElementById("annotation-cancel").getBoundingClientRect();
+    check(expanded.top >= source.bottom - 1, "Annotation editor covers its bookmark row");
+    const previousFocus = document.activeElement;
+    for (const id of ["annotation-save", "annotation-cancel"]) {
+      const button = document.getElementById(id);
+      button.focus({ preventScroll: true });
+      const bounds = button.getBoundingClientRect();
+      const style = getComputedStyle(button);
+      const ring = parseFloat(style.outlineWidth) + Math.max(0, parseFloat(style.outlineOffset));
+      check(
+        bounds.left - ring >= expanded.left &&
+          bounds.right + ring <= expanded.right &&
+          bounds.bottom + ring <= expanded.bottom,
+        "Annotation action focus outline is clipped: " + id,
+      );
+    }
+
+    previousFocus?.focus({ preventScroll: true });
+    check(
+      source.top >= viewport.top - 1 &&
+        expanded.bottom <= viewport.bottom + 1 &&
+        actions.bottom <= viewport.bottom,
+      "Source row or editor/actions are clipped by the list viewport",
+    );
+  };
+  visibleEditor();
+  check(
+    listEl.scrollTop > startScroll,
+    "Opening a bottom-row note did not scroll the source row upward",
+  );
+  cases.push(
+    "One dynamically populated inline editor, 500ms reveal and full bottom-row visibility",
+  );
+  noteField.value = "Unsaved draft survives background storage updates";
+  noteField.focus();
+  noteField.setSelectionRange(4, 12);
+  const concurrent = await WAYPOINTS_STORAGE.read();
+  concurrent.videos.aaaaaaaaaaa.t += 1;
+  concurrent.videos[scrollIds[0]].startNote = "Changed by another editor";
+  await WAYPOINTS_STORAGE.save(concurrent);
+  await render();
+  check(
+    inlineEditor.parentElement === inlineRow && listEl.contains(inlineRow),
+    "Storage refresh detached the inline editor/source row",
+  );
+  check(
+    noteField.value === "Unsaved draft survives background storage updates" &&
+      noteField.selectionStart === 4 &&
+      noteField.selectionEnd === 12 &&
+      document.activeElement === noteField,
+    "Storage refresh lost the draft, selection or focus",
+  );
+  await markers.saveEditor();
+  check(
+    document.getElementById("annotation-error").textContent.includes("changed elsewhere"),
+    "Conflicting save must preserve the draft with an explanation",
+  );
+  visibleEditor();
+  cases.push(
+    "Background refresh preserves the inline draft/selection and validation stays visible",
+  );
+  const collapse = markers.closeEditor();
+  const collapseMotion = inlineEditor.getAnimations()[0];
+  check(
+    collapseMotion &&
+      collapseMotion.effect.getTiming().duration === 500 &&
+      parseFloat(collapseMotion.effect.getKeyframes().at(-1).height) === 0,
+    "Inline editor must ease closed to zero over 500ms",
+  );
+  collapseMotion.finish();
+  await collapse;
+  check(
+    inlineEditor.hidden &&
+      !listEl.contains(inlineEditor) &&
+      noteField.value === "" &&
+      document.getElementById("annotation-target").textContent === "",
+    "Closed editor must detach and clear its dynamic data",
+  );
+  check(
+    document.activeElement?.dataset.id === scrollIds[0],
+    "Closing did not restore source-row focus",
+  );
+  // Restore the fixture's saved-only view before the existing preview driver.
+  const cleanup = await WAYPOINTS_STORAGE.read();
+  cleanup.videos = baseline.videos;
+  await WAYPOINTS_STORAGE.save(cleanup);
+  await render();
+  cases.push("Inline editor 500ms collapse, cleared parked form and source-row focus return");
   return cases;
 }
 
@@ -593,8 +1027,25 @@ const driver = `window.addEventListener('load', async () => {
   const report = document.createElement('pre'); report.id = 'keyboard-result'; document.body.append(report);
   try {
     const cases = await (${exerciseKeyboard.toString()})();
+    if (${JSON.stringify(markerPreview)}.startsWith("options")) {
+      setOptionsOpen(true);
+      if (${JSON.stringify(markerPreview)} === "options-expanded") {
+        document.getElementById("options-appearance").open = true;
+      }
+      if (${JSON.stringify(markerPreview)} === "options-bookmarks") {
+        document.getElementById("options-bookmarks").open = true;
+        document.getElementById("auto-bookmark").focus();
+      }
+      if (${JSON.stringify(markerPreview)} === "options-transcripts") {
+        document.getElementById("options-transcripts").open = true;
+        document.getElementById("transcript-format-toggle").click();
+      }
+    }
     if (${JSON.stringify(markerPreview)} === "editor") {
       await markers.edit("aaaaaaaaaaa");
+      for (const motion of document.getElementById("annotation-editor").getAnimations()) motion.finish();
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      document.getElementById("annotation-save").focus({ preventScroll: true });
     }
     if (${JSON.stringify(markerPreview)}.startsWith("help")) {
       dialogs.openHelp();
@@ -639,7 +1090,7 @@ const result = spawnSync(
     "--no-first-run",
     "--allow-file-access-from-files",
     "--user-data-dir=" + path.join(temporary, "profile"),
-    "--virtual-time-budget=6000",
+    "--virtual-time-budget=20000",
     "--dump-dom",
     ...(markerPreview
       ? ["--screenshot=" + path.join(temporary, "popup.png"), "--window-size=500,600"]
@@ -655,7 +1106,7 @@ assert.ok(match, "No browser test report; inspect fixture: " + fixturePath + "\n
 const report = JSON.parse(decodeURIComponent(match[1]));
 fs.writeFileSync(path.join(temporary, "result.json"), JSON.stringify(report, null, 2));
 assert.equal(report.pass, true, report.error);
-assert.equal(report.cases.length, 32);
+assert.equal(report.cases.length, 44);
 console.log(
   `PASS: ${flavor} adapter, ${report.cases.length} real-DOM keyboard cases in headless Chrome`,
 );

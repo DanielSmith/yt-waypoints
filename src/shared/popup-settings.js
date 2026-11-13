@@ -11,8 +11,48 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   refresh,
   updateFormatUI,
   setStatus,
+  closeFormatMenu,
 }) => {
   let thumbnailChangePending = false;
+  const optionsPanel = document.getElementById("options-panel");
+  const groups = [...optionsPanel.querySelectorAll(".option-group")];
+  const disclosures = WAYPOINTS_CREATE_DISCLOSURES(".option-group-content");
+
+  function resetGroups() {
+    disclosures.settle();
+    for (const group of groups) group.open = false;
+    optionsPanel.scrollTop = 0;
+  }
+
+  function focusFirstGroup() {
+    groups[0]?.querySelector("summary").focus();
+  }
+
+  function navigateGroups(event) {
+    if (
+      event.defaultPrevented ||
+      event.isComposing ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.altKey ||
+      event.shiftKey ||
+      !["ArrowUp", "ArrowDown"].includes(event.key)
+    )
+      return;
+    const headings = groups.map((group) => group.querySelector("summary"));
+    const index = headings.indexOf(document.activeElement);
+    // Never take arrows from sliders, selects, inputs or the transcript picker.
+    if (index < 0) return;
+    const next = Math.max(
+      0,
+      Math.min(headings.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)),
+    );
+    event.preventDefault();
+    event.stopPropagation();
+    headings[next].focus();
+    headings[next].scrollIntoView({ block: "nearest" });
+  }
+
   const themeSelect = document.getElementById("theme-select");
   const deletionModeEl = document.getElementById("deletion-mode");
   const trashDaysEl = document.getElementById("trash-days");
@@ -48,6 +88,17 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
 
   function updateSettingsUI() {
     const settings = getSettings();
+    const themeLabel = themeService.choices.find((theme) => theme.id === settings.theme)?.label;
+    const summaries = {
+      appearance: `${themeLabel} · thumbnails ${settings.showThumbnails ? "on" : "off"} · markers ${settings.showMarkers ? "on" : "off"}`,
+      bookmarks: `Auto-bookmark ${settings.autoBookmark ? "on" : "off"} · ${settings.includeChannelNames ? "titles & channels" : "titles only"}`,
+      playback: `${settings.scrubSeconds}s · Shift ${settings.scrubSeconds * settings.shiftMultiplier}s`,
+      trash: `${settings.deletionMode === "timed" ? `Trash for ${settings.trashDays} days` : "Delete immediately"} · ${settings.showTrash ? "visible" : "hidden"}`,
+      transcripts: formats.get(settings.transcriptFormat).label,
+      backup: `JSON transfer · file offer ${settings.offerSaveFile ? "on" : "off"}`,
+    };
+    for (const [group, summary] of Object.entries(summaries))
+      document.getElementById(`${group}-summary`).textContent = summary;
     deletionModeEl.value = settings.deletionMode;
     trashDaysEl.value = String(settings.trashDays);
     showTrashEl.checked = settings.showTrash;
@@ -102,6 +153,15 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   function initControls() {
+    optionsPanel.addEventListener("keydown", navigateGroups);
+    for (const group of groups) {
+      group.querySelector("summary").addEventListener("click", (event) => {
+        event.preventDefault();
+        // Closing a group also dismisses any active format preview it contains.
+        closeFormatMenu(false);
+        disclosures.toggle(group);
+      });
+    }
     markersEl.addEventListener("change", () => changeSetting("showMarkers", markersEl.checked));
     themeSelect.replaceChildren(
       ...themeService.choices.map((theme) => {
@@ -161,6 +221,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   return Object.freeze({
+    resetGroups,
+    focusFirstGroup,
     normalizeSettings,
     updateSettingsUI,
     changeSetting,

@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased — 2026-11-13
+
+- Expand the single on-demand annotation editor beneath its source bookmark
+  instead of above the list. Use 500ms easing in both directions and follow
+  expansion with list scrolling so the row and editor actions remain visible.
+  Preserve drafts/focus during background refreshes, clear the form on close,
+  and reserve space around controls so focus outlines are not clipped.
+
+- Add `*` to toggle Settings outside text fields, with repeat protection and
+  focus on the first group when opening. Document it in Help and the gear tooltip.
+
+- Ease Help and Settings disclosures over 500ms in both directions. Start opening
+  at zero even when a browser reports the natural height of collapsed content;
+  preserve smooth reversal during rapid toggles and immediate reduced-motion behavior.
+
+- Arrange the toolbar as search, Settings gear, Help question mark, and the
+  YT Waypoints icon for About. Keep labelled tooltips and keyboard activation.
+
+- Rename the user-facing Options panel to Settings. Use a theme-aware SVG gear
+  to open it and “Hide settings” to close it. Keep the full green group focus
+  outline visible above content and dividers.
+
+- Organize Options into six independently expandable groups with current-setting
+  summaries and contextual explanations. Reuse Help's keyboard navigation,
+  reversible eased motion and reduced-motion behavior. Start with all groups
+  collapsed and keep the frame fixed while expanded content scrolls internally.
+- Keep transcript format choices and examples inside the original popup width.
+  Preserve existing preferences, actions, automatic saving and browser permissions.
+
 ## 2.3.0 — 2026-11-12
 
 - Compact shortcut help into one-line summaries with independently expandable

@@ -15,6 +15,62 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
   const current = new Map();
   let editor = null;
   const editorEl = document.getElementById("annotation-editor");
+  const editorHome = editorEl.parentNode || document.body;
+  const listEl = document.getElementById("list");
+  let editorRow = null;
+  let editorMotion = null;
+  let closingEditor = null;
+  let editorObserver = null;
+
+  function ensureEditorVisible() {
+    if (!editorRow || typeof editorRow.getBoundingClientRect !== "function") return;
+    const row = editorRow.getBoundingClientRect();
+    const viewport = listEl.getBoundingClientRect();
+    const content = editorEl.querySelector(".annotation-content");
+    const inputHeight = noteEl.getBoundingClientRect().height;
+    const rowHeight = row.height - editorEl.getBoundingClientRect().height;
+    const otherEditorHeight = content.getBoundingClientRect().height - inputHeight;
+    const inputLimit = Math.floor(
+      Math.max(40, Math.min(160, viewport.height - rowHeight - otherEditorHeight - 8)),
+    );
+    // Leave room for the source row, actions and validation text. Long notes
+    // scroll within the textarea rather than pushing Save/Cancel offscreen.
+    const limit = `${inputLimit}px`;
+    if (noteEl.style.getPropertyValue("--annotation-input-max") !== limit)
+      noteEl.style.setProperty("--annotation-input-max", limit);
+    // Follow the growing row as it reveals. Reserving a few pixels also keeps
+    // the bottom border and control focus rings off the scrollport edge.
+    if (row.bottom > viewport.bottom - 4) listEl.scrollTop += row.bottom - viewport.bottom + 4;
+    else if (row.top < viewport.top + 4) listEl.scrollTop += row.top - viewport.top - 4;
+  }
+
+  function revealEditor() {
+    editorEl.hidden = false;
+    document.body.classList.add("annotation-open");
+    document.documentElement.classList.add("annotation-open");
+    if (typeof globalThis.ResizeObserver === "function") {
+      editorObserver = new ResizeObserver(ensureEditorVisible);
+      editorObserver.observe(editorEl);
+      editorObserver.observe(listEl);
+      editorObserver.observe(editorEl.querySelector(".annotation-content"));
+    }
+    const height = typeof editorEl.animate === "function" ? editorEl.scrollHeight : 0;
+    const animation = WAYPOINTS_ANIMATE_HEIGHT(editorEl, 0, height);
+    editorMotion = animation;
+    if (animation) {
+      animation.finished.then(
+        () => {
+          if (editorMotion !== animation) return;
+          editorMotion = null;
+          animation.cancel();
+          ensureEditorVisible();
+        },
+        () => {},
+      );
+    }
+    noteEl.focus({ preventScroll: true });
+    ensureEditorVisible();
+  }
   const noteEl = document.getElementById("annotation-text");
   const saveEl = document.getElementById("annotation-save");
   const cancelEl = document.getElementById("annotation-cancel");
@@ -163,7 +219,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     return true;
   }
   async function edit(id, markerId) {
-    if (editor) return setStatus("Save or cancel the open note first.");
+    if (editor || closingEditor) return setStatus("Save or cancel the open note first.");
     const snapshot = await snapshotFor(id);
     if (markerId !== undefined) {
       if (markerId !== null && !find(snapshot.videos[id], markerId))
@@ -179,20 +235,50 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
       snapshot,
       note: marker ? data.annotation(marker) : snapshot.videos[id].startNote || "",
     };
+    const row = listEl.querySelector(`.main[data-id="${CSS.escape(id)}"]`);
+    if (!row) {
+      editor = null;
+      throw new Error("This bookmark is no longer visible.");
+    }
+    editorRow = row.parentNode;
+    editorRow.append(editorEl);
     noteEl.value = editor.note;
     document.getElementById("annotation-target").textContent =
-      `${snapshot.videos[id].title || id} · ${marker ? "Marker" : "Video start"} ${fmt(anchor.t)}`;
+      `${marker ? "Marker" : "Video start"} ${fmt(anchor.t)}`;
     errorEl.textContent = "";
-    editorEl.hidden = false;
-    noteEl.focus();
+    revealEditor();
   }
   function closeEditor() {
-    if (!editor) return;
+    if (closingEditor) return closingEditor;
+    if (!editor) return Promise.resolve();
     const id = editor.id;
-    editor = null;
-    noteEl.value = "";
-    editorEl.hidden = true;
-    focusRow(id);
+    const from =
+      typeof editorEl.animate === "function" ? editorEl.getBoundingClientRect().height : 0;
+    editorMotion?.cancel();
+    const animation = WAYPOINTS_ANIMATE_HEIGHT(editorEl, from, 0);
+    editorMotion = animation;
+    closingEditor = (async () => {
+      if (animation) await animation.finished.catch(() => {});
+      editorObserver?.disconnect();
+      editorObserver = null;
+      editorEl.hidden = true;
+      animation?.cancel();
+      editorMotion = null;
+      editorHome.append(editorEl);
+      editorRow = null;
+      editor = null;
+      noteEl.value = "";
+      noteEl.style.removeProperty?.("--annotation-input-max");
+      errorEl.textContent = "";
+      document.getElementById("annotation-target").textContent = "";
+      document.body.classList.remove("annotation-open");
+      document.documentElement.classList.remove("annotation-open");
+      await refresh();
+      focusRow(id);
+    })().finally(() => {
+      closingEditor = null;
+    });
+    return closingEditor;
   }
   async function saveEditor() {
     if (!editor || saveEl.disabled) return;
@@ -224,11 +310,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
       draft.clock = latest.clock;
       await storage.save(draft);
       await stillCurrent(draft, pending.id);
-      closeEditor();
-      await refresh();
+      await closeEditor();
       setStatus("Annotation saved.");
     } catch (error) {
       errorEl.textContent = error.message;
+      ensureEditorVisible();
     } finally {
       saveEl.disabled = false;
       cancelEl.disabled = false;
@@ -262,7 +348,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
   }
   function init() {
     saveEl.addEventListener("click", () => enqueue(saveEditor));
-    cancelEl.addEventListener("click", closeEditor);
+    cancelEl.addEventListener("click", () => enqueue(closeEditor));
     saveEl.disabled = false;
     cancelEl.disabled = false;
   }

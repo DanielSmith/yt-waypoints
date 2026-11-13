@@ -24,7 +24,7 @@ background worker, account flow, or extra permissions for shortcuts.
 - Use the existing strict JSON transfer format for both one-row and all-row copy.
 - Keep component rules separate from palette definitions. Light and dark
   themes use a shared semantic color contract; System follows device appearance
-  unless the user explicitly chooses a theme in Options.
+  unless the user explicitly chooses a theme in Settings.
 
 ## Accessibility
 

@@ -16,99 +16,139 @@
         <button id="clear-search" type="button" aria-label="Clear search" title="Clear search" hidden>×</button>
       </div>
       <button id="restore-bookmark" type="button" hidden>Add bookmark</button>
-      <button id="options-toggle" aria-expanded="false" aria-controls="options-panel" disabled>Show options</button>
-      <button id="about-toggle" type="button" aria-haspopup="dialog" aria-controls="about-dialog">About</button>
+      <button id="options-toggle" type="button" aria-label="Settings" title="Settings (*)" aria-keyshortcuts="*" aria-expanded="false" aria-controls="options-panel" disabled>
+        <svg class="settings-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <path d="m9.5 3-.6 2.4-1.3.8-2.4-.7-2.5 4.3 1.8 1.7v1.5l-1.8 1.7L5.2 19l2.4-.7 1.3.8.6 2.4h5l.6-2.4 1.3-.8 2.4.7 2.5-4.3-1.8-1.7v-1.5l1.8-1.7-2.5-4.3-2.4.7-1.3-.8L14.5 3Z"/>
+          <circle cx="12" cy="12.25" r="3"/>
+        </svg>
+        <span id="settings-toggle-label" hidden>Hide settings</span>
+      </button>
+      <button id="help-toggle" type="button" aria-label="Help" title="Help (h / ?)" aria-haspopup="dialog" aria-controls="help-dialog"><span aria-hidden="true">?</span></button>
+      <button id="about-toggle" type="button" aria-label="About YT Waypoints" title="About YT Waypoints" aria-haspopup="dialog" aria-controls="about-dialog"><img src="/icons/icon-48.png" width="22" height="22" alt=""></button>
     </div>
     <div id="status" role="status"></div>
-    <div id="hint"><span>/ search · space play · ↵ open · </span><button id="help-toggle" type="button" aria-haspopup="dialog" aria-controls="help-dialog">h / ? toggle help</button></div>
+    <div id="hint">/ search · space play · ↵ open · h / ? help</div>
   </header>
   <section id="annotation-editor" aria-labelledby="annotation-heading" hidden>
-    <strong id="annotation-heading">Edit note</strong>
-    <p id="annotation-target"></p>
-    <label for="annotation-text">Annotation</label>
-    <textarea id="annotation-text" rows="3" maxlength="10000" aria-describedby="annotation-error"></textarea>
-    <p id="annotation-error" role="alert"></p>
-    <div class="annotation-actions">
-      <button id="annotation-save" class="secondary-button" type="button" title="Save annotation (Ctrl/Command+Enter)">Save</button>
-      <button id="annotation-cancel" class="secondary-button" type="button">Cancel</button>
+    <div class="annotation-content">
+      <strong id="annotation-heading">Edit note</strong>
+      <p id="annotation-target"></p>
+      <label for="annotation-text">Annotation</label>
+      <textarea id="annotation-text" rows="3" maxlength="10000" aria-describedby="annotation-error"></textarea>
+      <p id="annotation-error" role="alert"></p>
+      <div class="annotation-actions">
+        <button id="annotation-save" class="secondary-button" type="button" title="Save annotation (Ctrl/Command+Enter)">Save</button>
+        <button id="annotation-cancel" class="secondary-button" type="button">Cancel</button>
+      </div>
     </div>
   </section>
   <ul id="list"></ul>
-  <section id="options-panel" aria-label="Options" hidden>
-    <label class="setting" for="theme-select">
-      <span class="setting-title">Theme</span>
-      <select id="theme-select" aria-describedby="theme-help"></select>
-      <p id="theme-help">System follows your device’s light or dark appearance.</p>
-    </label>
-    <label class="setting">
-      <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
-      <p id="thumbnail-help">On by default. Loads images from YouTube’s image server using the video IDs. Your bookmarks stay local. Press t outside search to toggle.</p>
-    </label>
-    <label class="setting">
-      <span class="setting-title"><span>Show markers</span><input id="show-markers" type="checkbox"></span>
-      <p>Press M to show or hide marker lines. Hidden markers and annotations are kept in storage and JSON exports.</p>
-    </label>
-    <label class="setting">
-      <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox"></span>
-      <p>Match video titles or channel names. Channel names are saved when you bookmark or revisit a video.</p>
-    </label>
-    <label class="setting">
-      <span class="setting-title"><span>Auto-bookmark</span><input id="auto-bookmark" type="checkbox"></span>
-      <p>Bookmark an unsaved video when you open this popup. Applies next time you open it.</p>
-    </label>
-    <label class="setting" for="scrub-seconds">
-      <span class="setting-title"><span>Arrow-key scrub</span><output id="scrub-value" for="scrub-seconds"></output></span>
-      <p>Seconds to move with ← or → on a bookmark.</p>
-      <input id="scrub-seconds" type="range" min="1" max="60" step="1" value="10">
-    </label>
-    <label class="setting" for="shift-multiplier">
-      <span class="setting-title"><span>Shift multiplier</span><output id="multiplier-value" for="shift-multiplier"></output></span>
-      <p id="shift-preview"></p>
-      <input id="shift-multiplier" type="range" min="1" max="10" step="1" value="3">
-    </label>
-    <div class="setting trash-settings">
-      <label class="setting-title" for="deletion-mode">Deletion mode</label>
-      <select id="deletion-mode" aria-describedby="deletion-help" disabled>
-        <option value="timed">Timed: move to trash</option>
-        <option value="permanent">Permanent: delete now</option>
-      </select>
-      <p id="deletion-help">Timed deletion keeps bookmarks in trash for restoration. Permanent deletion removes their stored content immediately.</p>
-      <label class="retention-control" for="trash-days">Permanently delete trash after <input id="trash-days" type="number" min="1" max="365" step="1" value="7" aria-describedby="trash-expiry-help" disabled> days</label>
-      <p id="trash-expiry-help">Default: 7 days (one week). Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.</p>
-      <label class="setting-title"><span>Show trash in the list and search</span><input id="show-trash" type="checkbox" disabled></label>
-      <p>Current bookmarks always show. Trash is tinted red and has a Restore toggle.</p>
-      <button id="empty-trash" class="secondary-button" type="button" aria-describedby="trash-count" disabled>Empty trash</button>
-      <p id="trash-count"></p>
-    </div>
-    <p id="shortcut-help"></p>
-    <div class="setting export-videos">
-      <div class="export-heading"><strong>Export saved videos</strong><button id="copy-videos" type="button" aria-describedby="export-help">Copy JSON</button></div>
-      <p id="export-help">Copy all current videos. Trash is excluded. Paste into another Waypoints popup to merge.</p>
-    </div>
-    <div class="setting transcript-setting">
-      <label id="transcript-format-label" class="setting-title">Transcript format</label>
-      <p>Used when copying or saving a transcript.</p>
-      <div id="transcript-format-picker">
-        <button id="transcript-format-toggle" type="button" role="combobox" aria-labelledby="transcript-format-label transcript-format-toggle" aria-haspopup="listbox" aria-controls="transcript-format-list" aria-expanded="false"></button>
-        <div id="transcript-format-menu" hidden>
-          <div id="transcript-format-list" role="listbox" aria-labelledby="transcript-format-label"></div>
-          <div id="transcript-format-detail" aria-live="polite" aria-atomic="true">
-            <strong id="transcript-format-use"></strong>
-            <p id="transcript-format-description"></p>
-            <pre id="transcript-format-example"></pre>
-          </div>
+  <section id="options-panel" aria-label="Settings" hidden>
+    <p class="options-intro">Changes save automatically. Expand a group to adjust its settings.</p>
+    <details class="option-group" id="options-appearance">
+      <summary><span class="option-group-title">Appearance</span><span class="option-group-state" id="appearance-summary"></span></summary>
+      <div class="option-group-content">
+        <label class="setting" for="theme-select">
+          <span class="setting-title">Theme</span>
+          <select id="theme-select" aria-describedby="theme-help"></select>
+          <p id="theme-help">System follows your device’s light or dark appearance.</p>
+        </label>
+        <label class="setting">
+          <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
+          <p id="thumbnail-help">Loads images from YouTube’s image server, sharing the requested video IDs with Google. Bookmarks stay local. Press t outside search to toggle.</p>
+        </label>
+        <label class="setting">
+          <span class="setting-title"><span>Show markers</span><input id="show-markers" type="checkbox" aria-describedby="marker-help"></span>
+          <p id="marker-help">Press M to show or hide marker lines. Hidden markers and annotations are kept in storage and JSON exports.</p>
+        </label>
+      </div>
+    </details>
+    <details class="option-group" id="options-bookmarks">
+      <summary><span class="option-group-title">Bookmarks &amp; search</span><span class="option-group-state" id="bookmarks-summary"></span></summary>
+      <div class="option-group-content">
+        <label class="setting">
+          <span class="setting-title"><span>Auto-bookmark</span><input id="auto-bookmark" type="checkbox" aria-describedby="auto-bookmark-help"></span>
+          <p id="auto-bookmark-help">Save an unsaved video when you open this popup. Changes apply next time you open it. When off, use Add bookmark to save it yourself.</p>
+        </label>
+        <label class="setting">
+          <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox" aria-describedby="channel-search-help"></span>
+          <p id="channel-search-help">Match video titles or channel names. Channel names are saved when you bookmark or revisit a video.</p>
+        </label>
+      </div>
+    </details>
+    <details class="option-group" id="options-playback">
+      <summary><span class="option-group-title">Playback &amp; keyboard</span><span class="option-group-state" id="playback-summary"></span></summary>
+      <div class="option-group-content">
+        <label class="setting" for="scrub-seconds">
+          <span class="setting-title"><span>Arrow-key scrub</span><output id="scrub-value" for="scrub-seconds"></output></span>
+          <p id="scrub-help">Seconds to move with ← or → on a bookmark. An open video seeks; a closed video updates its saved position.</p>
+          <input id="scrub-seconds" aria-describedby="scrub-help" type="range" min="1" max="60" step="1" value="10">
+        </label>
+        <label class="setting" for="shift-multiplier">
+          <span class="setting-title"><span>Shift multiplier</span><output id="multiplier-value" for="shift-multiplier"></output></span>
+          <p id="shift-preview"></p>
+          <input id="shift-multiplier" aria-describedby="shift-preview" type="range" min="1" max="10" step="1" value="3">
+        </label>
+        <p id="shortcut-help"></p>
+      </div>
+    </details>
+    <details class="option-group" id="options-trash">
+      <summary><span class="option-group-title">Trash &amp; deletion</span><span class="option-group-state" id="trash-summary"></span></summary>
+      <div class="option-group-content">
+        <div class="setting trash-settings">
+          <label class="setting-title" for="deletion-mode">Deletion mode</label>
+          <select id="deletion-mode" aria-describedby="deletion-help" disabled>
+            <option value="timed">Timed: move to trash</option>
+            <option value="permanent">Permanent: delete now</option>
+          </select>
+          <p id="deletion-help">Timed deletion keeps bookmarks in trash for restoration. Permanent deletion removes their stored content immediately.</p>
+          <label class="retention-control" for="trash-days">Permanently delete trash after <input id="trash-days" type="number" min="1" max="365" step="1" value="7" aria-describedby="trash-expiry-help" disabled> days</label>
+          <p id="trash-expiry-help">Default: 7 days (one week). Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.</p>
+          <label class="setting-title"><span>Show trash in the list and search</span><input id="show-trash" type="checkbox" disabled></label>
+          <p>Current bookmarks always show. Trash is tinted red and has a Restore toggle.</p>
+          <button id="empty-trash" class="secondary-button" type="button" aria-describedby="trash-count" disabled>Empty trash</button>
+          <p id="trash-count"></p>
         </div>
       </div>
-      <p id="transcript-target">Select a bookmark before opening Options, or open a YouTube video.</p>
-      <div class="transcript-actions">
-        <button id="copy-transcript" class="secondary-button" type="button">Copy transcript</button>
+    </details>
+    <details class="option-group" id="options-transcripts">
+      <summary><span class="option-group-title">Transcripts</span><span class="option-group-state" id="transcripts-summary"></span></summary>
+      <div class="option-group-content">
+        <div class="setting transcript-setting">
+          <label id="transcript-format-label" class="setting-title">Transcript format</label>
+          <p>Used when copying or saving a transcript.</p>
+          <div id="transcript-format-picker">
+            <button id="transcript-format-toggle" type="button" role="combobox" aria-labelledby="transcript-format-label transcript-format-toggle" aria-haspopup="listbox" aria-controls="transcript-format-list" aria-expanded="false"></button>
+            <div id="transcript-format-menu" hidden>
+              <div id="transcript-format-list" role="listbox" aria-labelledby="transcript-format-label"></div>
+              <div id="transcript-format-detail" aria-live="polite" aria-atomic="true">
+                <strong id="transcript-format-use"></strong>
+                <p id="transcript-format-description"></p>
+                <pre id="transcript-format-example"></pre>
+              </div>
+            </div>
+          </div>
+          <p id="transcript-target">Select a bookmark before opening Settings, or open a YouTube video.</p>
+          <div class="transcript-actions">
+            <button id="copy-transcript" class="secondary-button" type="button">Copy transcript</button>
+          </div>
+          <p>Uses an open YouTube tab.</p>
+        </div>
       </div>
-      <p>Uses an open YouTube tab.</p>
-    </div>
-    <label class="setting">
-      <span class="setting-title"><span>Offer to save to file</span><input id="offer-save-file" type="checkbox" aria-describedby="offer-save-help"></span>
-      <p id="offer-save-help">Off by default. After copying a transcript or all bookmarks as JSON, ask whether to save a file too. You can choose its filename. Copying always happens first.</p>
-    </label>
+    </details>
+    <details class="option-group" id="options-backup">
+      <summary><span class="option-group-title">Backup &amp; files</span><span class="option-group-state" id="backup-summary"></span></summary>
+      <div class="option-group-content">
+        <div class="setting export-videos">
+          <div class="export-heading"><strong>Export saved videos</strong><button id="copy-videos" type="button" aria-describedby="export-help">Copy JSON</button></div>
+          <p id="export-help">Copy all current bookmarks, including markers and annotations even when hidden. Trash and preferences are excluded. Paste JSON into a Waypoints popup to import or merge; unrelated bookmarks are kept.</p>
+        </div>
+        <label class="setting">
+          <span class="setting-title"><span>Offer to save to file</span><input id="offer-save-file" type="checkbox" aria-describedby="offer-save-help"></span>
+          <p id="offer-save-help">After copying a transcript or all bookmarks as JSON, offer to save a file too. Choose a filename or decline the offer. Copying always happens first; declining keeps the clipboard copy.</p>
+        </label>
+      </div>
+    </details>
   </section>
   <dialog id="file-save-dialog" aria-labelledby="file-save-title" aria-describedby="file-save-description">
     <strong id="file-save-title">Also save to file?</strong>
@@ -206,7 +246,11 @@
       </details>
       <details class="shortcut">
         <summary><span class="shortcut-key">C</span><span class="shortcut-name">Copy all JSON</span></summary>
-        <div class="shortcut-explanation"><p>Press Shift+c to copy all current bookmarks, including rows hidden by search, with their markers and annotations. Trash and preferences are excluded. Also works in Options.</p></div>
+        <div class="shortcut-explanation"><p>Press Shift+c to copy all current bookmarks, including rows hidden by search, with their markers and annotations. Trash and preferences are excluded. Also works in Settings.</p></div>
+      </details>
+      <details class="shortcut">
+        <summary><span class="shortcut-key">*</span><span class="shortcut-name">Toggle settings</span></summary>
+        <div class="shortcut-explanation"><p>Open or close Settings outside text fields. Opening focuses the first group so Up/Down works immediately. Closing returns focus to the gear button. Holding the key does not toggle repeatedly.</p></div>
       </details>
       <details class="shortcut">
         <summary><span class="shortcut-key">h / ?</span><span class="shortcut-name">Toggle help</span></summary>

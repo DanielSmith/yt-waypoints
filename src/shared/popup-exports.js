@@ -38,7 +38,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
         : null);
     document.getElementById("transcript-target").textContent = video
       ? `Video: ${video.title || transcriptTargetId}`
-      : "Select a bookmark before opening Options, or open a YouTube video.";
+      : "Select a bookmark before opening Settings, or open a YouTube video.";
     transcriptCopyEl.disabled = transcriptPending || !video;
   }
 
@@ -60,7 +60,6 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     formatMenuOpen = false;
     formatMenu.hidden = true;
     formatToggle.setAttribute("aria-expanded", "false");
-    document.body.classList.remove("format-menu-open");
     if (restoreFocus) formatToggle.focus();
   }
 
@@ -68,7 +67,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     formatMenuOpen = true;
     formatMenu.hidden = false;
     formatToggle.setAttribute("aria-expanded", "true");
-    document.body.classList.add("format-menu-open");
+    // Keep the picker and its examples in view inside the fixed Options frame.
+    formatToggle.scrollIntoView({ block: "start" });
     previewFormat(
       formats.formats.findIndex((format) => format.id === getSettings().transcriptFormat),
       true,

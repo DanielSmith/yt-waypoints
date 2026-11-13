@@ -16,54 +16,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   const aboutToggle = document.getElementById("about-toggle");
   let helpPreviousFocus = null;
   let helpPreviousRowId = null;
-  const helpMotions = new Map();
-  const disclosureDuration = 1000 / 3;
-
-  function settleHelpMotions() {
-    for (const [row, motion] of helpMotions) {
-      motion.animation.cancel();
-      row.open = motion.open;
-    }
-    helpMotions.clear();
-  }
-
-  function toggleExplanation(row) {
-    const content = row.querySelector(".shortcut-explanation");
-    const previous = helpMotions.get(row);
-    const open = previous ? !previous.open : !row.open;
-    const from = content.getBoundingClientRect().height;
-    previous?.animation.cancel();
-    helpMotions.delete(row);
-    row.open = true;
-    const to = open ? content.scrollHeight : 0;
-    if (
-      globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches ||
-      typeof content.animate !== "function" ||
-      from === to
-    ) {
-      row.open = open;
-      return;
-    }
-    // The content stays clipped during the height reveal, including when a
-    // second click reverses an in-flight animation from its current height.
-    const animation = content.animate([{ height: `${from}px` }, { height: `${to}px` }], {
-      duration: disclosureDuration,
-      easing: "cubic-bezier(0.22, 1, 0.36, 1)",
-      fill: "both",
-    });
-    helpMotions.set(row, { animation, open });
-    animation.finished.then(
-      () => {
-        if (helpMotions.get(row)?.animation !== animation) return;
-        row.open = open;
-        helpMotions.delete(row);
-        animation.cancel();
-      },
-      () => {
-        /* A rapid toggle or closing help intentionally cancels motion. */
-      },
-    );
-  }
+  const explanations = WAYPOINTS_CREATE_DISCLOSURES(".shortcut-explanation");
 
   function navigateHelp(event) {
     if (
@@ -107,7 +60,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     document.getElementById("help-multiplier").textContent =
       `Scrub ${settings.scrubSeconds * settings.shiftMultiplier}s`;
     document.getElementById("help-multiplier-detail").textContent =
-      `Hold Shift with the scrub arrows to apply your ×${settings.shiftMultiplier} multiplier, moving ${settings.scrubSeconds * settings.shiftMultiplier} seconds. Configure both values in Options.`;
+      `Hold Shift with the scrub arrows to apply your ×${settings.shiftMultiplier} multiplier, moving ${settings.scrubSeconds * settings.shiftMultiplier} seconds. Configure both values in Settings.`;
   }
 
   function openHelp() {
@@ -122,7 +75,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
 
   function closeHelp() {
     if (!helpDialog.open) return;
-    settleHelpMotions();
+    explanations.settle();
     helpDialog.close();
     document.body.classList.remove("help-open");
     document.documentElement.classList.remove("help-open");
@@ -153,7 +106,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     for (const row of helpDialog.querySelectorAll(".shortcut")) {
       row.querySelector("summary").addEventListener("click", (event) => {
         event.preventDefault();
-        toggleExplanation(row);
+        explanations.toggle(row);
       });
     }
     helpToggle.addEventListener("click", openHelp);

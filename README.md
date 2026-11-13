@@ -7,7 +7,7 @@ Chrome, and Brave.
 
 ## Start using Waypoints
 
-These features work with the default settings; no setup in Options is needed.
+These features work with the default settings; no setup in Settings is needed.
 
 ### Add a waypoint
 
@@ -74,7 +74,7 @@ position.
 Press **Shift+T** to copy the selected video's transcript. The video must be
 open in a YouTube tab and have an available transcript. The default output is
 **Markdown with linked timestamps**, including the video title and source URL.
-You can also select a video, open **Show options**, and click **Copy transcript**.
+You can also select a video, open **Settings (gear)**, and click **Copy transcript**.
 
 ### Markers and annotations (development build)
 
@@ -90,14 +90,18 @@ Select a saved video row. Marker controls are keyboard driven:
   it uses **0:00**, even when markers exist elsewhere. Adding a marker or
   navigating to one establishes the current marker for this popup.
 - **M** shows/hides marker lines. Hidden markers and notes stay stored and are
-  included in JSON exports. Visibility is also available in Options.
+  included in JSON exports. Visibility is also available in Settings.
 
 Markers are thin vertical lines over the existing timeline, green for personal
 markers and blue for chapter markers. There are no extra marker buttons, lists,
 restoration controls, or additional row height. The lines leave slider dragging
 and clicking alone.
 
-The annotation editor appears only when requested. **Ctrl/⌘+Enter** or **Save**
+A single annotation editor expands directly beneath its bookmark row when
+requested, using the same 500ms easing as Help and Settings. The list scrolls
+as needed to keep the source row and editor actions visible. Notes load on demand;
+closing clears the editor. Background updates preserve the active draft and text
+selection until you save or cancel. **Ctrl/⌘+Enter** or **Save**
 saves the note; **Cancel** discards the draft. **a** reopens the existing note
 instead of creating another. Notes preserve line breaks and are plain text.
 Removing a marker clears its note and personal label; creating another marker
@@ -118,11 +122,11 @@ videos retain chapters previously saved or imported.
 Click **×** on a row or select it and press **Delete / Backspace**. By default,
 the bookmark moves to hidden trash for **7 days** before permanent deletion.
 The header's **Restore bookmark** button restores the most recently trashed
-bookmark. To find and restore other trash, enable its display in Options.
+bookmark. To find and restore other trash, enable its display in Settings.
 
 ### Back up or transfer saved videos
 
-1. Open **Show options → Export saved videos → Copy JSON**, or press **Shift+C**.
+1. Open **Settings (gear) → Backup & files → Copy JSON**, or press **Shift+C**.
 2. Paste the copy into a text editor and save it as a `.json` file for a backup.
 3. To restore or transfer it, paste the complete JSON into a Waypoints popup,
    including in another browser. The popup stays open and reports the result.
@@ -136,9 +140,17 @@ Press lowercase **c** on a selected row to copy only that bookmark as JSON.
 See the [transfer reference](docs/behavior-reference.md#bookmark-transfer-and-validation)
 for accepted formats and validation rules.
 
-## Customize with Options
+## Customize with Settings
 
-Open **Show options** to change these preferences. Changes are saved locally.
+Open **Settings (gear)** for six expandable groups, all visible at first:
+**Appearance**, **Bookmarks & search**, **Playback & keyboard**, **Trash & deletion**,
+**Transcripts**, and **Backup & files**. Each heading summarizes its current settings.
+Groups open independently and start collapsed each time you reopen Settings.
+
+Use Up/Down on a group heading to move between groups, Enter/Space to toggle,
+and Tab to reach its controls. Arrow keys inside controls retain their usual
+behavior. Changes save locally and automatically. Like Help, Settings has a fixed
+frame and scrolls internally without resizing, including transcript previews.
 
 ### Choose automatic or manual bookmarking
 
@@ -189,6 +201,7 @@ visible trash row also permanently removes it.
 | JSON with timed segments | Scripts, indexing, and structured processing | `.json` |
 
 Open the dropdown and hover over a choice to preview its explanation and example.
+The explanation and example appear below the choices within the panel.
 With the keyboard, use arrows to preview and Enter or Space to choose. Previewing
 alone does not change the saved format.
 
@@ -209,10 +222,14 @@ appearance. Choose **Light** or **Dark** to keep a fixed appearance.
 
 ## Keyboard reference
 
+The toolbar runs left to right: search, Settings (gear), Help (**?**), and
+About (the YT Waypoints icon). Help opens the keyboard reference; About shows
+the version and product information. Each icon has a tooltip and accessible label.
+
 Press **h** or **?** outside search, or click **h / ? toggle help**, to open the
 compact shortcut list. Use **Up/Down** or **Tab** to focus a row, then **Enter**
 or **Space** (or click) to expand/collapse its explanation. Multiple rows can
-stay open. Toggles ease over one third of a second; expanded rows use the selected
+stay open. Opening and closing ease over half a second (500ms); expanded rows use the selected
 row background. Reduced-motion settings skip the animation. The help popup and
 dialog keep fixed heights, with reserved scrollbar space and internal scrolling
 as needed. Use **h**, **?**, or Close to dismiss help. Expanding a row does not
@@ -239,10 +256,11 @@ run its shortcut.
 | `u` | Copy the selected video's clean URL, including its saved position |
 | `c` | Copy just the selected row in the standard JSON transfer envelope |
 | `C` (Shift + c) | Copy all saved videos as JSON, including filtered-out rows |
+| `*` | Toggle Settings outside text fields |
 | `h` / `?` | Toggle help |
 
 Letter shortcuts leave search typing and Command/Ctrl/Alt combinations alone.
-Single-row copy commands require a focused row; Shift+C also works in Options.
+Single-row copy commands require a focused row; Shift+C also works in Settings.
 The in-popup help shows your configured scrub distance and multiplier.
 
 ## Privacy and limitations
@@ -287,7 +305,8 @@ popup bundle:
 | --- | --- |
 | `popup.js` | Startup, module wiring, shared action queue, header state, and storage refresh |
 | `player-client.js` | Tab navigation and validated injected requests, including Firefox fallback |
-| `popup-settings.js` | Settings normalization, captured field changes, persistence, and Options controls |
+| `popup-settings.js` | Settings normalization, captured field changes, persistence, and grouped Settings controls |
+| `popup-disclosures.js` | Shared reversible disclosure motion for Settings and Help |
 | `popup-bookmarks.js` | Bookmark/import/trash actions and lifetime-bound playback-position saves |
 | `popup-exports.js` | Transcript format UI, copying, clipboard fallback, and optional file saving |
 | `popup-list.js` | Filtering, grouped sorting, rows, sliders, and focus restoration |

@@ -7,6 +7,6 @@ yt-waypoints-firefox/
 yt-waypoints-chrome/
 __pycache__/
 .DS_Store
-/STORE-SUBMISSION.md
+STORE-SUBMISSION.md
 NEXT-SESSION.md
 docs/private-dev/

@@ -11,6 +11,7 @@ import "../shared/player.js";
 import "../shared/player-results.js";
 import "../shared/transcript.js";
 import "../shared/player-client.js";
+import "../shared/popup-disclosures.js";
 import "../shared/popup-settings.js";
 import "../shared/popup-exports.js";
 import "../shared/popup-bookmarks.js";

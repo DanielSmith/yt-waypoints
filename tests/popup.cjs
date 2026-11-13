@@ -74,7 +74,10 @@ async function createPopupFixture(
       this[k] = v;
     }
     append(...els) {
-      for (const el of els) el.parentNode = this;
+      for (const el of els) {
+        el.remove();
+        el.parentNode = this;
+      }
       this.children.push(...els);
     }
     contains(el) {
@@ -126,6 +129,12 @@ async function createPopupFixture(
     }
   }
   const ids = [
+    "appearance-summary",
+    "bookmarks-summary",
+    "playback-summary",
+    "trash-summary",
+    "transcripts-summary",
+    "backup-summary",
     "show-markers",
     "annotation-editor",
     "annotation-text",
@@ -172,6 +181,7 @@ async function createPopupFixture(
     "clear-search",
     "hint",
     "options-toggle",
+    "settings-toggle-label",
     "options-panel",
     "auto-bookmark",
     "scrub-seconds",
@@ -514,6 +524,7 @@ async function createPopupFixture(
   await markerKey(clustered, "a");
   assert.equal(clustered.els["annotation-text"].value, "Personal note");
   clustered.els["annotation-cancel"].click();
+  await clustered.settle();
   await markerKey(clustered, "m");
   assert.equal(
     clustered.data.videos[markerId].markers.find((point) => point.id === "u:same").removed,
@@ -534,6 +545,7 @@ async function createPopupFixture(
     "coincident chapter remains keyboard reachable",
   );
   clustered.els["annotation-cancel"].click();
+  await clustered.settle();
   const manualMarkers = await markerFixture();
   manualMarkers.els.list.querySelectorAll(".main")[0].focus();
   await markerKey(manualMarkers, "m");
@@ -616,6 +628,7 @@ async function createPopupFixture(
   await markerKey(markerNav, "a");
   assert.match(markerNav.els["annotation-target"].textContent, /Video start 0:00/);
   markerNav.els["annotation-cancel"].click();
+  await markerNav.settle();
   await markerKey(markerNav, "[");
   assert.equal(markerNav.data.videos[markerId].t, 10);
   markerWrites = markerNav.writes();
@@ -706,6 +719,7 @@ async function createPopupFixture(
   assert.equal(conflictingNote.els["annotation-text"].value, "My draft");
   assert.match(conflictingNote.els["annotation-error"].textContent, /changed elsewhere/);
   conflictingNote.els["annotation-cancel"].click();
+  await conflictingNote.settle();
   await markerKey(conflictingNote, "a");
   conflictingNote.els["annotation-text"].value = "Draft after import";
   await vm.runInContext(
@@ -717,6 +731,7 @@ async function createPopupFixture(
   assert.match(conflictingNote.els["annotation-error"].textContent, /bookmark changed/);
   assert.equal(conflictingNote.els["annotation-text"].value, "Draft after import");
   conflictingNote.els["annotation-cancel"].click();
+  await conflictingNote.settle();
   const unknownMarker = await markerFixture(
     markerSeed({ duration: 0, markers: [markerPoint("outside", 10)] }),
   );

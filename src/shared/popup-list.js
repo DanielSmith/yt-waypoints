@@ -120,7 +120,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
     const trashVideos = getTrash();
     const settings = getSettings();
     // Native range dragging must retain the same DOM node until release/cancel.
-    if (activeScrubber) return;
+    // Keep the single editor, its source row, focus and draft stable while
+    // background autosave/chapter/storage snapshots update. Closing refreshes.
+    if (activeScrubber || markers.editorOpen) return;
     updateHeaderMode();
     const query = searchEl.value.trim().toLocaleLowerCase();
     clearSearchEl.hidden = searchEl.value.length === 0;
