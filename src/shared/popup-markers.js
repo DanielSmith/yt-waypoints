@@ -1,4 +1,4 @@
-// Marker interactions own selection and drafts. Storage snapshots bind every
+// Marker interactions own selection and annotation persistence. Storage snapshots bind every
 // delayed operation to its original bookmark lifetime, never to a later import.
 globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
   document,
@@ -6,91 +6,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
   data,
   player,
   getSettings,
-  enqueue,
+  annotationEditor,
   refresh,
   setStatus,
   fmt,
-  focusRow,
 }) => {
   const MARKER_PROXIMITY_SECONDS = 2;
   const current = new Map();
-  let editor = null;
-  const editorEl = document.getElementById("annotation-editor");
-  const editorHome = editorEl.parentNode || document.body;
-  const listEl = document.getElementById("list");
-  let editorRow = null;
-  let editorMotion = null;
-  let closingEditor = null;
-  let editorObserver = null;
-
-  function ensureEditorVisible() {
-    if (!editorRow || typeof editorRow.getBoundingClientRect !== "function") return;
-    const row = editorRow.getBoundingClientRect();
-    const viewport = listEl.getBoundingClientRect();
-    const content = editorEl.querySelector(".annotation-content");
-    const inputHeight = noteEl.getBoundingClientRect().height;
-    const rowHeight = row.height - editorEl.getBoundingClientRect().height;
-    const otherEditorHeight = content.getBoundingClientRect().height - inputHeight;
-    // Read the pixel tokens that also constrain the native input; CSS owns the
-    // dimensions, while this calculation only fits them into the current row.
-    const layout = globalThis.getComputedStyle(noteEl);
-    const minimumInputHeight = parseFloat(layout.getPropertyValue("--annotation-input-min-height"));
-    const maximumInputHeight = parseFloat(layout.getPropertyValue("--annotation-input-max-height"));
-    const scrollClearance = parseFloat(layout.getPropertyValue("--annotation-scroll-clearance"));
-    const inputLimit = Math.floor(
-      Math.max(
-        minimumInputHeight,
-        Math.min(
-          maximumInputHeight,
-          viewport.height - rowHeight - otherEditorHeight - 2 * scrollClearance,
-        ),
-      ),
-    );
-    // Leave room for the source row, actions and validation text. Long notes
-    // scroll within the textarea rather than pushing Save/Cancel offscreen.
-    const limit = `${inputLimit}px`;
-    if (noteEl.style.getPropertyValue("--annotation-input-max") !== limit)
-      noteEl.style.setProperty("--annotation-input-max", limit);
-    // Follow the growing row as it reveals. Reserving a few pixels also keeps
-    // the bottom border and control focus rings off the scrollport edge.
-    if (row.bottom > viewport.bottom - scrollClearance)
-      listEl.scrollTop += row.bottom - viewport.bottom + scrollClearance;
-    else if (row.top < viewport.top + scrollClearance)
-      listEl.scrollTop += row.top - viewport.top - scrollClearance;
-  }
-
-  function revealEditor() {
-    editorEl.hidden = false;
-    document.body.classList.add("annotation-open");
-    document.documentElement.classList.add("annotation-open");
-    if (typeof globalThis.ResizeObserver === "function") {
-      editorObserver = new ResizeObserver(ensureEditorVisible);
-      editorObserver.observe(editorEl);
-      editorObserver.observe(listEl);
-      editorObserver.observe(editorEl.querySelector(".annotation-content"));
-    }
-    const height = typeof editorEl.animate === "function" ? editorEl.scrollHeight : 0;
-    const animation = WAYPOINTS_ANIMATE_HEIGHT(editorEl, 0, height);
-    editorMotion = animation;
-    if (animation) {
-      animation.finished.then(
-        () => {
-          if (editorMotion !== animation) return;
-          editorMotion = null;
-          animation.cancel();
-          ensureEditorVisible();
-        },
-        () => {},
-      );
-    }
-    noteEl.focus({ preventScroll: true });
-    ensureEditorVisible();
-  }
-  const noteEl = document.getElementById("annotation-text");
-  noteEl.maxLength = data.MAX_NOTE_CHARACTERS;
-  const saveEl = document.getElementById("annotation-save");
-  const cancelEl = document.getElementById("annotation-cancel");
-  const errorEl = document.getElementById("annotation-error");
   const life = (snapshot, id) => JSON.stringify(snapshot.records[id]?.life.v);
   const points = (video) => (video.markers || []).filter((marker) => !marker.removed);
   const find = (video, id) => points(video).find((marker) => marker.id === id);
@@ -111,9 +33,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     if (!snapshot.videos[id]) throw new Error("This bookmark is no longer current.");
     return snapshot;
   }
-  async function stillCurrent(snapshot, id) {
+  async function stillCurrent(snapshot, id, expectedLife = life(snapshot, id)) {
     const latest = await storage.read();
-    if (!latest.videos[id] || life(latest, id) !== life(snapshot, id))
+    if (!latest.videos[id] || life(latest, id) !== expectedLife)
       throw new Error("This bookmark changed. Try again on the current bookmark.");
     return latest;
   }
@@ -154,7 +76,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     );
   }
   async function remove(id, markerId, snapshot) {
-    if (editor?.id === id && editor.markerId === markerId)
+    const draft = annotationEditor.draft;
+    if (draft?.id === id && draft.markerId === markerId)
       throw new Error("Save or cancel this note before removing its marker.");
     snapshot ||= await snapshotFor(id);
     const marker = find(snapshot.videos[id], markerId);
@@ -235,8 +158,10 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     return true;
   }
   async function edit(id, markerId) {
-    if (editor || closingEditor) return setStatus("Save or cancel the open note first.");
+    if (annotationEditor.isBusy) return setStatus("Save or cancel the open note first.");
     const snapshot = await snapshotFor(id);
+    // A second direct edit request may have opened a form while this read waited.
+    if (annotationEditor.isBusy) return setStatus("Save or cancel the open note first.");
     if (markerId !== undefined) {
       if (markerId !== null && !find(snapshot.videos[id], markerId))
         throw new Error("This marker is no longer available.");
@@ -245,96 +170,40 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     }
     const anchor = data.anchor(snapshot.videos[id].markers || [], current.get(id)?.markerId);
     const marker = anchor.markerId ? find(snapshot.videos[id], anchor.markerId) : null;
-    editor = {
+    const draft = Object.freeze({
       id,
       markerId: anchor.markerId,
-      snapshot,
-      note: marker ? data.annotation(marker) : snapshot.videos[id].startNote || "",
-    };
-    const row = listEl.querySelector(`.main[data-id="${CSS.escape(id)}"]`);
-    if (!row) {
-      editor = null;
-      throw new Error("This bookmark is no longer visible.");
-    }
-    editorRow = row.parentNode;
-    editorRow.append(editorEl);
-    noteEl.value = editor.note;
-    document.getElementById("annotation-target").textContent =
-      `${marker ? "Marker" : "Video start"} ${fmt(anchor.t)}`;
-    errorEl.textContent = "";
-    revealEditor();
-  }
-  function closeEditor() {
-    if (closingEditor) return closingEditor;
-    if (!editor) return Promise.resolve();
-    const id = editor.id;
-    const from =
-      typeof editorEl.animate === "function" ? editorEl.getBoundingClientRect().height : 0;
-    editorMotion?.cancel();
-    const animation = WAYPOINTS_ANIMATE_HEIGHT(editorEl, from, 0);
-    editorMotion = animation;
-    closingEditor = (async () => {
-      if (animation) await animation.finished.catch(() => {});
-      editorObserver?.disconnect();
-      editorObserver = null;
-      editorEl.hidden = true;
-      animation?.cancel();
-      editorMotion = null;
-      editorHome.append(editorEl);
-      editorRow = null;
-      editor = null;
-      noteEl.value = "";
-      noteEl.style.removeProperty?.("--annotation-input-max");
-      errorEl.textContent = "";
-      document.getElementById("annotation-target").textContent = "";
-      document.body.classList.remove("annotation-open");
-      document.documentElement.classList.remove("annotation-open");
-      await refresh();
-      focusRow(id);
-    })().finally(() => {
-      closingEditor = null;
+      time: anchor.t,
+      originalNote: marker ? data.annotation(marker) : snapshot.videos[id].startNote || "",
+      lifetime: life(snapshot, id),
     });
-    return closingEditor;
+    annotationEditor.open({
+      draft,
+      save: (context, note) => saveAnnotation(snapshot, context, note),
+    });
   }
-  async function saveEditor() {
-    if (!editor || saveEl.disabled) return;
-    const pending = editor;
-    const note = noteEl.value;
-    saveEl.disabled = true;
-    cancelEl.disabled = true;
-    errorEl.textContent = "";
-    try {
-      data.note(note);
-      const latest = await stillCurrent(pending.snapshot, pending.id);
-      const draft = {
-        ...pending.snapshot,
-        videos: JSON.parse(JSON.stringify(pending.snapshot.videos)),
-      };
-      const beforeVideo = draft.videos[pending.id];
-      const latestVideo = latest.videos[pending.id];
-      const before = pending.markerId ? find(beforeVideo, pending.markerId) : beforeVideo;
-      const now = pending.markerId ? find(latestVideo, pending.markerId) : latestVideo;
-      if (!now) throw new Error("This marker was removed. Copy your draft, then cancel.");
-      const noteField = pending.markerId ? "note" : "startNote";
-      if (note !== pending.note) {
-        if ((pending.markerId ? data.annotation(now) : now[noteField] || "") !== pending.note)
-          throw new Error(
-            "This note changed elsewhere. Copy your draft, then cancel and reopen it.",
-          );
-        before[noteField] = note;
-      }
-      draft.clock = latest.clock;
-      await storage.save(draft);
-      await stillCurrent(draft, pending.id);
-      await closeEditor();
-      setStatus("Annotation saved.");
-    } catch (error) {
-      errorEl.textContent = error.message;
-      ensureEditorVisible();
-    } finally {
-      saveEl.disabled = false;
-      cancelEl.disabled = false;
+
+  async function saveAnnotation(snapshot, context, note) {
+    data.note(note);
+    const latest = await stillCurrent(snapshot, context.id, context.lifetime);
+    const mutation = {
+      ...snapshot,
+      videos: JSON.parse(JSON.stringify(snapshot.videos)),
+    };
+    const beforeVideo = mutation.videos[context.id];
+    const latestVideo = latest.videos[context.id];
+    const before = context.markerId ? find(beforeVideo, context.markerId) : beforeVideo;
+    const now = context.markerId ? find(latestVideo, context.markerId) : latestVideo;
+    if (!now) throw new Error("This marker was removed. Copy your draft, then cancel.");
+    const noteField = context.markerId ? "note" : "startNote";
+    if (note !== context.originalNote) {
+      if ((context.markerId ? data.annotation(now) : now[noteField] || "") !== context.originalNote)
+        throw new Error("This note changed elsewhere. Copy your draft, then cancel and reopen it.");
+      before[noteField] = note;
     }
+    mutation.clock = latest.clock;
+    await storage.save(mutation);
+    await stillCurrent(mutation, context.id, context.lifetime);
   }
   function decorate(video, timeline) {
     if (!getSettings().showMarkers || !video.duration) return;
@@ -362,12 +231,6 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     }
     timeline.append(overlay);
   }
-  function init() {
-    saveEl.addEventListener("click", () => enqueue(saveEditor));
-    cancelEl.addEventListener("click", () => enqueue(closeEditor));
-    saveEl.disabled = false;
-    cancelEl.disabled = false;
-  }
   return Object.freeze({
     toggle,
     remove,
@@ -375,13 +238,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     navigate,
     refreshChapters,
     edit,
-    saveEditor,
-    closeEditor,
+    saveEditor: annotationEditor.save,
+    closeEditor: annotationEditor.close,
     decorate,
     sync,
-    init,
     get editorOpen() {
-      return Boolean(editor);
+      return annotationEditor.isOpen;
     },
   });
 };

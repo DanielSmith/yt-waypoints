@@ -1,4 +1,4 @@
-// Options normalization, field-intent capture, persistence, and control binding.
+// Settings normalization, field-intent capture, persistence, and control binding.
 globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   document,
   api,
@@ -13,11 +13,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   setStatus,
   closeFormatMenu,
 }) => {
+  const { navigateSummaries } = WAYPOINTS_POPUP_DOM;
   const policy = WAYPOINTS_SETTINGS_POLICY;
   const { defaults, numeric } = policy;
   let thumbnailChangePending = false;
   const optionsPanel = document.getElementById("options-panel");
   const groups = [...optionsPanel.querySelectorAll(".option-group")];
+  const headings = groups.map((group) => group.querySelector("summary"));
   const disclosures = WAYPOINTS_CREATE_DISCLOSURES(".option-group-content");
 
   function resetGroups() {
@@ -27,32 +29,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   function focusFirstGroup() {
-    groups[0]?.querySelector("summary").focus();
+    headings[0]?.focus();
   }
 
   function navigateGroups(event) {
-    if (
-      event.defaultPrevented ||
-      event.isComposing ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      event.shiftKey ||
-      !["ArrowUp", "ArrowDown"].includes(event.key)
-    )
-      return;
-    const headings = groups.map((group) => group.querySelector("summary"));
-    const index = headings.indexOf(document.activeElement);
-    // Never take arrows from sliders, selects, inputs or the transcript picker.
-    if (index < 0) return;
-    const next = Math.max(
-      0,
-      Math.min(headings.length - 1, index + (event.key === "ArrowDown" ? 1 : -1)),
-    );
-    event.preventDefault();
-    event.stopPropagation();
-    headings[next].focus();
-    headings[next].scrollIntoView({ block: "nearest" });
+    // Unlike Help, arrows from form controls must not enter the headings.
+    navigateSummaries(event, headings, document.activeElement);
   }
 
   const themeSelect = document.getElementById("theme-select");
@@ -67,6 +49,30 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   const scrubSecondsEl = document.getElementById("scrub-seconds");
   const shiftMultiplierEl = document.getElementById("shift-multiplier");
   const offerSaveFileEl = document.getElementById("offer-save-file");
+  const scrubValueEl = document.getElementById("scrub-value");
+  const multiplierValueEl = document.getElementById("multiplier-value");
+  const shiftPreviewEl = document.getElementById("shift-preview");
+  const trashExpiryHelpEl = document.getElementById("trash-expiry-help");
+  const summaryEls = Object.fromEntries(
+    ["appearance", "bookmarks", "playback", "trash", "transcripts", "backup"].map((name) => [
+      name,
+      document.getElementById(`${name}-summary`),
+    ]),
+  );
+  // Plain checkboxes share one field binding; thumbnails retain their pending guard.
+  const checkboxControls = [
+    ["autoBookmark", autoBookmarkEl],
+    ["includeChannelNames", includeChannelsEl],
+    ["showMarkers", markersEl],
+    ["offerSaveFile", offerSaveFileEl],
+    ["showTrash", showTrashEl],
+  ];
+
+  function updateScrubPreview({ scrubSeconds, shiftMultiplier }) {
+    scrubValueEl.textContent = `${scrubSeconds} s`;
+    multiplierValueEl.textContent = `×${shiftMultiplier}`;
+    shiftPreviewEl.textContent = `Shift + ← or → moves ${Number(scrubSeconds) * Number(shiftMultiplier)} seconds.`;
+  }
 
   function normalizeSettings(saved = {}) {
     return {
@@ -104,25 +110,18 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
       backup: `JSON transfer · file offer ${settings.offerSaveFile ? "on" : "off"}`,
     };
     for (const [group, summary] of Object.entries(summaries))
-      document.getElementById(`${group}-summary`).textContent = summary;
+      summaryEls[group].textContent = summary;
     deletionModeEl.value = settings.deletionMode;
     trashDaysEl.value = String(settings.trashDays);
-    showTrashEl.checked = settings.showTrash;
     themeSelect.value = settings.theme;
     themeService.apply(settings.theme);
-    autoBookmarkEl.checked = settings.autoBookmark;
-    includeChannelsEl.checked = settings.includeChannelNames;
+    for (const [name, control] of checkboxControls) control.checked = settings[name];
     thumbnailsEl.checked = settings.showThumbnails;
-    markersEl.checked = settings.showMarkers;
     thumbnailsEl.disabled = thumbnailChangePending;
-    offerSaveFileEl.checked = settings.offerSaveFile;
     updateFormatUI(settings.transcriptFormat);
     scrubSecondsEl.value = settings.scrubSeconds;
     shiftMultiplierEl.value = settings.shiftMultiplier;
-    document.getElementById("scrub-value").textContent = `${settings.scrubSeconds} s`;
-    document.getElementById("multiplier-value").textContent = `×${settings.shiftMultiplier}`;
-    document.getElementById("shift-preview").textContent =
-      `Shift + ← or → moves ${settings.scrubSeconds * settings.shiftMultiplier} seconds.`;
+    updateScrubPreview(settings);
   }
 
   function changeSetting(name, value) {
@@ -130,6 +129,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     return enqueue(() => persistSettings(normalizeSettings({ ...getSettings(), [name]: value })));
   }
   function toggleMarkers() {
+    // Shortcut toggles must observe preceding queued writes. They are not
+    // absolute form values to capture early or enqueue again via changeSetting.
     return enqueue(async () => {
       const showMarkers = !getSettings().showMarkers;
       await persistSettings({ ...getSettings(), showMarkers });
@@ -151,7 +152,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     thumbnailChangePending = true;
     updateSettingsUI();
     try {
-      await enqueue(() => persistSettings({ ...getSettings(), showThumbnails: show }));
+      await changeSetting("showThumbnails", show);
     } finally {
       thumbnailChangePending = false;
       updateSettingsUI();
@@ -169,18 +170,16 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
       control.step = "1";
       control.defaultValue = String(rule.defaultValue);
     }
-    document.getElementById("trash-expiry-help").textContent =
-      `Default: ${numeric.trashDays.defaultValue} days${numeric.trashDays.defaultValue === 7 ? " (one week)" : ""}. Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.`;
+    trashExpiryHelpEl.textContent = `Default: ${numeric.trashDays.defaultValue} days${numeric.trashDays.defaultValue === 7 ? " (one week)" : ""}. Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.`;
     optionsPanel.addEventListener("keydown", navigateGroups);
-    for (const group of groups) {
-      group.querySelector("summary").addEventListener("click", (event) => {
+    for (const [index, group] of groups.entries()) {
+      headings[index].addEventListener("click", (event) => {
         event.preventDefault();
         // Closing a group also dismisses any active format preview it contains.
         closeFormatMenu(false);
         disclosures.toggle(group);
       });
     }
-    markersEl.addEventListener("change", () => changeSetting("showMarkers", markersEl.checked));
     themeSelect.replaceChildren(
       ...themeService.choices.map((theme) => {
         const option = document.createElement("option");
@@ -189,23 +188,14 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
         return option;
       }),
     );
-    themeSelect.addEventListener("change", () => {
-      const theme = themeService.normalize(themeSelect.value);
-      enqueue(() => persistSettings({ ...getSettings(), theme }));
-    });
-    autoBookmarkEl.addEventListener("change", () =>
-      changeSetting("autoBookmark", autoBookmarkEl.checked),
+    themeSelect.addEventListener("change", () =>
+      changeSetting("theme", themeService.normalize(themeSelect.value)),
     );
-    includeChannelsEl.addEventListener("change", () =>
-      changeSetting("includeChannelNames", includeChannelsEl.checked),
-    );
-    offerSaveFileEl.addEventListener("change", () =>
-      changeSetting("offerSaveFile", offerSaveFileEl.checked),
-    );
+    for (const [name, control] of checkboxControls)
+      control.addEventListener("change", () => changeSetting(name, control.checked));
     deletionModeEl.addEventListener("change", () =>
       changeSetting("deletionMode", deletionModeEl.value),
     );
-    showTrashEl.addEventListener("change", () => changeSetting("showTrash", showTrashEl.checked));
     trashDaysEl.addEventListener("change", () => {
       const days = Number(trashDaysEl.value);
       if (!policy.isIntegerInRange(days, numeric.trashDays)) {
@@ -221,10 +211,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     });
     for (const slider of [scrubSecondsEl, shiftMultiplierEl]) {
       slider.addEventListener("input", () => {
-        document.getElementById("scrub-value").textContent = `${scrubSecondsEl.value} s`;
-        document.getElementById("multiplier-value").textContent = `×${shiftMultiplierEl.value}`;
-        document.getElementById("shift-preview").textContent =
-          `Shift + ← or → moves ${Number(scrubSecondsEl.value) * Number(shiftMultiplierEl.value)} seconds.`;
+        // Preview the current controls, not the last persisted settings. Saving
+        // still happens only on change, with each field captured at that event.
+        updateScrubPreview({
+          scrubSeconds: scrubSecondsEl.value,
+          shiftMultiplier: shiftMultiplierEl.value,
+        });
       });
       slider.addEventListener("change", () =>
         changeSetting(

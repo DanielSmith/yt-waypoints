@@ -941,6 +941,237 @@ async function createPopupFixture(
   console.log(
     "PASS: marker shortcuts, live/closed positions, selection, annotations/start fallback, editing guards, hide/export, navigation and delayed/conflicting lifetime safety",
   );
+  // The UI gets a frozen identity/value context, not the full storage snapshot.
+  // Changing marker selection while editing cannot redirect the eventual write.
+  const anchoredDraft = await markerFixture(
+    markerSeed({
+      markers: [
+        markerPoint("first", 10, { note: "First original" }),
+        markerPoint("second", 20, { note: "Second original" }),
+      ],
+    }),
+  );
+  await vm.runInContext(`markers.edit("${markerId}", "u:first")`, anchoredDraft.context);
+  const originalDraft = vm.runInContext("annotationEditor.draft", anchoredDraft.context);
+  assert.ok(Object.isFrozen(originalDraft));
+  assert.deepEqual(
+    Object.keys(originalDraft).sort(),
+    ["id", "markerId", "time", "originalNote", "lifetime"].sort(),
+  );
+  assert.equal(originalDraft.id, markerId);
+  assert.equal(originalDraft.markerId, "u:first");
+  assert.equal(originalDraft.time, 10);
+  assert.equal(originalDraft.originalNote, "First original");
+  const originalLifetime = JSON.stringify(
+    (await anchoredDraft.context.WAYPOINTS_STORAGE.read()).records[markerId].life.v,
+  );
+  assert.equal(originalDraft.lifetime, originalLifetime);
+  for (const name of ["id", "markerId", "originalNote", "lifetime"])
+    assert.equal(Reflect.set(originalDraft, name, "mutated"), false, name);
+  anchoredDraft.els["annotation-text"].value = "Edit belongs to first";
+  await vm.runInContext(`markers.select("${markerId}", "u:second")`, anchoredDraft.context);
+  await assert.rejects(
+    vm.runInContext(`markers.remove("${markerId}", "u:first")`, anchoredDraft.context),
+    /Save or cancel/,
+  );
+  await vm.runInContext("markers.saveEditor()", anchoredDraft.context);
+  assert.equal(anchoredDraft.data.videos[markerId].markers[0].note, "Edit belongs to first");
+  assert.equal(anchoredDraft.data.videos[markerId].markers[1].note, "Second original");
+  assert.equal(
+    anchoredDraft.data.videos[markerId].t,
+    20,
+    "saving a note must preserve an intervening seek",
+  );
+  assert.equal(vm.runInContext("annotationEditor.draft", anchoredDraft.context), null);
+  assert.equal(anchoredDraft.els["annotation-text"].value, "");
+  console.log(
+    "PASS: annotation UI receives immutable context without snapshots; saves retain the original anchor and preserve other fields",
+  );
+
+  const removedDraft = await markerFixture(
+    markerSeed({ markers: [markerPoint("gone", 10, { note: "Before removal" })] }),
+  );
+  await vm.runInContext(`markers.edit("${markerId}", "u:gone")`, removedDraft.context);
+  removedDraft.els["annotation-text"].value = "Keep my unsaved text";
+  await vm.runInContext(
+    `(async()=>{const s=await WAYPOINTS_STORAGE.read();s.videos["${markerId}"].markers[0].removed=true;await WAYPOINTS_STORAGE.save(s);})()`,
+    removedDraft.context,
+  );
+  await vm.runInContext("markers.saveEditor()", removedDraft.context);
+  assert.match(removedDraft.els["annotation-error"].textContent, /marker was removed/);
+  assert.equal(removedDraft.els["annotation-text"].value, "Keep my unsaved text");
+  assert.equal(removedDraft.els["annotation-editor"].hidden, false);
+  assert.equal(removedDraft.data.videos[markerId].markers[0].removed, true);
+  await vm.runInContext("markers.closeEditor()", removedDraft.context);
+
+  // Hold the validation read before import: even if that read returns an older
+  // valid view, the mutation is still bound to the original lifetime.
+  const heldDraft = await markerFixture(markerSeed({ startNote: "Before import" }));
+  await vm.runInContext(`markers.edit("${markerId}")`, heldDraft.context);
+  const heldIdentity = vm.runInContext("annotationEditor.draft", heldDraft.context);
+  heldDraft.els["annotation-text"].value = "Obsolete local edit";
+  const heldApi = heldDraft.context.browser || heldDraft.context.chrome;
+  const heldGet = heldApi.storage.local.get;
+  let releaseDraftRead;
+  heldApi.storage.local.get = async (keys) => {
+    const value = await heldGet(keys);
+    if (keys === null) {
+      heldApi.storage.local.get = heldGet;
+      await new Promise((resolve) => {
+        releaseDraftRead = resolve;
+      });
+    }
+    return value;
+  };
+  const heldSave = vm.runInContext("markers.saveEditor()", heldDraft.context);
+  await heldDraft.settle();
+  assert.ok(releaseDraftRead);
+  assert.equal(heldDraft.els["annotation-save"].disabled, true);
+  await vm.runInContext(
+    `WAYPOINTS_STORAGE.importVideos({"${markerId}":{id:"${markerId}",t:90,duration:100,startNote:"Imported note"}})`,
+    heldDraft.context,
+  );
+  releaseDraftRead();
+  await heldSave;
+  assert.equal(heldDraft.data.videos[markerId].startNote, "Imported note");
+  assert.equal(heldDraft.data.videos[markerId].t, 90);
+  assert.equal(vm.runInContext("annotationEditor.draft", heldDraft.context), heldIdentity);
+  assert.match(heldDraft.els["annotation-error"].textContent, /bookmark changed/);
+  assert.equal(heldDraft.els["annotation-text"].value, "Obsolete local edit");
+  assert.equal(heldDraft.els["annotation-save"].disabled, false);
+  await vm.runInContext("markers.closeEditor()", heldDraft.context);
+  console.log(
+    "PASS: external marker removal and import during a held annotation save retain drafts without writing into a new lifetime",
+  );
+
+  // Two direct edit requests may finish their reads in a different order.
+  // The first form to open keeps ownership instead of being silently replaced.
+  const concurrentEdit = await markerFixture(
+    markerSeed({
+      markers: [
+        markerPoint("first", 10, { note: "First" }),
+        markerPoint("second", 20, { note: "Second" }),
+      ],
+    }),
+  );
+  const editApi = concurrentEdit.context.browser || concurrentEdit.context.chrome;
+  const editGet = editApi.storage.local.get;
+  let releaseEditRead;
+  editApi.storage.local.get = async (keys) => {
+    const value = await editGet(keys);
+    editApi.storage.local.get = editGet;
+    await new Promise((resolve) => {
+      releaseEditRead = resolve;
+    });
+    return value;
+  };
+  const delayedEdit = vm.runInContext(
+    `markers.edit("${markerId}","u:first")`,
+    concurrentEdit.context,
+  );
+  await concurrentEdit.settle();
+  assert.ok(releaseEditRead);
+  await vm.runInContext(`markers.edit("${markerId}","u:second")`, concurrentEdit.context);
+  releaseEditRead();
+  await delayedEdit;
+  assert.equal(
+    vm.runInContext("annotationEditor.draft.markerId", concurrentEdit.context),
+    "u:second",
+  );
+  assert.equal(concurrentEdit.els["annotation-text"].value, "Second");
+  await vm.runInContext("markers.closeEditor()", concurrentEdit.context);
+
+  // UI-level late results are isolated from a subsequent form, independently
+  // of the domain-level lifetime checks above.
+  const uiSessions = await markerFixture(markerSeed({ startNote: "Stored note" }));
+  const sessionLife = JSON.stringify(
+    (await uiSessions.context.WAYPOINTS_STORAGE.read()).records[markerId].life.v,
+  );
+  uiSessions.context.firstUiDraft = Object.freeze({
+    id: markerId,
+    markerId: null,
+    time: 0,
+    originalNote: "First view",
+    lifetime: sessionLife,
+  });
+  let rejectUiSave;
+  uiSessions.context.firstUiSave = () =>
+    new Promise((resolve, reject) => {
+      rejectUiSave = reject;
+    });
+  assert.equal(
+    vm.runInContext(
+      "annotationEditor.open({draft:firstUiDraft,save:firstUiSave})",
+      uiSessions.context,
+    ),
+    true,
+  );
+  uiSessions.els["annotation-text"].value = "Old UI text";
+  const staleUiSave = vm.runInContext("annotationEditor.save()", uiSessions.context);
+  await uiSessions.settle();
+  assert.ok(rejectUiSave);
+  await vm.runInContext("annotationEditor.close()", uiSessions.context);
+  uiSessions.context.secondUiDraft = Object.freeze({
+    id: markerId,
+    markerId: null,
+    time: 0,
+    originalNote: "Second view",
+    lifetime: sessionLife,
+  });
+  uiSessions.context.secondUiSave = async () => {};
+  assert.equal(
+    vm.runInContext(
+      "annotationEditor.open({draft:secondUiDraft,save:secondUiSave})",
+      uiSessions.context,
+    ),
+    true,
+  );
+  uiSessions.els["annotation-text"].value = "New UI draft";
+  rejectUiSave(new Error("Late error from the old form"));
+  await staleUiSave;
+  assert.equal(
+    vm.runInContext("annotationEditor.draft", uiSessions.context),
+    uiSessions.context.secondUiDraft,
+  );
+  assert.equal(uiSessions.els["annotation-text"].value, "New UI draft");
+  assert.equal(uiSessions.els["annotation-error"].textContent, "");
+  assert.equal(uiSessions.els["annotation-save"].disabled, false);
+  assert.equal(uiSessions.els["annotation-cancel"].disabled, false);
+  assert.equal(uiSessions.data.videos[markerId].startNote, "Stored note");
+  await vm.runInContext("annotationEditor.close()", uiSessions.context);
+  let resolveUiSave;
+  uiSessions.context.firstUiSave = () =>
+    new Promise((resolve) => {
+      resolveUiSave = resolve;
+    });
+  vm.runInContext(
+    "annotationEditor.open({draft:firstUiDraft,save:firstUiSave})",
+    uiSessions.context,
+  );
+  const staleUiSuccess = vm.runInContext("annotationEditor.save()", uiSessions.context);
+  await uiSessions.settle();
+  assert.ok(resolveUiSave);
+  await vm.runInContext("annotationEditor.close()", uiSessions.context);
+  vm.runInContext(
+    "annotationEditor.open({draft:secondUiDraft,save:secondUiSave})",
+    uiSessions.context,
+  );
+  uiSessions.els["annotation-text"].value = "Do not close this new draft";
+  const statusBeforeOldSuccess = uiSessions.els.status.textContent;
+  resolveUiSave();
+  await staleUiSuccess;
+  assert.equal(
+    vm.runInContext("annotationEditor.draft", uiSessions.context),
+    uiSessions.context.secondUiDraft,
+  );
+  assert.equal(uiSessions.els["annotation-text"].value, "Do not close this new draft");
+  assert.equal(uiSessions.els["annotation-editor"].hidden, false);
+  assert.equal(uiSessions.els.status.textContent, statusBeforeOldSuccess);
+  await vm.runInContext("annotationEditor.close()", uiSessions.context);
+  console.log(
+    "PASS: overlapping edit reads and late UI save results cannot replace or poison a newer annotation session",
+  );
+
   const markerVideo = {
     id: "aaaaaaaaaaa",
     title: "Marker export",
@@ -2641,6 +2872,205 @@ async function createPopupFixture(
   assert.equal(delayed.data.settings.showTrash, true);
   assert.equal(delayed.data.settings.trashDays, 14);
   console.log("PASS: delayed settings saves preserve later visibility and retention changes");
+
+  // Live slider previews use the form values, while change commits only its
+  // captured field. Form synchronization must not disturb the focused control.
+  const previewSettings = await createPopupFixture(
+    { settings: { autoBookmark: false } },
+    "https://example.com/",
+  );
+  previewSettings.els["options-toggle"].click();
+  const previewScrub = previewSettings.els["scrub-seconds"];
+  const previewMultiplier = previewSettings.els["shift-multiplier"];
+  previewScrub.focus();
+  const previewWrites = previewSettings.writes();
+  previewScrub.value = "12";
+  previewMultiplier.value = "4";
+  previewScrub.events.input();
+  assert.equal(previewSettings.els["scrub-value"].textContent, "12 s");
+  assert.equal(previewSettings.els["multiplier-value"].textContent, "×4");
+  assert.equal(
+    previewSettings.els["shift-preview"].textContent,
+    "Shift + ← or → moves 48 seconds.",
+  );
+  assert.equal(previewSettings.writes(), previewWrites, "input preview must not save settings");
+  assert.equal(vm.runInContext("settings.scrubSeconds", previewSettings.context), 10);
+  assert.equal(previewSettings.doc.activeElement, previewScrub);
+  previewScrub.events.change();
+  await vm.runInContext("queue", previewSettings.context);
+  await previewSettings.settle();
+  assert.equal(previewSettings.data.settings.scrubSeconds, 12);
+  assert.equal(
+    previewSettings.data.settings.shiftMultiplier,
+    3,
+    "scrub change must not save an uncommitted multiplier",
+  );
+  assert.equal(
+    previewSettings.els["shift-preview"].textContent,
+    "Shift + ← or → moves 36 seconds.",
+  );
+  assert.equal(previewSettings.doc.activeElement, previewScrub);
+  previewMultiplier.value = "4";
+  previewMultiplier.events.input();
+  assert.equal(
+    previewSettings.els["shift-preview"].textContent,
+    "Shift + ← or → moves 48 seconds.",
+  );
+  previewMultiplier.events.change();
+  await vm.runInContext("queue", previewSettings.context);
+  const reopenedPreview = await createPopupFixture(previewSettings.data, "https://example.com/");
+  assert.equal(reopenedPreview.els["scrub-value"].textContent, "12 s");
+  assert.equal(reopenedPreview.els["multiplier-value"].textContent, "×4");
+  assert.equal(reopenedPreview.els["playback-summary"].textContent, "12s · Shift 48s");
+  console.log(
+    "PASS: shared Settings previews use unsaved controls without writes, commit field-specific values and retain focus/reopen state",
+  );
+
+  function holdNextSettingsWrite(popup) {
+    const api = popup.context.browser || popup.context.chrome;
+    const original = api.storage.local.set;
+    let release, reject;
+    let entered = false;
+    const pending = new Promise((yes, no) => {
+      release = yes;
+      reject = no;
+    });
+    api.storage.local.set = async (value) => {
+      if (value.settings) {
+        api.storage.local.set = original;
+        entered = true;
+        await pending;
+      }
+      return original(value);
+    };
+    return { release, reject, entered: () => entered };
+  }
+
+  const rapidSettings = await createPopupFixture(
+    { settings: { autoBookmark: false } },
+    "https://example.com/",
+  );
+  rapidSettings.els["options-toggle"].click();
+  const rapidGate = holdNextSettingsWrite(rapidSettings);
+  rapidSettings.els["include-channel-names"].checked = false;
+  rapidSettings.els["include-channel-names"].events.change();
+  await rapidSettings.settle();
+  assert.ok(rapidGate.entered());
+  for (const [controlId, checked] of [
+    ["auto-bookmark", true],
+    ["show-markers", false],
+    ["show-markers", true],
+    ["show-markers", false],
+    ["offer-save-file", true],
+    ["show-trash", true],
+    ["include-channel-names", true],
+  ]) {
+    rapidSettings.els[controlId].checked = checked;
+    rapidSettings.els[controlId].events.change();
+  }
+  for (const theme of ["light", "dark"]) {
+    rapidSettings.els["theme-select"].value = theme;
+    rapidSettings.els["theme-select"].events.change();
+  }
+  for (const [controlId, value] of [
+    ["scrub-seconds", "17"],
+    ["shift-multiplier", "5"],
+    ["trash-days", "14"],
+  ]) {
+    rapidSettings.els[controlId].value = value;
+    rapidSettings.els[controlId].events.change();
+  }
+  rapidSettings.els["theme-select"].value = "system";
+  rapidSettings.els["show-markers"].checked = true;
+  rapidSettings.els["trash-days"].value = "1";
+  rapidSettings.els["trash-days"].focus();
+  rapidGate.release();
+  await vm.runInContext("queue", rapidSettings.context);
+  await rapidSettings.settle();
+  for (const [name, expected] of Object.entries({
+    autoBookmark: true,
+    includeChannelNames: true,
+    showMarkers: false,
+    offerSaveFile: true,
+    showTrash: true,
+    theme: "dark",
+    scrubSeconds: 17,
+    shiftMultiplier: 5,
+    trashDays: 14,
+    showThumbnails: true,
+  }))
+    assert.equal(rapidSettings.data.settings[name], expected, name);
+  assert.equal(rapidSettings.doc.activeElement, rapidSettings.els["trash-days"]);
+  const reopenedRapid = await createPopupFixture(rapidSettings.data, "https://example.com/");
+  assert.equal(reopenedRapid.els["theme-select"].value, "dark");
+  assert.equal(reopenedRapid.els["show-markers"].checked, false);
+  assert.equal(reopenedRapid.els["auto-bookmark"].checked, true);
+  assert.equal(reopenedRapid.els["include-channel-names"].checked, true);
+  assert.equal(reopenedRapid.els["offer-save-file"].checked, true);
+  assert.equal(reopenedRapid.els["show-trash"].checked, true);
+  assert.equal(reopenedRapid.els["playback-summary"].textContent, "17s · Shift 85s");
+  assert.ok(reopenedRapid.els["appearance-summary"].textContent.startsWith("Dark ·"));
+  console.log(
+    "PASS: rapid mapped checkbox/theme/numeric changes retain captured intent across a held write and persist summaries on reopen",
+  );
+
+  const pendingThumbnails = await createPopupFixture(
+    { settings: { autoBookmark: false, showThumbnails: true } },
+    "https://example.com/",
+  );
+  pendingThumbnails.els["options-toggle"].click();
+  const thumbnailGate = holdNextSettingsWrite(pendingThumbnails);
+  const thumbnailWrites = pendingThumbnails.writes();
+  pendingThumbnails.els["show-thumbnails"].checked = false;
+  pendingThumbnails.els["show-thumbnails"].events.change();
+  await pendingThumbnails.settle();
+  assert.ok(thumbnailGate.entered());
+  assert.equal(pendingThumbnails.els["show-thumbnails"].disabled, true);
+  await vm.runInContext("setThumbnails(true)", pendingThumbnails.context);
+  pendingThumbnails.els["theme-select"].value = "dark";
+  pendingThumbnails.els["theme-select"].events.change();
+  pendingThumbnails.els["theme-select"].focus();
+  assert.equal(pendingThumbnails.writes(), thumbnailWrites);
+  thumbnailGate.release();
+  await vm.runInContext("queue", pendingThumbnails.context);
+  await pendingThumbnails.settle();
+  assert.equal(
+    pendingThumbnails.data.settings.showThumbnails,
+    false,
+    "pending thumbnail requests are ignored",
+  );
+  assert.equal(pendingThumbnails.data.settings.theme, "dark");
+  assert.equal(pendingThumbnails.writes(), thumbnailWrites + 2);
+  assert.equal(pendingThumbnails.els["show-thumbnails"].disabled, false);
+  assert.equal(pendingThumbnails.els["show-thumbnails"].checked, false);
+  assert.equal(pendingThumbnails.doc.activeElement, pendingThumbnails.els["theme-select"]);
+
+  const failedThumbnails = await createPopupFixture(
+    { settings: { autoBookmark: false, showThumbnails: true } },
+    "https://example.com/",
+  );
+  const failureGate = holdNextSettingsWrite(failedThumbnails);
+  failedThumbnails.els["show-thumbnails"].checked = false;
+  failedThumbnails.els["show-thumbnails"].events.change();
+  await failedThumbnails.settle();
+  assert.ok(failureGate.entered());
+  assert.equal(failedThumbnails.els["show-thumbnails"].disabled, true);
+  failureGate.reject(new Error("Settings write failed"));
+  await vm.runInContext("queue", failedThumbnails.context);
+  await failedThumbnails.settle();
+  assert.equal(failedThumbnails.data.settings.showThumbnails, true);
+  assert.equal(failedThumbnails.els["show-thumbnails"].disabled, false);
+  assert.equal(failedThumbnails.els["show-thumbnails"].checked, true);
+  assert.match(failedThumbnails.els.status.textContent, /Settings write failed/);
+  failedThumbnails.els["show-thumbnails"].checked = false;
+  failedThumbnails.els["show-thumbnails"].events.change();
+  await vm.runInContext("queue", failedThumbnails.context);
+  await failedThumbnails.settle();
+  assert.equal(failedThumbnails.data.settings.showThumbnails, false);
+  assert.equal(failedThumbnails.els["show-thumbnails"].disabled, false);
+  console.log(
+    "PASS: thumbnails retain pending suppression/disabled state, other field intent and failure recovery",
+  );
 
   const cleanupFailure = { failStorageRemove: true };
   const retryCleanup = await createPopupFixture(

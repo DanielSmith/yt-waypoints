@@ -1,6 +1,7 @@
 // Transcript output is independent of YouTube's changing page markup.
 globalThis.WAYPOINTS_TRANSCRIPT = (() => {
   const { isVideoId } = WAYPOINTS_YOUTUBE_VALUES;
+  const timestamp = WAYPOINTS_TIME_FORMAT.displayTimestamp;
   const DEFAULT_FORMAT_ID = "markdown-linked";
   const TRANSCRIPT_FORMAT_VERSION = 1;
   const MAX_FILENAME_SLUG_CHARACTERS = 80;
@@ -80,15 +81,6 @@ globalThis.WAYPOINTS_TRANSCRIPT = (() => {
     formats.find((format) => format.id === id) ||
     formats.find((format) => format.id === DEFAULT_FORMAT_ID);
   const escapeMarkdown = (text) => String(text).replace(/([\\`*_{}\[\]()<>#+.!|~-])/g, "\\$1");
-  function timestamp(seconds) {
-    const total = Math.floor(seconds);
-    const h = Math.floor(total / 3600),
-      m = Math.floor(total / 60) % 60,
-      s = total % 60;
-    return h
-      ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`
-      : `${m}:${String(s).padStart(2, "0")}`;
-  }
   function cueTime(positionSeconds, separator) {
     const totalMilliseconds = Math.round(positionSeconds * 1000);
     const hours = Math.floor(totalMilliseconds / 3600000);

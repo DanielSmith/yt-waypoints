@@ -308,12 +308,15 @@ popup bundle:
 | `popup-refresh.mjs` | Orders and coalesces popup reads so stale snapshots cannot replace newer views |
 | `youtube-values.js` | Pure video-ID and channel-URL validation shared by extension-side consumers |
 | `settings-policy.js` | Immutable Settings defaults/ranges shared by controls, normalization and trash retention |
-| `popup-settings.js` | Settings normalization, captured field changes, persistence, and grouped Settings controls |
+| `display-time.js` | Shared ordinary position-clock formatting; subtitle milliseconds remain separate |
+| `popup-dom.js` | Bounded summary navigation, surviving focus return and dialog-dismissal bindings |
+| `popup-settings.js` | Settings normalization, captured field changes, persistence, cached form bindings and shared previews |
 | `popup-disclosures.js` | Shared reversible disclosure motion for Settings and Help |
 | `popup-bookmarks.js` | Bookmark/import/trash actions and lifetime-bound playback-position saves |
 | `popup-exports.js` | Transcript format UI, copying, clipboard fallback, and optional file saving |
 | `popup-list.js` | Filtering, grouped sorting, rows, sliders, and focus restoration |
-| `popup-markers.js` | Keyboard marker operations, chapter refresh, selection, timeline overlays, and annotation editing |
+| `popup-annotation-editor.js` | Single on-demand form, immutable draft sessions, motion/scrolling, errors and focus lifecycle |
+| `popup-markers.js` | Marker selection/commands, chapter refresh, timeline overlays and guarded annotation persistence |
 | `chapter-reader.js` | Self-contained read-only extraction from video-bound YouTube chapter models |
 | `popup-input.js` | Keyboard and paste routing, modal guards, and native editing behavior |
 | `popup-dialogs.js` | Help/About lifecycle and focus return |

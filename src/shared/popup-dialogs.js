@@ -9,6 +9,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   listEl,
   headerControl,
 }) => {
+  const { navigateSummaries, restoreFocus, bindDialogDismissal } = WAYPOINTS_POPUP_DOM;
   const helpDialog = document.getElementById("help-dialog");
   const helpToggle = document.getElementById("help-toggle");
   const helpClose = document.getElementById("help-close");
@@ -17,33 +18,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   let helpPreviousFocus = null;
   let helpPreviousRowId = null;
   const explanations = WAYPOINTS_CREATE_DISCLOSURES(".shortcut-explanation");
+  const helpRows = [...helpDialog.querySelectorAll(".shortcut")];
+  const helpHeadings = helpRows.map((row) => row.querySelector("summary"));
 
   function navigateHelp(event) {
-    if (
-      !helpDialog.open ||
-      event.defaultPrevented ||
-      event.isComposing ||
-      event.ctrlKey ||
-      event.metaKey ||
-      event.altKey ||
-      event.shiftKey ||
-      !["ArrowDown", "ArrowUp"].includes(event.key)
-    )
-      return;
-    const rows = [...helpDialog.querySelectorAll(".shortcut > summary")];
-    if (!rows.length) return;
-    const index = rows.indexOf(document.activeElement);
-    const down = event.key === "ArrowDown";
-    const next =
-      index < 0
-        ? down
-          ? 0
-          : rows.length - 1
-        : Math.max(0, Math.min(rows.length - 1, index + (down ? 1 : -1)));
-    event.preventDefault();
-    event.stopPropagation();
-    rows[next].focus();
-    rows[next].scrollIntoView({ block: "nearest" });
+    if (!helpDialog.open) return;
+    navigateSummaries(event, helpHeadings, document.activeElement, { enterFromOutside: true });
   }
 
   function updateHint() {
@@ -79,10 +59,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     helpDialog.close();
     document.body.classList.remove("help-open");
     document.documentElement.classList.remove("help-open");
-    const row =
-      helpPreviousRowId &&
-      listEl.querySelector(`.main[data-id="${CSS.escape(helpPreviousRowId)}"]`);
-    (row || (helpPreviousRowId ? headerControl() : helpPreviousFocus))?.focus();
+    restoreFocus({
+      previousFocus: helpPreviousFocus,
+      rowId: helpPreviousRowId,
+      listEl,
+      fallback: headerControl,
+    });
   }
 
   function openAbout() {
@@ -103,8 +85,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
 
   function init() {
     helpDialog.addEventListener("keydown", navigateHelp);
-    for (const row of helpDialog.querySelectorAll(".shortcut")) {
-      row.querySelector("summary").addEventListener("click", (event) => {
+    for (const [index, row] of helpRows.entries()) {
+      helpHeadings[index].addEventListener("click", (event) => {
         event.preventDefault();
         explanations.toggle(row);
       });
@@ -112,37 +94,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     helpToggle.addEventListener("click", openHelp);
     aboutToggle.addEventListener("click", openAbout);
     document.getElementById("about-close").addEventListener("click", closeAbout);
-    aboutDialog.addEventListener("cancel", (event) => {
-      event.preventDefault();
-      closeAbout();
-    });
-    aboutDialog.addEventListener("click", (event) => {
-      const bounds = aboutDialog.getBoundingClientRect();
-      if (
-        event.target === aboutDialog &&
-        (event.clientX < bounds.left ||
-          event.clientX > bounds.right ||
-          event.clientY < bounds.top ||
-          event.clientY > bounds.bottom)
-      )
-        closeAbout();
-    });
+    bindDialogDismissal(aboutDialog, closeAbout);
     helpClose.addEventListener("click", closeHelp);
-    helpDialog.addEventListener("cancel", (event) => {
-      event.preventDefault();
-      closeHelp();
-    });
-    helpDialog.addEventListener("click", (event) => {
-      const bounds = helpDialog.getBoundingClientRect();
-      if (
-        event.target === helpDialog &&
-        (event.clientX < bounds.left ||
-          event.clientX > bounds.right ||
-          event.clientY < bounds.top ||
-          event.clientY > bounds.bottom)
-      )
-        closeHelp();
-    });
+    bindDialogDismissal(helpDialog, closeHelp);
   }
 
   return Object.freeze({

@@ -53,7 +53,12 @@ function setupFixture() {
     },
   };
   const subscribers = [];
-  const fixture = (globalThis.keyboardFixture = { operations: [], open: true, position: 700 });
+  const fixture = (globalThis.keyboardFixture = {
+    operations: [],
+    open: true,
+    position: 700,
+    settingsWrites: 0,
+  });
   const api = {
     runtime: { getManifest: () => ({ version: "test" }) },
     storage: {
@@ -68,6 +73,7 @@ function setupFixture() {
           );
         },
         async set(values) {
+          if (Object.hasOwn(values, "settings")) fixture.settingsWrites++;
           const changes = {};
           for (const [key, value] of Object.entries(values)) {
             changes[key] = { newValue: structuredClone(value) };
@@ -624,6 +630,86 @@ async function exerciseKeyboard() {
   );
   dialogs.closeHelp();
   cases.push("Help summaries and explanations reflect current settings");
+  const focusSource = document.querySelector(".main");
+  focusSource.focus();
+  dialogs.openHelp();
+  await render();
+  const replacementSource = document.querySelector(".main");
+  check(
+    replacementSource !== focusSource && !focusSource.isConnected,
+    "Focus test did not replace the bookmark row",
+  );
+  dialogs.closeHelp();
+  check(
+    document.activeElement === replacementSource,
+    "Help must return to the replacement row rather than its detached predecessor",
+  );
+  dialogs.openHelp();
+  replacementSource.parentElement.remove();
+  dialogs.closeHelp();
+  check(
+    document.activeElement === headerControl(),
+    "A missing Help source row must return to the current header control",
+  );
+  await render();
+  const transient = document.createElement("button");
+  transient.textContent = "Temporary focus fixture";
+  document.body.append(transient);
+  transient.focus({ preventScroll: true });
+  dialogs.openHelp();
+  transient.remove();
+  dialogs.closeHelp();
+  check(
+    document.activeElement === headerControl(),
+    "Detached non-row controls need a live focus fallback",
+  );
+  dialogs.openAbout();
+  const about = document.getElementById("about-dialog");
+  about.querySelector("strong").click();
+  check(about.open, "A click inside About must not dismiss it");
+  const aboutRect = about.getBoundingClientRect();
+  about.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      clientX: aboutRect.left - 1,
+      clientY: aboutRect.top + 5,
+    }),
+  );
+  check(
+    !about.open && document.activeElement === document.getElementById("about-toggle"),
+    "Outside About dismissal must restore its toolbar button",
+  );
+  dialogs.openHelp();
+  const helpRect = helpBounds.getBoundingClientRect();
+  helpBounds.dispatchEvent(
+    new MouseEvent("click", { bubbles: true, clientX: helpRect.left, clientY: helpRect.top }),
+  );
+  check(helpBounds.open, "The Help boundary is inside, not an outside-click dismissal");
+  helpBounds.dispatchEvent(
+    new MouseEvent("click", {
+      bubbles: true,
+      clientX: helpRect.right + 1,
+      clientY: helpRect.top + 5,
+    }),
+  );
+  check(
+    !helpBounds.open && document.activeElement === document.getElementById("about-toggle"),
+    "Help outside dismissal must return to the surviving previous control",
+  );
+  const saveDialog = document.getElementById("file-save-dialog");
+  saveDialog.showModal();
+  saveDialog.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: -1, clientY: -1 }));
+  check(saveDialog.open, "File-save prompts must not inherit outside-click dismissal");
+  const saveCancel = new Event("cancel", { cancelable: true });
+  saveDialog.dispatchEvent(saveCancel);
+  check(
+    saveCancel.defaultPrevented && !saveDialog.open,
+    "File-save native cancel must use its owner close action",
+  );
+  cases.push(
+    "Shared dialog helpers preserve current-row/control focus, outside-click bounds and cancel-only file-save policy",
+  );
+
   const settingsButton = document.getElementById("options-toggle");
   check(
     settingsButton.getAttribute("aria-label") === "Settings" &&
@@ -808,13 +894,26 @@ async function exerciseKeyboard() {
     keyboardFixture.operations.length === operationsBefore,
     "Options slider ran video playback",
   );
+  const settingsPreviewWrites = keyboardFixture.settingsWrites;
+  const savedMultiplier = settings.shiftMultiplier;
+  const multiplierInput = document.getElementById("shift-multiplier");
   scrubInput.value = "12";
+  multiplierInput.value = "5";
   scrubInput.dispatchEvent(new Event("input", { bubbles: true }));
+  multiplierInput.dispatchEvent(new Event("input", { bubbles: true }));
   check(
-    document
-      .getElementById("shift-preview")
-      .textContent.includes(String(12 * settings.shiftMultiplier)),
-    "Scrub preview did not update",
+    document.getElementById("scrub-value").textContent === "12 s" &&
+      document.getElementById("multiplier-value").textContent === "×5" &&
+      document.getElementById("shift-preview").textContent.includes("60 seconds"),
+    "Settings preview did not combine current unsaved slider values",
+  );
+  check(
+    keyboardFixture.settingsWrites === settingsPreviewWrites,
+    "Slider preview wrote to storage",
+  );
+  check(
+    settings.shiftMultiplier === savedMultiplier && document.activeElement === scrubInput,
+    "Slider preview changed saved settings or focus",
   );
   scrubInput.dispatchEvent(new Event("change", { bubbles: true }));
   await queue;
@@ -827,6 +926,26 @@ async function exerciseKeyboard() {
     "Options setting summary is stale",
   );
   check(groups[0].open && groups[2].open, "Saving settings collapses Options groups");
+  check(
+    settings.shiftMultiplier === savedMultiplier &&
+      document.getElementById("multiplier-value").textContent === `×${savedMultiplier}` &&
+      document
+        .getElementById("shift-preview")
+        .textContent.includes(`${12 * savedMultiplier} seconds`),
+    "Scrub commit saved an unrelated draft multiplier or displayed stale output",
+  );
+  multiplierInput.value = "5";
+  multiplierInput.dispatchEvent(new Event("change", { bubbles: true }));
+  await queue;
+  check(
+    settings.shiftMultiplier === 5 &&
+      document.getElementById("shift-preview").textContent.includes("60 seconds"),
+    "Multiplier commit did not use the shared preview updater",
+  );
+  multiplierInput.value = String(savedMultiplier);
+  multiplierInput.dispatchEvent(new Event("change", { bubbles: true }));
+  await queue;
+
   cases.push(
     "Independent Options groups, stable motion, native sliders and saved-setting summaries",
   );
@@ -940,6 +1059,15 @@ async function exerciseKeyboard() {
   await markers.edit(scrollIds[0]);
   const inlineEditor = document.getElementById("annotation-editor");
   const inlineRow = sourceRow.parentElement;
+  const inlineDraft = annotationEditor.draft;
+  check(
+    Object.isFrozen(inlineDraft) &&
+      inlineDraft.id === scrollIds[0] &&
+      inlineDraft.markerId === null &&
+      inlineDraft.originalNote === "Loaded on demand: 1" &&
+      !Object.hasOwn(inlineDraft, "snapshot"),
+    "Inline UI must receive only the immutable domain draft context",
+  );
   check(
     inlineEditor.parentElement === inlineRow && inlineRow.contains(sourceRow),
     "Editor must be attached beneath its source bookmark",
@@ -1042,7 +1170,24 @@ async function exerciseKeyboard() {
   cases.push(
     "Background refresh preserves the inline draft/selection and validation stays visible",
   );
+  check(
+    annotationEditor.draft === inlineDraft,
+    "Background conflict changed the editor's original draft identity",
+  );
   const collapse = markers.closeEditor();
+  check(
+    annotationEditor.isBusy && annotationEditor.isOpen,
+    "Editor must retain its draft while closing",
+  );
+  check(
+    markers.closeEditor() === collapse,
+    "Repeated close calls must share one lifecycle promise",
+  );
+  await markers.edit(scrollIds[1]);
+  check(
+    annotationEditor.draft === inlineDraft,
+    "A new edit request must not replace a closing draft",
+  );
   const collapseMotion = inlineEditor.getAnimations()[0];
   check(
     collapseMotion &&
@@ -1052,6 +1197,10 @@ async function exerciseKeyboard() {
   );
   collapseMotion.finish();
   await collapse;
+  check(
+    annotationEditor.draft === null && !annotationEditor.isBusy,
+    "Closing must clear the editor session and pending lifecycle",
+  );
   check(
     inlineEditor.hidden &&
       !listEl.contains(inlineEditor) &&
@@ -1167,7 +1316,7 @@ assert.ok(match, "No browser test report; inspect fixture: " + fixturePath + "\n
 const report = JSON.parse(decodeURIComponent(match[1]));
 fs.writeFileSync(path.join(temporary, "result.json"), JSON.stringify(report, null, 2));
 assert.equal(report.pass, true, report.error);
-assert.equal(report.cases.length, 44);
+assert.equal(report.cases.length, 45);
 console.log(
   `PASS: ${flavor} adapter, ${report.cases.length} real-DOM keyboard cases in headless Chrome`,
 );

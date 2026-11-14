@@ -1,6 +1,7 @@
 import { createPopupRefresh } from "./popup-refresh.mjs";
 
 const api = globalThis.browser ?? globalThis.chrome;
+const fmt = WAYPOINTS_TIME_FORMAT.displayTimestamp;
 const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
 const CHAPTER_REFRESH_INTERVAL_MS = 5000;
 const TRASH_CLEANUP_INTERVAL_MS = 60000;
@@ -147,19 +148,27 @@ const bookmarks = WAYPOINTS_CREATE_POPUP_BOOKMARKS({
 });
 const { bookmarkCurrent, refreshCurrentChannel, restoreBookmark, emptyTrash } = bookmarks;
 
+const annotationEditor = WAYPOINTS_CREATE_ANNOTATION_EDITOR({
+  document,
+  enqueue,
+  maxNoteCharacters: WAYPOINTS_MARKERS.MAX_NOTE_CHARACTERS,
+  fmt,
+  refresh: () => render(),
+  focusRow(id) {
+    (listEl.querySelector(`.main[data-id="${CSS.escape(id)}"]`) || headerControl()).focus();
+  },
+  onSaved: () => setStatus("Annotation saved."),
+});
 const markers = WAYPOINTS_CREATE_POPUP_MARKERS({
   document,
   storage: WAYPOINTS_STORAGE,
   data: WAYPOINTS_MARKERS,
   player: playerClient,
   getSettings: () => settings,
-  enqueue,
+  annotationEditor,
   refresh: () => render(),
   setStatus,
   fmt,
-  focusRow(id) {
-    (listEl.querySelector(`.main[data-id="${CSS.escape(id)}"]`) || headerControl()).focus();
-  },
 });
 
 const listController = WAYPOINTS_CREATE_POPUP_LIST({
@@ -218,14 +227,6 @@ const inputController = WAYPOINTS_CREATE_POPUP_INPUT({
 function enqueue(fn) {
   queue = queue.then(fn).catch((e) => setStatus(e.message));
   return queue;
-}
-
-function fmt(sec) {
-  sec = Math.max(0, Math.floor(sec || 0));
-  const h = Math.floor(sec / 3600);
-  const m = Math.floor((sec % 3600) / 60);
-  const s = String(sec % 60).padStart(2, "0");
-  return h ? `${h}:${String(m).padStart(2, "0")}:${s}` : `${m}:${s}`;
 }
 
 function setStatus(msg) {
@@ -309,7 +310,7 @@ async function init() {
   exportsController.init();
   updateSettingsUI();
   dialogs.init();
-  markers.init();
+  annotationEditor.init();
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   inputController.initControls();
   optionsToggle.addEventListener("click", () => {

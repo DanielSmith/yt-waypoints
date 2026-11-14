@@ -2,6 +2,21 @@
 
 ## Unreleased — 2026-11-13
 
+- Separate annotation editor DOM/motion/focus lifecycle from marker selection
+  and persistence. Pass immutable draft identity and lifetime with a save
+  operation bound to its original snapshot. Preserve inline behavior and guard
+  newer sessions from late results belonging to an older form.
+
+- Share display timestamp formatting and narrow popup navigation/focus/dialog
+  helpers. Keep subtitle precision, Settings control arrows, Help edge entry,
+  and file-save cancel-only dismissal intact. Fall back to the live header when
+  a previous non-row control has been detached.
+
+- Simplify Settings form synchronization with cached controls/outputs, one scrub
+  preview updater and a small plain-checkbox mapping. Use captured-field saving
+  consistently for theme/thumbnails while retaining pending-state and shortcut
+  toggle semantics. Keep unsaved previews separate from persistence.
+
 - Share pure extension-side video-ID and channel-URL validation. Preserve URL
   normalization, caller-specific errors and strict field/accessor checks. Require
   string IDs in direct transcript formatting calls rather than coercing objects.

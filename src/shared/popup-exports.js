@@ -13,6 +13,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   headerControl,
   closeOtherDialogs,
 }) => {
+  const { restoreFocus, bindDialogDismissal } = WAYPOINTS_POPUP_DOM;
   const DOWNLOAD_URL_REVOKE_DELAY_MS = 30000;
   const copyVideosEl = document.getElementById("copy-videos");
   const formatToggle = document.getElementById("transcript-format-toggle");
@@ -118,10 +119,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     transcriptCopyEl.addEventListener("click", () => exportTranscript(transcriptTargetId));
     fileSaveConfirm.addEventListener("click", confirmFileSave);
     document.getElementById("file-save-cancel").addEventListener("click", closeFileSave);
-    fileSaveDialog.addEventListener("cancel", (event) => {
-      event.preventDefault();
-      closeFileSave();
-    });
+    bindDialogDismissal(fileSaveDialog, closeFileSave, { outsideClick: false });
     fileSaveName.addEventListener("keydown", (event) => {
       if (event.key === "Enter") {
         event.preventDefault();
@@ -204,9 +202,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     fileSaveDialog.close();
     fileSaveOutput = null;
     document.body.classList.remove("file-save-open");
-    const rowId = fileSavePreviousFocus?.dataset?.id;
-    const row = rowId && listEl.querySelector(`.main[data-id="${CSS.escape(rowId)}"]`);
-    (row || (rowId ? headerControl() : fileSavePreviousFocus))?.focus();
+    restoreFocus({
+      previousFocus: fileSavePreviousFocus,
+      rowId: fileSavePreviousFocus?.dataset?.id,
+      listEl,
+      fallback: headerControl,
+    });
   }
 
   function confirmFileSave() {

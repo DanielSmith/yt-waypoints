@@ -3,6 +3,8 @@
 import "@platform";
 import "../shared/settings-policy.js";
 import "../shared/youtube-values.js";
+import "../shared/display-time.js";
+import "../shared/popup-dom.js";
 import "../shared/marker-data.js";
 import "../shared/transfer.js";
 import "../shared/storage.js";
@@ -19,6 +21,7 @@ import "../shared/popup-exports.js";
 import "../shared/popup-bookmarks.js";
 import "../shared/popup-dialogs.js";
 import "../shared/popup-list.js";
+import "../shared/popup-annotation-editor.js";
 import "../shared/popup-markers.js";
 import "../shared/popup-input.js";
 import "../shared/popup.js";

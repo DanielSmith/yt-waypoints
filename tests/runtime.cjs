@@ -4,6 +4,12 @@ const fs = require("node:fs");
 const path = require("node:path");
 function readModule(name) {
   let source = fs.readFileSync(path.join(__dirname, "../src/shared", name), "utf8");
+  if (name === "transcript.js") {
+    source =
+      fs.readFileSync(path.join(__dirname, "../src/shared/display-time.js"), "utf8") +
+      "\n" +
+      source;
+  }
   if (["player-results.js", "transfer.js", "transcript.js"].includes(name)) {
     source =
       fs.readFileSync(path.join(__dirname, "../src/shared/youtube-values.js"), "utf8") +
