@@ -318,7 +318,8 @@ popup bundle:
 | `popup-annotation-editor.js` | Single on-demand form, immutable draft sessions, motion/scrolling, errors and focus lifecycle |
 | `popup-markers.js` | Marker selection/commands, chapter refresh, timeline overlays and guarded annotation persistence |
 | `chapter-reader.js` | Self-contained read-only extraction from video-bound YouTube chapter models |
-| `popup-input.js` | Keyboard and paste routing, modal guards, and native editing behavior |
+| `popup-shortcuts.js` | Read-only keys/direction labels shared by explicit routing, Help and toolbar hints |
+| `popup-input.js` | Explicit editing/modal/native contexts, global/list commands and independent paste routing |
 | `popup-dialogs.js` | Help/About lifecycle and focus return |
 
 Each module receives its collaborators and state readers from the coordinator.

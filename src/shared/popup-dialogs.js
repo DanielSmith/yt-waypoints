@@ -12,6 +12,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   const { navigateSummaries, restoreFocus, bindDialogDismissal } = WAYPOINTS_POPUP_DOM;
   const helpDialog = document.getElementById("help-dialog");
   const helpToggle = document.getElementById("help-toggle");
+  helpToggle.setAttribute("title", `Help (${WAYPOINTS_SHORTCUTS.label("help")})`);
+  for (const label of helpDialog.querySelectorAll("[data-shortcut-label]"))
+    label.textContent = WAYPOINTS_SHORTCUTS.label(label.dataset.shortcutLabel);
   const helpClose = document.getElementById("help-close");
   const aboutDialog = document.getElementById("about-dialog");
   const aboutToggle = document.getElementById("about-toggle");

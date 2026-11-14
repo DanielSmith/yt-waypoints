@@ -2,6 +2,18 @@
 
 ## Unreleased — 2026-11-13
 
+- Share the snapshot-bound relative/absolute seek flow while retaining separate
+  saved-position calculations, rounding, duration fallback and player status.
+
+- Make bookmark-action snapshots explicit instead of associating videos maps
+  through a WeakMap. Capture metadata snapshots before player requests too, so
+  late responses respect deletion/import/re-add and preserve unrelated edits.
+
+- Separate keyboard editing/modal/native contexts from global and list commands
+  with explicit precedence. Share immutable key/label metadata with Help and
+  tooltips without introducing a dispatch engine or changing shortcut behavior.
+  Preserve the early Settings asterisk, held Escape and independent paste rules.
+
 - Separate annotation editor DOM/motion/focus lifecycle from marker selection
   and persistence. Pass immutable draft identity and lifetime with a save
   operation bound to its original snapshot. Preserve inline behavior and guard

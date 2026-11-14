@@ -1428,7 +1428,7 @@ async function createPopupFixture(
   assert.equal(p.els.search.value, "Dario");
   assert.deepEqual(rows(), ["a"]);
   await vm.runInContext(
-    '(async () => { const videos = await bookmarks.loadVideos(); videos.a.title = "Renamed title"; await bookmarks.saveVideos(videos); await render(); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.a.title = "Renamed title"; await bookmarks.saveSnapshot(snapshot); await render(); })()',
     p.context,
   );
   assert.deepEqual(rows(), [], "storage refresh must keep applying current search");
@@ -1917,7 +1917,7 @@ async function createPopupFixture(
   assert.deepEqual(undo.data.videos.c, initial.videos.c);
   await vm.runInContext('bookmarks.deleteVideo("c")', undo.context);
   await vm.runInContext(
-    '(async () => { const videos = await bookmarks.loadVideos(); videos.c = { id: "c", title: "Video animation tips", t: 999, updated: 1 }; await bookmarks.saveVideos(videos); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.c = { id: "c", title: "Video animation tips", t: 999, updated: 1 }; await bookmarks.saveSnapshot(snapshot); })()',
     undo.context,
   );
   undo.els["restore-bookmark"].click();
@@ -2222,6 +2222,67 @@ async function createPopupFixture(
       aaaaaaaaaaa: { id: "aaaaaaaaaaa", title: "Scrub me", t: 100, duration: 1000, updated: 123 },
     },
   };
+  // Relative saved-only movement retains fractional time and treats unknown
+  // duration as unbounded. Absolute slider commits floor and retain a zero bound.
+  for (const [method, time, duration, value, expected] of [
+    ["scrub", 100.75, 1000, 7.5, 108.25],
+    ["scrub", 100.75, 1000, -200, 0],
+    ["scrub", 995.5, 1000, 10, 1000],
+    ["scrub", 100.75, 0, 7.5, 108.25],
+    ["seekTo", 100.75, 1000, 108.75, 108],
+    ["seekTo", 100.75, 1000, -10, 0],
+    ["seekTo", 100.75, 1000, 1500, 1000],
+    ["seekTo", 0, 0, 108.75, 0],
+  ]) {
+    const saved = await createPopupFixture(
+      {
+        ...seekData,
+        videos: { aaaaaaaaaaa: { ...seekData.videos.aaaaaaaaaaa, t: time, duration } },
+      },
+      "https://example.com/",
+    );
+    await vm.runInContext(`bookmarks.${method}("aaaaaaaaaaa", ${value})`, saved.context);
+    assert.equal(saved.data.videos.aaaaaaaaaaa.t, expected, `${method}, duration ${duration}`);
+    assert.equal(saved.data.videos.aaaaaaaaaaa.updated, 123);
+    assert.equal(saved.data.videos.aaaaaaaaaaa.duration, duration);
+    assert.equal(
+      saved.els.status.textContent,
+      `Resume point ${Math.floor(expected / 60)}:${String(Math.floor(expected % 60)).padStart(2, "0")}`,
+    );
+    assert.equal(saved.executions.length, 0);
+  }
+  for (const [method, operation] of [
+    ["scrub", "seek"],
+    ["seekTo", "seekTo"],
+  ]) {
+    for (const paused of [false, true]) {
+      const seeking = await createPopupFixture(seekData, "https://example.com/", {
+        tabs: [{ id: 7, url: "https://www.youtube.com/watch?v=aaaaaaaaaaa" }],
+        executeScript: async () => [
+          { result: { id: "aaaaaaaaaaa", t: 750, duration: 1200, paused } },
+        ],
+      });
+      seeking.executions.length = 0; // Exclude the startup chapter probe.
+      await vm.runInContext(`bookmarks.${method}("aaaaaaaaaaa", 7.5)`, seeking.context);
+      assert.deepEqual(seeking.executions, [{ operation, args: [7.5, "aaaaaaaaaaa"], tabId: 7 }]);
+      assert.equal(
+        seeking.data.videos.aaaaaaaaaaa.t,
+        750,
+        "use the validated live position rather than calculating from saved time",
+      );
+      assert.equal(seeking.data.videos.aaaaaaaaaaa.duration, 1200);
+      assert.equal(seeking.data.videos.aaaaaaaaaaa.updated, 123);
+      assert.equal(seeking.writes(), 1);
+      assert.equal(seeking.els.status.textContent, `${paused ? "⏸ Paused" : "▶ Playing"} at 12:30`);
+      await vm.runInContext(`bookmarks.${method}("missing", 7.5)`, seeking.context);
+      assert.equal(seeking.executions.length, 1, "missing bookmarks cannot request a seek");
+      assert.equal(seeking.writes(), 1);
+    }
+  }
+  console.log(
+    "PASS: shared seek flow preserves relative/absolute bounds, fractional/rounded saved times, live results, recency, status and one request/save",
+  );
+
   const drag = await createPopupFixture(seekData, "https://example.com/");
   const findSlider = () => {
     const walk = (el) => (el.className === "bar" ? el : el.children.map(walk).find(Boolean));
@@ -2244,7 +2305,7 @@ async function createPopupFixture(
   assert.equal(drag.writes(), 0);
   assert.equal(slider.style["--progress"], "65%");
   await vm.runInContext(
-    '(async () => { const videos = await bookmarks.loadVideos(); videos.extra = {id: "extra",title: "Concurrent bookmark",t:5,duration:60,updated:1}; videos.aaaaaaaaaaa.t = 105; await bookmarks.saveVideos(videos); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.extra = {id: "extra",title: "Concurrent bookmark",t:5,duration:60,updated:1}; videos.aaaaaaaaaaa.t = 105; await bookmarks.saveSnapshot(snapshot); })()',
     drag.context,
   );
   const writesBeforeDragCommit = drag.writes();
@@ -3303,6 +3364,118 @@ async function createPopupFixture(
   }
   console.log(
     "PASS: accepted positions retain matching duration; delayed valid frame/slider results cannot overwrite a newer import",
+  );
+
+  // Every delayed bookmark writer must retain its pre-player lifetime, including
+  // metadata creation/enrichment. Startup reads finish before this gate is armed.
+  for (const command of [
+    `bookmarks.scrub("${hostileId}", 10)`,
+    `bookmarks.seekTo("${hostileId}", 300)`,
+    `bookmarks.togglePlay("${hostileId}")`,
+    `bookmarks.controlPlayback("${hostileId}", "frame", 1)`,
+    "bookmarks.bookmarkCurrent()",
+    "bookmarks.refreshCurrentChannel()",
+  ]) {
+    for (const conflict of ["trash", "purge", "import", "readd", "fields"]) {
+      let armed = false;
+      let release;
+      const delayed = await createPopupFixture(
+        { settings: { autoBookmark: false }, videos: { [hostileId]: originalHostileVideo } },
+        "https://www.youtube.com/watch?v=" + hostileId,
+        {
+          tabs: [{ id: 7, url: "https://www.youtube.com/watch?v=" + hostileId }],
+          executeScript: async (request) => {
+            if (request.func.name === "chapters")
+              return [
+                { result: { id: hostileId, duration: 1000, available: false, chapters: [] } },
+              ];
+            if (armed) await new Promise((resolve) => (release = resolve));
+            const metadata = !["seek", "seekTo", "toggle", "playback"].includes(request.func.name);
+            return [
+              {
+                result: {
+                  id: hostileId,
+                  t: 321,
+                  duration: 1000,
+                  ...(metadata
+                    ? {
+                        title: "Player title",
+                        ...(armed ? { channelName: "Delayed channel" } : {}),
+                      }
+                    : { paused: true, ...(request.func.name === "playback" ? { fps: 60 } : {}) }),
+                },
+              },
+            ];
+          },
+        },
+      );
+      armed = true;
+      const pending = vm.runInContext(command, delayed.context);
+      await delayed.settle();
+      assert.equal(typeof release, "function", `${command} must reach the held player`);
+      const storage = delayed.context.WAYPOINTS_STORAGE;
+      if (conflict === "trash") await storage.trash(hostileId);
+      if (conflict === "purge" || conflict === "readd") await storage.purge([hostileId]);
+      if (conflict === "import")
+        await storage.importVideos({ [hostileId]: { ...originalHostileVideo, t: 796 } });
+      if (conflict === "readd" || conflict === "fields") {
+        const snapshot = await storage.read();
+        snapshot.videos[hostileId] =
+          conflict === "readd"
+            ? { ...originalHostileVideo, title: "New lifetime", t: 555 }
+            : { ...snapshot.videos[hostileId], startNote: "Concurrent note" };
+        snapshot.videos.yyyyyyyyyyy = { id: "yyyyyyyyyyy", title: "Concurrent video", t: 5 };
+        await storage.save(snapshot);
+      }
+      const before = (await storage.read()).videos;
+      release();
+      await pending;
+      await delayed.settle();
+      const after = (await storage.read()).videos;
+      if (conflict === "fields") {
+        assert.equal(after[hostileId].startNote, "Concurrent note", command);
+        assert.deepEqual(after.yyyyyyyyyyy, before.yyyyyyyyyyy, command);
+        assert.equal(
+          after[hostileId].t,
+          command.includes("refreshCurrentChannel") ? 100 : 321,
+          command,
+        );
+      } else {
+        assert.deepEqual(after, before, `${command} must respect ${conflict}`);
+        if (conflict === "trash")
+          assert.ok((await storage.read()).trash[hostileId], "late bookmark cannot restore trash");
+      }
+    }
+  }
+  console.log(
+    "PASS: all six bookmark writers preserve pre-player lifetimes through trash/purge/import/re-add and retain concurrent notes/other videos",
+  );
+
+  // Replacing/copying the editable map keeps context explicit on the snapshot;
+  // no object-identity registration is needed, even across a concurrent edit.
+  const copied = await createPopupFixture(
+    {
+      settings: { autoBookmark: false },
+      videos: { [hostileId]: originalHostileVideo },
+    },
+    "https://example.com/",
+  );
+  await vm.runInContext(
+    `(async () => {
+    const snapshot = await bookmarks.loadSnapshot();
+    const concurrent = await bookmarks.loadSnapshot();
+    concurrent.videos["${hostileId}"].startNote = "Keep concurrent note";
+    await bookmarks.saveSnapshot(concurrent);
+    snapshot.videos = { ...snapshot.videos,
+      ["${hostileId}"]: { ...snapshot.videos["${hostileId}"], t: 222 } };
+    await bookmarks.saveSnapshot(snapshot);
+  })()`,
+    copied.context,
+  );
+  assert.equal(copied.data.videos[hostileId].t, 222);
+  assert.equal(copied.data.videos[hostileId].startNote, "Keep concurrent note");
+  console.log(
+    "PASS: copied videos maps retain explicit snapshot context and field-specific merging",
   );
 
   for (const transcript of [

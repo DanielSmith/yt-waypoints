@@ -2,6 +2,7 @@ import { createPopupRefresh } from "./popup-refresh.mjs";
 
 const api = globalThis.browser ?? globalThis.chrome;
 const fmt = WAYPOINTS_TIME_FORMAT.displayTimestamp;
+const shortcuts = WAYPOINTS_SHORTCUTS;
 const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
 const CHAPTER_REFRESH_INTERVAL_MS = 5000;
 const TRASH_CLEANUP_INTERVAL_MS = 60000;
@@ -35,7 +36,10 @@ let savedVideos = {};
 let trashVideos = {};
 let currentDeleted = false;
 const hintEl = document.getElementById("hint");
+hintEl.textContent = `${shortcuts.hint("focusSearch")} search · ${shortcuts.hint("playPause")} play · ${shortcuts.hint("openVideo")} open · ${shortcuts.hint("help")} help`;
 const optionsToggle = document.getElementById("options-toggle");
+optionsToggle.setAttribute("title", `Settings (${shortcuts.label("settings")})`);
+optionsToggle.setAttribute("aria-keyshortcuts", shortcuts.definitions.settings.keys.join(" "));
 const optionsPanel = document.getElementById("options-panel");
 const emptyTrashEl = document.getElementById("empty-trash");
 let settings;
@@ -98,7 +102,7 @@ function setOptionsOpen(open) {
   document.getElementById("settings-toggle-label").hidden = !open;
   const toggleLabel = open ? "Hide settings" : "Settings";
   optionsToggle.setAttribute("aria-label", toggleLabel);
-  optionsToggle.setAttribute("title", `${toggleLabel} (*)`);
+  optionsToggle.setAttribute("title", `${toggleLabel} (${shortcuts.label("settings")})`);
   optionsToggle.setAttribute("aria-expanded", String(open));
   // Capture the selected video first, then move into the now-visible headings.
   if (opening) settingsController.focusFirstGroup();
@@ -282,7 +286,6 @@ function render() {
 function renderSnapshot(snapshot) {
   markers.sync(snapshot);
   savedVideos = snapshot.videos;
-  bookmarks.rememberSnapshot(snapshot);
   trashVideos = snapshot.trash;
   currentDeleted = snapshot.records[currentId]?.life.deleted === true;
   document.getElementById("trash-count").textContent =

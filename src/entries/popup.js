@@ -5,6 +5,7 @@ import "../shared/settings-policy.js";
 import "../shared/youtube-values.js";
 import "../shared/display-time.js";
 import "../shared/popup-dom.js";
+import "../shared/popup-shortcuts.js";
 import "../shared/marker-data.js";
 import "../shared/transfer.js";
 import "../shared/storage.js";

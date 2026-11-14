@@ -137,9 +137,10 @@ async function exerciseKeyboard() {
   }
   const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
   async function reset(position = 100) {
-    const videos = await bookmarks.loadVideos();
+    const snapshot = await bookmarks.loadSnapshot();
+    const { videos } = snapshot;
     videos.aaaaaaaaaaa.t = position;
-    await bookmarks.saveVideos(videos);
+    await bookmarks.saveSnapshot(snapshot);
     await render();
     await flush();
     keyboardFixture.operations = [];
@@ -414,6 +415,22 @@ async function exerciseKeyboard() {
   const bookmarkFocusBackground = bookmarkFocusStyle.backgroundColor;
   dialogs.openHelp();
   const helpRows = [...document.querySelectorAll(".shortcut")];
+  const shortcutLabels = [
+    ...document.getElementById("help-dialog").querySelectorAll("[data-shortcut-label]"),
+  ];
+  check(
+    shortcutLabels.length === 22 &&
+      shortcutLabels.every(
+        (label) => label.textContent === WAYPOINTS_SHORTCUTS.label(label.dataset.shortcutLabel),
+      ),
+    "Help labels do not match the shared shortcut metadata",
+  );
+  check(
+    document.getElementById("help-toggle").title === "Help (h / ?)" &&
+      document.getElementById("options-toggle").getAttribute("aria-keyshortcuts") === "*" &&
+      document.getElementById("hint").textContent === "/ search · space play · ↵ open · h / ? help",
+    "Toolbar shortcut hints or accessible keys changed",
+  );
   check(
     helpRows.length === 22 && helpRows.every((row) => !row.open),
     "Help must start with 22 collapsed rows",

@@ -58,7 +58,7 @@ for browser in ('firefox', 'chrome'):
             assert any(name.endswith('/youtube-values.js') for name in mapping['sources'])
             assert not (package / 'youtube-values.js').exists()
         if entry == popup_script:
-            for helper in ('display-time.js', 'popup-dom.js', 'popup-annotation-editor.js'):
+            for helper in ('display-time.js', 'popup-dom.js', 'popup-shortcuts.js', 'popup-annotation-editor.js'):
                 assert any(name.endswith('/' + helper) for name in mapping['sources'])
                 assert not (package / helper).exists()
             assert any(name.endswith('/popup-refresh.mjs') for name in mapping['sources'])

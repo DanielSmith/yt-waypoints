@@ -17,16 +17,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
 }) => {
   const { activeTab, videoIdOf, findVideoTab, inPlayer } = player;
 
-  const videoSnapshots = new WeakMap();
-  async function loadVideos() {
-    const snapshot = await storage.read();
-    videoSnapshots.set(snapshot.videos, snapshot);
-    return snapshot.videos;
-  }
-
-  async function saveVideos(videos) {
-    await storage.save(videoSnapshots.get(videos));
-  }
+  // A mutation owns the complete storage snapshot: videos are editable, while
+  // original/records/clock retain field diffs and the observed bookmark lifetime.
+  // Read before requesting player data, then save that same context. Never re-read
+  // after a delayed result or save a bare videos map: deletion/import/re-add must
+  // supersede the old lifetime, and unrelated field edits must survive the save.
+  const loadSnapshot = () => storage.read();
+  const saveSnapshot = (snapshot) => storage.save(snapshot);
 
   async function importVideos(incoming) {
     const { counts, positions } = await storage.importVideos(incoming);
@@ -63,15 +60,16 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
       setStatus("Open a YouTube video first.");
       return;
     }
+    const snapshot = await loadSnapshot();
+    const { videos } = snapshot;
     const info = await inPlayer(tab.id, "bookmark", [videoIdOf(tab.url)]);
     if (info.error) return setStatus(info.error);
-    const videos = await loadVideos();
-    if ((await storage.read()).trash[info.id]) {
+    if (snapshot.trash[info.id]) {
       await restoreTrashVideo(info.id);
       return;
     }
     videos[info.id] = { ...info, updated: Date.now() };
-    await saveVideos(videos);
+    await saveSnapshot(snapshot);
     setStatus(`Saved at ${fmt(info.t)}.`);
   }
 
@@ -79,10 +77,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
   async function refreshCurrentChannel() {
     const tab = await activeTab();
     if (!tab || videoIdOf(tab.url) !== getCurrentId()) return;
+    const snapshot = await loadSnapshot();
+    const { videos } = snapshot;
     const info = await inPlayer(tab.id, "bookmark", [videoIdOf(tab.url)]);
     if (info.error) return setStatus(info.error);
     if (!info.channelName) return;
-    const videos = await loadVideos();
     const entry = videos[getCurrentId()];
     if (!entry || (entry.channelName === info.channelName && entry.channelUrl === info.channelUrl))
       return;
@@ -91,7 +90,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
       channelName: info.channelName,
       channelUrl: info.channelUrl,
     };
-    await saveVideos(videos);
+    await saveSnapshot(snapshot);
   }
 
   async function deleteVideo(id) {
@@ -139,31 +138,47 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
     );
   }
 
-  // Move a resume point by delta seconds. If the video is open in a tab, seek
-  // the live player (from where it actually is) and save that position.
-  // Leaves `updated` alone so the row doesn't jump to the top while scrubbing.
-  async function scrub(id, delta) {
-    const videos = await loadVideos();
-    const v = videos[id];
+  // Both seek commands retain the pre-request lifetime and save only changed
+  // fields. The player client validates results before they reach this owner.
+  // Do not round live results or change playback state; the player owns both.
+  async function seekBookmark(id, operation, value) {
+    const snapshot = await loadSnapshot();
+    const v = snapshot.videos[id];
     if (!v) return;
 
     const tab = await findVideoTab(id);
-    const live = tab ? await inPlayer(tab.id, "seek", [delta, id]) : null;
-
+    const live = tab ? await inPlayer(tab.id, operation, [value, id]) : null;
     if (live?.error) return setStatus(live.error);
     if (live) {
       v.t = live.t;
       v.duration = live.duration;
       showPlayer(live);
     } else {
-      v.t = Math.min(v.duration || Infinity, Math.max(0, v.t + delta));
+      // Relative scrubbing preserves fractional seconds and can advance without
+      // a known duration. Absolute slider commits floor and require its bound.
+      v.t =
+        operation === "seek"
+          ? Math.min(v.duration || Infinity, Math.max(0, v.t + value))
+          : Math.floor(Math.min(v.duration, Math.max(0, value)));
       setStatus(`Resume point ${fmt(v.t)}`);
     }
-    await saveVideos(videos);
+    // Leave recency alone so a seek never jumps the row to the top.
+    await saveSnapshot(snapshot);
+  }
+
+  // Seek from the live player's current position, or move the saved resume point.
+  function scrub(id, delta) {
+    return seekBookmark(id, "seek", delta);
+  }
+
+  // Commit an absolute slider position using the same lifetime-bound save path.
+  function seekTo(id, time) {
+    return seekBookmark(id, "seekTo", time);
   }
 
   async function controlPlayback(id, operation, direction) {
-    const videos = operation === "frame" ? await loadVideos() : null;
+    const snapshot = operation === "frame" ? await loadSnapshot() : null;
+    const videos = snapshot?.videos;
     if (operation === "frame" && !videos[id]) return;
     const tab = await findVideoTab(id);
     if (!tab) return setStatus("Open this video on YouTube first.");
@@ -177,34 +192,15 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
     if (videos[id]) {
       videos[id].t = result.t;
       videos[id].duration = result.duration;
-      await saveVideos(videos);
+      await saveSnapshot(snapshot);
     }
     setStatus(`${direction > 0 ? "Next" : "Previous"} frame (${result.fps} fps).`);
   }
 
-  // Bind a slider action to the bookmark lifetime read before the seek. The
-  // storage module merges unrelated edits and rejects superseded lifetimes.
-  async function seekTo(id, time) {
-    const videos = await loadVideos();
-    const v = videos[id];
-    if (!v) return;
-    const tab = await findVideoTab(id);
-    const live = tab ? await inPlayer(tab.id, "seekTo", [time, id]) : null;
-    if (live?.error) return setStatus(live.error);
-    if (live) {
-      v.t = live.t;
-      v.duration = live.duration;
-      showPlayer(live);
-    } else {
-      v.t = Math.floor(Math.min(v.duration, Math.max(0, time)));
-      setStatus(`Resume point ${fmt(v.t)}`);
-    }
-    await saveVideos(videos);
-  }
-
   // Space: play/pause the video in its open tab. Not open → open it (like Enter).
   async function togglePlay(id) {
-    const videos = await loadVideos();
+    const snapshot = await loadSnapshot();
+    const { videos } = snapshot;
     const v = videos[id];
     if (!v) return;
 
@@ -222,17 +218,12 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
       return setStatus("Invalid player response: position exceeds the saved video duration.");
     v.t = state.t;
     v.duration = state.duration || v.duration || 0;
-    await saveVideos(videos);
-  }
-
-  function rememberSnapshot(snapshot) {
-    videoSnapshots.set(snapshot.videos, snapshot);
+    await saveSnapshot(snapshot);
   }
 
   return Object.freeze({
-    loadVideos,
-    saveVideos,
-    rememberSnapshot,
+    loadSnapshot,
+    saveSnapshot,
     importVideos,
     bookmarkCurrent,
     refreshCurrentChannel,

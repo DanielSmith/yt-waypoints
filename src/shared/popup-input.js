@@ -25,9 +25,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   setStatus,
   closePopup,
 }) => {
+  const shortcuts = WAYPOINTS_SHORTCUTS;
+  const { matches, definitions } = shortcuts;
   let helpEscapeHeld = false;
   const { parseVideoLink, linkFor, navigateVideo } = player;
-  const { loadVideos, importVideos, deleteVideo, controlPlayback, togglePlay, scrub } = actions;
+  const { loadSnapshot, importVideos, deleteVideo, controlPlayback, togglePlay, scrub } = actions;
   const { closeAbout, closeHelp, openHelp } = dialogs;
   const { closeFileSave, copyVideos, copyText, exportTranscript } = exportsController;
   const { renderList, focusables } = listController;
@@ -36,7 +38,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   );
 
   async function openPastedVideo(link) {
-    const videos = await loadVideos();
+    const { videos } = await loadSnapshot();
     const target = { id: link.id, t: link.t ?? videos[link.id]?.t ?? 0 };
     await navigateVideo(target, link.t !== null);
     searchEl.value = "";
@@ -80,223 +82,246 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
     if (link) enqueue(() => openPastedVideo(link));
   }
 
-  // Keyboard: ↑/↓ move between search and the filtered rows,
-  // Enter opens, Space plays/pauses, ←/→ scrub by the configured amount,
-  // Delete/Backspace removes the focused row.
-  function handleKeydown(e) {
-    const settings = getSettings();
-    const savedVideos = getVideos();
-    const trashVideos = getTrash();
-    if (e.isComposing) return;
+  const tagOf = (element) => (element?.tagName || element?.tag || "").toLowerCase();
+  const helpDialog = document.getElementById("help-dialog");
+  const aboutDialog = document.getElementById("about-dialog");
+
+  // Contexts consume application routing without suppressing native editing
+  // unless they perform an explicit command (save/cancel/dismiss).
+  function handleEditingContext(e, active) {
     if (
       markers.editorOpen &&
       !dialogs.helpOpen &&
       !dialogs.aboutOpen &&
       !exportsController.fileSaveOpen
     ) {
-      if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.repeat) {
+      if (matches("annotationSave", e.key) && (e.ctrlKey || e.metaKey) && !e.repeat) {
         e.preventDefault();
         enqueue(markers.saveEditor);
-        return;
-      }
-      if (
-        e.key === "Escape" &&
+      } else if (
+        matches("escape", e.key) &&
         !escapeClosesPopup &&
-        !document.getElementById("help-dialog").open &&
-        !document.getElementById("about-dialog").open
+        !helpDialog.open &&
+        !aboutDialog.open
       ) {
         e.preventDefault();
         enqueue(markers.closeEditor);
       }
-      return;
+      return true;
     }
-    const active = document.activeElement;
-    const tag = (active?.tagName || active?.tag || "").toLowerCase();
-    if (
+    const tag = tagOf(active);
+    return Boolean(
       active?.isContentEditable ||
       tag === "textarea" ||
       (tag === "input" &&
         active !== searchEl &&
-        !["range", "checkbox", "button", "submit"].includes(active.type))
-    )
-      return;
-    if (dialogs.aboutOpen) {
-      if (e.key === "Escape" && !escapeClosesPopup) {
-        e.preventDefault();
-        e.stopPropagation();
-        closeAbout();
-      }
-      return;
-    }
-    if (
-      e.key === "*" &&
-      !e.ctrlKey &&
-      !e.altKey &&
-      !e.metaKey &&
-      active !== searchEl &&
-      !dialogs.helpOpen &&
-      !exportsController.fileSaveOpen
-    ) {
+        !["range", "checkbox", "button", "submit"].includes(active.type)),
+    );
+  }
+
+  function handleAboutContext(e) {
+    if (!dialogs.aboutOpen) return false;
+    if (matches("escape", e.key) && !escapeClosesPopup) {
       e.preventDefault();
-      if (!e.repeat) {
-        const open = !isOptionsOpen();
-        setOptionsOpen(open);
-        if (!open) optionsToggle.focus();
-      }
-      return;
+      e.stopPropagation();
+      closeAbout();
     }
-    // Native select navigation/type-ahead must not invoke popup shortcuts.
-    if (nativeControls.includes(document.activeElement)) return;
+    return true;
+  }
+
+  // This global command intentionally precedes native selects/checkboxes and
+  // the format picker. Text, annotation, About, Help and file-save guards win.
+  function handleSettingsShortcut(e, active) {
+    if (
+      !matches("settings", e.key) ||
+      e.ctrlKey ||
+      e.altKey ||
+      e.metaKey ||
+      active === searchEl ||
+      dialogs.helpOpen ||
+      exportsController.fileSaveOpen
+    )
+      return false;
+    e.preventDefault();
+    if (!e.repeat) {
+      const open = !isOptionsOpen();
+      setOptionsOpen(open);
+      if (!open) optionsToggle.focus();
+    }
+    return true;
+  }
+
+  function handleControlOrModalContext(e, active) {
+    if (nativeControls.includes(active)) return true;
     if (exportsController.fileSaveOpen) {
-      if (e.key === "Escape") {
+      if (matches("escape", e.key)) {
         e.preventDefault();
         closeFileSave();
       }
-      return;
+      return true;
     }
-    if (exportsController.handleFormatKey(e)) return;
-    // Chromium can consume Escape here. Firefox reserves it for closing the
-    // entire toolbar popup, outside the control of content event listeners.
-    if (e.key === "Escape" && escapeClosesPopup) return;
-    if (e.key === "Escape" && (dialogs.helpOpen || helpEscapeHeld)) {
+    if (exportsController.handleFormatKey(e)) return true;
+    // Firefox reserves toolbar-popup Escape outside content event control.
+    if (matches("escape", e.key) && escapeClosesPopup) return true;
+    if (matches("escape", e.key) && (dialogs.helpOpen || helpEscapeHeld)) {
       e.preventDefault();
       e.stopPropagation();
       helpEscapeHeld = true;
       closeHelp();
-      return;
+      return true;
     }
-    if (document.activeElement?.type === "checkbox") return;
-    const modified = e.ctrlKey || e.altKey || e.metaKey;
-    const helpKey = e.key === "?" || e.key.toLowerCase() === "h";
+    if (active?.type === "checkbox") return true;
     if (dialogs.helpOpen) {
-      if (!modified && helpKey) {
+      if (!e.ctrlKey && !e.altKey && !e.metaKey && matches("help", e.key)) {
         e.preventDefault();
         if (!e.repeat) closeHelp();
       }
-      return;
+      return true;
     }
-    if (modified) return;
-    if (e.key === "M" && document.activeElement !== searchEl) {
+    return false;
+  }
+
+  function handleGlobalCommand(e, active) {
+    if (active === searchEl) return false;
+    if (matches("markerVisibility", e.key)) {
       e.preventDefault();
       if (!e.repeat) toggleMarkers().catch((error) => setStatus(error.message));
-      return;
-    }
-    if (helpKey && document.activeElement !== searchEl) {
+    } else if (matches("help", e.key)) {
       e.preventDefault();
       if (!e.repeat) openHelp();
-      return;
-    }
-    if (e.key === "C" && document.activeElement !== searchEl) {
+    } else if (matches("allJson", e.key)) {
       e.preventDefault();
       if (!e.repeat) copyVideos();
-      return;
-    }
-    if (
-      e.key === "t" &&
-      !e.ctrlKey &&
-      !e.altKey &&
-      !e.metaKey &&
-      document.activeElement !== searchEl
-    ) {
+    } else if (matches("thumbnails", e.key)) {
       e.preventDefault();
       if (!e.repeat)
-        setThumbnails(!settings.showThumbnails).catch((error) => setStatus(error.message));
-      return;
-    }
-    if (isOptionsOpen()) return;
-    if (
-      e.key === "/" &&
-      !e.ctrlKey &&
-      !e.altKey &&
-      !e.metaKey &&
-      document.activeElement !== searchEl
-    ) {
-      e.preventDefault();
-      requestSearch();
-      updateHeaderMode();
-      searchEl.focus();
-      return;
-    }
-    if (document.activeElement === optionsToggle) return;
-    // Text editing keys belong to search; only ↑/↓ move into the result list.
-    if (document.activeElement === searchEl && e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-    // The document runs in capture, before a range can stop propagation.
-    // Its arrows belong to that control, not the enclosing bookmark row.
-    const keyTarget = e.target || document.activeElement;
-    if (keyTarget?.type === "range" && ["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+        setThumbnails(!getSettings().showThumbnails).catch((error) => setStatus(error.message));
+    } else return false;
+    return true;
+  }
+
+  function handleSearchShortcut(e, active) {
+    if (active === searchEl || !matches("focusSearch", e.key)) return false;
+    e.preventDefault();
+    requestSearch();
+    updateHeaderMode();
+    searchEl.focus();
+    return true;
+  }
+
+  function usesNativeListInput(e, active) {
+    if (active === optionsToggle) return true;
+    if (active === searchEl && !matches("selectVideo", e.key)) return true;
+    // Document capture runs before a slider can stop propagation itself.
+    const target = e.target || active;
+    return target?.type === "range" && matches("scrub", e.key);
+  }
+
+  function handleListCommands(e, active) {
+    const settings = getSettings();
+    const savedVideos = getVideos();
+    const trashVideos = getTrash();
+    const tag = tagOf(active);
     const items = focusables();
     const row =
-      items.find(
-        (item) => item.dataset.id && item.dataset.id === document.activeElement?.dataset?.id,
-      ) || document.activeElement;
+      items.find((item) => item.dataset.id && item.dataset.id === active?.dataset?.id) || active;
     const i = items.indexOf(row);
-    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+    if (matches("selectVideo", e.key)) {
       e.preventDefault();
-      const next = e.key === "ArrowDown" ? Math.min(items.length - 1, i + 1) : Math.max(0, i - 1);
+      const next =
+        e.key === definitions.selectVideo.next
+          ? Math.min(items.length - 1, i + 1)
+          : Math.max(0, i - 1);
       items[next]?.focus();
       return;
     }
     if (!row?.classList.contains("main")) return;
     const id = row.dataset.id;
-    if (!trashVideos[id] && ["m", "a", "[", "]"].includes(e.key)) {
+    if (
+      !trashVideos[id] &&
+      (matches("markerToggle", e.key) ||
+        matches("annotationEdit", e.key) ||
+        matches("markerNavigation", e.key))
+    ) {
       const key = e.key;
       e.preventDefault();
       if (!e.repeat)
         enqueue(() =>
-          key === "m"
+          matches("markerToggle", key)
             ? markers.toggle(id)
-            : key === "a"
+            : matches("annotationEdit", key)
               ? markers.edit(id)
-              : markers.navigate(id, key === "]" ? 1 : -1),
+              : markers.navigate(id, key === definitions.markerNavigation.next ? 1 : -1),
         );
       return;
     }
-    if (tag === "button" && ["Enter", " "].includes(e.key)) return;
+    if (tag === "button" && (matches("openVideo", e.key) || matches("playPause", e.key))) return;
     if (trashVideos[id]) {
-      if (e.key === "Delete" || e.key === "Backspace") {
+      if (matches("deleteBookmark", e.key)) {
         e.preventDefault();
         enqueue(() => deleteVideo(id));
-      } else if (e.key === "Enter") {
+      } else if (matches("openVideo", e.key)) {
         e.preventDefault();
         row.click();
       }
       return;
     }
 
-    if (e.key === "T") {
+    if (matches("transcript", e.key)) {
       e.preventDefault();
       if (!e.repeat) exportTranscript(id);
-    } else if ([",", ".", "<", ">"].includes(e.key)) {
+    } else if (matches("playbackFrame", e.key) || matches("playbackRate", e.key)) {
       e.preventDefault();
-      const rate = e.shiftKey || e.key === "<" || e.key === ">";
+      const rate = e.shiftKey || matches("playbackRate", e.key);
       enqueue(() =>
-        controlPlayback(id, rate ? "rate" : "frame", [".", ">"].includes(e.key) ? 1 : -1),
+        controlPlayback(
+          id,
+          rate ? "rate" : "frame",
+          e.key === definitions.playbackFrame.next || e.key === definitions.playbackRate.next
+            ? 1
+            : -1,
+        ),
       );
-    } else if (e.key === "u" || e.key === "c") {
+    } else if (matches("videoUrl", e.key) || matches("videoJson", e.key)) {
       e.preventDefault();
       const video = savedVideos[id];
       if (e.repeat || !video) return;
-      if (e.key === "c") copyVideos({ [id]: video }, false);
+      if (matches("videoJson", e.key)) copyVideos({ [id]: video }, false);
       else copyText(linkFor(video), "Copied video URL.", "Could not copy URL. Please try again.");
-    } else if (e.key === "Enter") {
+    } else if (matches("openVideo", e.key)) {
       e.preventDefault();
       row.click();
-    } else if (e.key === " ") {
+    } else if (matches("playPause", e.key)) {
       e.preventDefault();
       enqueue(() => togglePlay(id));
-    } else if (["ArrowLeft", "ArrowRight"].includes(e.key)) {
+    } else if (matches("scrub", e.key)) {
       e.preventDefault();
       const step = settings.scrubSeconds * (e.shiftKey ? settings.shiftMultiplier : 1);
-      enqueue(() => scrub(id, e.key === "ArrowRight" ? step : -step));
-    } else if (e.key === "Delete" || e.key === "Backspace") {
+      enqueue(() => scrub(id, e.key === definitions.scrub.next ? step : -step));
+    } else if (matches("deleteBookmark", e.key)) {
       e.preventDefault();
       listController.setPendingFocusIndex(i); // same position after re-render
       enqueue(() => deleteVideo(id));
     }
   }
+  // Keep precedence here, not in shortcut metadata or a dispatch framework.
+  function handleKeydown(e) {
+    const active = document.activeElement;
+    if (e.isComposing) return;
+    if (handleEditingContext(e, active)) return;
+    if (handleAboutContext(e)) return;
+    if (handleSettingsShortcut(e, active)) return;
+    if (handleControlOrModalContext(e, active)) return;
+    if (e.ctrlKey || e.altKey || e.metaKey) return;
+    if (handleGlobalCommand(e, active)) return;
+    if (isOptionsOpen()) return;
+    if (handleSearchShortcut(e, active)) return;
+    if (usesNativeListInput(e, active)) return;
+    handleListCommands(e, active);
+  }
 
   function handleKeyup(e) {
-    if (e.key !== "Escape" || !helpEscapeHeld) return;
+    if (!matches("escape", e.key) || !helpEscapeHeld) return;
     e.preventDefault();
     e.stopPropagation();
     helpEscapeHeld = false;
