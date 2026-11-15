@@ -17,15 +17,15 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   const policy = WAYPOINTS_SETTINGS_POLICY;
   const { defaults, numeric } = policy;
   let thumbnailChangePending = false;
-  const optionsPanel = document.getElementById("options-panel");
-  const groups = [...optionsPanel.querySelectorAll(".option-group")];
+  const settingsPanel = document.getElementById("settings-panel");
+  const groups = [...settingsPanel.querySelectorAll(".settings-group")];
   const headings = groups.map((group) => group.querySelector("summary"));
-  const disclosures = WAYPOINTS_CREATE_DISCLOSURES(".option-group-content");
+  const disclosures = WAYPOINTS_CREATE_DISCLOSURES(".settings-group-content");
 
   function resetGroups() {
     disclosures.settle();
     for (const group of groups) group.open = false;
-    optionsPanel.scrollTop = 0;
+    settingsPanel.scrollTop = 0;
   }
 
   function focusFirstGroup() {
@@ -171,7 +171,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
       control.defaultValue = String(rule.defaultValue);
     }
     trashExpiryHelpEl.textContent = `Default: ${numeric.trashDays.defaultValue} days${numeric.trashDays.defaultValue === 7 ? " (one week)" : ""}. Applies to existing trash too. Cleanup runs while this popup or a YouTube tab with the extension is active.`;
-    optionsPanel.addEventListener("keydown", navigateGroups);
+    settingsPanel.addEventListener("keydown", navigateGroups);
     for (const [index, group] of groups.entries()) {
       headings[index].addEventListener("click", (event) => {
         event.preventDefault();

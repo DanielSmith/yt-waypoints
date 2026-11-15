@@ -9,23 +9,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   getCurrentId,
   changeSetting,
   setStatus,
-  listEl,
-  headerControl,
-  closeOtherDialogs,
+  fileSave,
 }) => {
-  const { restoreFocus, bindDialogDismissal } = WAYPOINTS_POPUP_DOM;
-  const DOWNLOAD_URL_REVOKE_DELAY_MS = 30000;
   const copyVideosEl = document.getElementById("copy-videos");
   const formatToggle = document.getElementById("transcript-format-toggle");
   const formatMenu = document.getElementById("transcript-format-menu");
   const formatList = document.getElementById("transcript-format-list");
   const transcriptCopyEl = document.getElementById("copy-transcript");
-  const fileSaveDialog = document.getElementById("file-save-dialog");
-  const fileNameFields = document.getElementById("file-name-fields");
-  const fileSaveName = document.getElementById("file-save-name");
-  const fileSaveConfirm = document.getElementById("file-save-confirm");
-  let fileSaveOutput = null;
-  let fileSavePreviousFocus = null;
   let formatMenuOpen = false;
   let formatPreviewIndex = 0;
   let transcriptTargetId = null;
@@ -69,7 +59,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     formatMenuOpen = true;
     formatMenu.hidden = false;
     formatToggle.setAttribute("aria-expanded", "true");
-    // Keep the picker and its examples in view inside the fixed Options frame.
+    // Keep the picker and its examples in view inside the fixed Settings frame.
     formatToggle.scrollIntoView({ block: "start" });
     previewFormat(
       formats.formats.findIndex((format) => format.id === getSettings().transcriptFormat),
@@ -117,20 +107,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
         closeFormatMenu(false);
     });
     transcriptCopyEl.addEventListener("click", () => exportTranscript(transcriptTargetId));
-    fileSaveConfirm.addEventListener("click", confirmFileSave);
-    document.getElementById("file-save-cancel").addEventListener("click", closeFileSave);
-    bindDialogDismissal(fileSaveDialog, closeFileSave, { outsideClick: false });
-    fileSaveName.addEventListener("keydown", (event) => {
-      if (event.key === "Enter") {
-        event.preventDefault();
-        if (!event.repeat) confirmFileSave();
-      }
-    });
   }
 
   function copyWithSelection(text) {
     // Compatibility fallback only. The temporary selection stays offscreen and
-    // is removed immediately; JSON is never displayed in the Options panel.
+    // is removed immediately; JSON is never displayed in the Settings panel.
     const field = document.createElement("textarea");
     const previousFocus = document.activeElement;
     field.value = text;
@@ -181,80 +162,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   }
 
   function offerFileSave(output) {
-    if (!getSettings().offerSaveFile || fileSaveDialog.open) return;
-    closeOtherDialogs();
-    closeFormatMenu(false);
-    fileSavePreviousFocus = document.activeElement;
-    fileSaveOutput = output;
-    fileNameFields.hidden = true;
-    fileSaveName.value = output.filename;
-    fileSaveConfirm.textContent = "Yes";
-    document.getElementById("file-save-cancel").textContent = "No thanks";
-    document.getElementById("file-save-title").textContent = "Also save to file?";
-    document.getElementById("file-save-description").textContent =
-      `Already copied to the clipboard. Suggested file: ${output.filename}`;
-    document.getElementById("file-save-error").textContent = "";
-    document.body.classList.add("file-save-open");
-    fileSaveDialog.showModal();
-  }
-
-  function closeFileSave() {
-    fileSaveDialog.close();
-    fileSaveOutput = null;
-    document.body.classList.remove("file-save-open");
-    restoreFocus({
-      previousFocus: fileSavePreviousFocus,
-      rowId: fileSavePreviousFocus?.dataset?.id,
-      listEl,
-      fallback: headerControl,
-    });
-  }
-
-  function confirmFileSave() {
-    if (!fileSaveOutput) return;
-    if (fileNameFields.hidden) {
-      fileNameFields.hidden = false;
-      document.getElementById("file-save-title").textContent = "Save a copy";
-      fileSaveConfirm.textContent = "Save file";
-      document.getElementById("file-save-cancel").textContent = "Cancel";
-      fileSaveName.focus();
-      fileSaveName.select();
-      return;
-    }
-    let filename = fileSaveName.value.trim();
-    if (
-      !filename ||
-      filename === "." ||
-      filename === ".." ||
-      /[\\/:*?"<>|\u0000-\u001f]/.test(filename)
-    ) {
-      document.getElementById("file-save-error").textContent =
-        'Enter a filename without folder paths or these characters: / \\ : * ? " < > |';
-      fileSaveName.focus();
-      return;
-    }
-    const extension = fileSaveOutput.filename.split(".").at(-1);
-    if (!filename.toLowerCase().endsWith(`.${extension}`)) filename += `.${extension}`;
-    try {
-      const url = URL.createObjectURL(
-        new Blob([fileSaveOutput.text], { type: fileSaveOutput.mime }),
-      );
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      document.body.append(link);
-      try {
-        link.click();
-      } finally {
-        link.remove();
-        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
-      }
-      closeFileSave();
-      setStatus(`Copied to clipboard. File download requested: ${filename}`);
-    } catch (error) {
-      document.getElementById("file-save-error").textContent =
-        `Could not save file: ${error.message}. Your clipboard copy is unchanged.`;
-    }
+    if (getSettings().offerSaveFile) fileSave.offer(output);
   }
 
   let transcriptPending = false;
@@ -347,9 +255,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
     copyVideos,
     exportTranscript,
     closeFormatMenu,
-    closeFileSave,
+    closeFileSave: fileSave.close,
     get fileSaveOpen() {
-      return fileSaveDialog.open;
+      return fileSave.isOpen;
     },
   });
 };

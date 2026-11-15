@@ -18,6 +18,7 @@ import "../shared/transcript.js";
 import "../shared/player-client.js";
 import "../shared/popup-disclosures.js";
 import "../shared/popup-settings.js";
+import "../shared/popup-file-save.js";
 import "../shared/popup-exports.js";
 import "../shared/popup-bookmarks.js";
 import "../shared/popup-dialogs.js";

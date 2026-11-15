@@ -4,13 +4,13 @@ Wondering what happens when you paste a backup, delete a bookmark, or copy a
 transcript? This guide explains those details, including a few things that can
 help when something doesn't work as expected.
 
-For a first look at Waypoints and its Options, start with the [README](../README.md).
+For a first look at Waypoints and its Settings, start with the [README](../README.md).
 
 ## Playback controls
 
 You can use Waypoints to adjust an open video without returning to its tab.
 The help table shows your current arrow-key scrub distance and Shift multiplier,
-so you don't have to remember what you chose in Options.
+so you don't have to remember what you chose in Settings.
 
 For a closer look at a moment, press comma or period to step backward or forward
 by one frame. Waypoints uses the video's reported frame rate and pauses playback
@@ -32,7 +32,7 @@ context, with a compatibility fallback for Firefox versions before 128.
 
 While you're typing in search, letter shortcuts let you keep typing normally.
 Command/Ctrl/Alt combinations are left alone too. To copy one row, focus it
-first; **Shift+C** can copy all bookmarks from Options as well. These copy
+first; **Shift+C** can copy all bookmarks from Settings as well. These copy
 commands don't need additional clipboard permissions.
 
 ## Transcript extraction
@@ -137,7 +137,7 @@ Copying happens only when you click **Copy JSON** or use a copy shortcut;
 importing uses the text you paste. No additional clipboard permissions are
 needed. For browser compatibility, copying can use a temporary offscreen text
 selection, which is removed immediately afterward. If copying fails, the popup
-shows an error; you don't need to edit JSON inside Options.
+shows an error; you don't need to edit JSON inside Settings.
 
 ## Concurrent saves and upgrade storage
 
@@ -182,7 +182,7 @@ The default deletion mode gives you time to change your mind. Clicking **×** or
 pressing **Delete** moves a bookmark to trash, where it stays for **7 days**
 before permanent deletion.
 
-To find it again, turn on **Show trash in the list and search** in Options.
+To find it again, turn on **Show trash in the list and search** in Settings.
 Your current bookmarks remain visible, and trash appears alongside them with a
 red tint, a “Trash” label, and a **Restore** checkbox. Restore brings back the
 saved position and channel details too. The header can also restore the most

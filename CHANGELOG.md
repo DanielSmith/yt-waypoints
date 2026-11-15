@@ -1,6 +1,30 @@
 # Changelog
 
-## Unreleased — 2026-11-13
+## Unreleased — 2026-11-14
+
+- Include the last segment of a channel URL, such as @Business, when
+  channel-name search is enabled. Title-only search remains available when off.
+
+- Rename Settings identifiers, selectors, test references and preview commands
+  consistently throughout the implementation and current documentation.
+
+- Reserve space around Settings controls for complete keyboard focus outlines,
+  including inside animated groups and scrolling transcript-format choices.
+
+- Move the settings gear into an external SVG asset and use a CSS mask so its
+  color follows the current theme. Include the asset in both browser packages.
+
+- Put Edit Annotation and the marker time on one line, with an accessible
+  textarea label replacing the redundant visible label. Show the selected
+  marker's annotation beside its channel in parentheses, clipped to one line.
+
+- Skip the bookmark scroll container in the Tab sequence. Tabbing past About
+  reaches the first bookmark directly, preserving row Up/Down navigation and
+  avoiding the browser's default outline around the whole list.
+
+- Separate the optional file-save dialog, filename checks, focus and download URL
+  cleanup from clipboard/export orchestration. Preserve clipboard-first offers
+  and release allocated URLs even if download anchor setup fails.
 
 - Share the snapshot-bound relative/absolute seek flow while retaining separate
   saved-position calculations, rounding, duration fallback and player status.
@@ -64,11 +88,11 @@
 - Arrange the toolbar as search, Settings gear, Help question mark, and the
   YT Waypoints icon for About. Keep labelled tooltips and keyboard activation.
 
-- Rename the user-facing Options panel to Settings. Use a theme-aware SVG gear
+- Name the user-facing panel Settings. Use a theme-aware SVG gear
   to open it and “Hide settings” to close it. Keep the full green group focus
   outline visible above content and dividers.
 
-- Organize Options into six independently expandable groups with current-setting
+- Organize Settings into six independently expandable groups with current-setting
   summaries and contextual explanations. Reuse Help's keyboard navigation,
   reversible eased motion and reduced-motion behavior. Start with all groups
   collapsed and keep the frame fixed while expanded content scrolls internally.

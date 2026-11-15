@@ -7,17 +7,18 @@
     "build": "python3 scripts/build.py",
     "build:firefox": "python3 scripts/build.py firefox",
     "build:chrome": "python3 scripts/build.py chrome",
-    "test": "python3 scripts/build.py && node tests/popup-refresh.cjs && node tests/youtube-values.cjs && node tests/popup-ui.cjs && node tests/popup-input.cjs && node tests/popup.cjs firefox && node tests/popup.cjs chrome && node tests/theme.cjs firefox && node tests/theme.cjs chrome && node tests/player.cjs firefox && node tests/player.cjs chrome && node tests/player-results.cjs firefox && node tests/player-results.cjs chrome && node tests/transcript.cjs firefox && node tests/transcript.cjs chrome && node tests/transcript-reader.cjs firefox && node tests/transcript-reader.cjs chrome && node tests/storage.cjs firefox && node tests/storage.cjs chrome && node tests/metadata.cjs firefox && node tests/metadata.cjs chrome && node tests/transfer.cjs firefox && node tests/transfer.cjs chrome && node tests/content-lifecycle.cjs firefox && node tests/content-lifecycle.cjs chrome && node tests/marker-data.cjs firefox && node tests/marker-data.cjs chrome && node tests/chapters.cjs firefox && node tests/chapters.cjs chrome && python3 tests/build.py",
+    "test": "node tests/run.cjs",
     "dev": "wxt -b chrome --mv3",
     "dev:firefox": "wxt -b firefox --mv3",
-    "postinstall": "wxt prepare"
+    "postinstall": "wxt prepare",
+    "check": "node tests/quality.cjs"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "license": "Apache-2.0",
   "devDependencies": {
-    "vite": "7.3.1",
+    "vite": "7.3.8",
     "wxt": "0.21.5"
   }
 }

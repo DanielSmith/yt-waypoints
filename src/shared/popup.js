@@ -37,10 +37,10 @@ let trashVideos = {};
 let currentDeleted = false;
 const hintEl = document.getElementById("hint");
 hintEl.textContent = `${shortcuts.hint("focusSearch")} search · ${shortcuts.hint("playPause")} play · ${shortcuts.hint("openVideo")} open · ${shortcuts.hint("help")} help`;
-const optionsToggle = document.getElementById("options-toggle");
-optionsToggle.setAttribute("title", `Settings (${shortcuts.label("settings")})`);
-optionsToggle.setAttribute("aria-keyshortcuts", shortcuts.definitions.settings.keys.join(" "));
-const optionsPanel = document.getElementById("options-panel");
+const settingsToggle = document.getElementById("settings-toggle");
+settingsToggle.setAttribute("title", `Settings (${shortcuts.label("settings")})`);
+settingsToggle.setAttribute("aria-keyshortcuts", shortcuts.definitions.settings.keys.join(" "));
+const settingsPanel = document.getElementById("settings-panel");
 const emptyTrashEl = document.getElementById("empty-trash");
 let settings;
 const settingsController = WAYPOINTS_CREATE_POPUP_SETTINGS({
@@ -64,7 +64,19 @@ const { normalizeSettings, updateSettingsUI, changeSetting, setThumbnails } = se
 settings = normalizeSettings();
 let onVideo = false;
 let currentId = null;
-let optionsOpen = false;
+let settingsOpen = false;
+
+const fileSaveController = WAYPOINTS_CREATE_FILE_SAVE({
+  document,
+  listEl,
+  headerControl,
+  setStatus,
+  beforeOpen() {
+    closeHelp();
+    closeAbout();
+    exportsController.closeFormatMenu(false);
+  },
+});
 
 const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
   document,
@@ -76,34 +88,29 @@ const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
   getCurrentId: () => currentId,
   changeSetting,
   setStatus,
-  listEl,
-  headerControl,
-  closeOtherDialogs() {
-    closeHelp();
-    closeAbout();
-  },
+  fileSave: fileSaveController,
 });
 const { closeFormatMenu } = exportsController;
-function setOptionsOpen(open) {
+function setSettingsOpen(open) {
   if (open && markers.editorOpen) return setStatus("Save or cancel the open note first.");
-  const opening = open && !optionsOpen;
+  const opening = open && !settingsOpen;
   if (open) {
     exportsController.captureTarget();
-    if (!optionsOpen) settingsController.resetGroups();
+    if (!settingsOpen) settingsController.resetGroups();
   } else closeFormatMenu(false);
-  optionsOpen = open;
-  optionsPanel.hidden = !open;
-  document.body.classList.toggle("options-open", open);
-  document.documentElement.classList.toggle("options-open", open);
+  settingsOpen = open;
+  settingsPanel.hidden = !open;
+  document.body.classList.toggle("settings-open", open);
+  document.documentElement.classList.toggle("settings-open", open);
   updateHeaderMode();
-  actionsEl.classList.toggle("options-open", open);
+  actionsEl.classList.toggle("settings-open", open);
   listEl.hidden = open;
   hintEl.hidden = open;
   document.getElementById("settings-toggle-label").hidden = !open;
   const toggleLabel = open ? "Hide settings" : "Settings";
-  optionsToggle.setAttribute("aria-label", toggleLabel);
-  optionsToggle.setAttribute("title", `${toggleLabel} (${shortcuts.label("settings")})`);
-  optionsToggle.setAttribute("aria-expanded", String(open));
+  settingsToggle.setAttribute("aria-label", toggleLabel);
+  settingsToggle.setAttribute("title", `${toggleLabel} (${shortcuts.label("settings")})`);
+  settingsToggle.setAttribute("aria-expanded", String(open));
   // Capture the selected video first, then move into the now-visible headings.
   if (opening) settingsController.focusFirstGroup();
 }
@@ -135,7 +142,7 @@ const bookmarks = WAYPOINTS_CREATE_POPUP_BOOKMARKS({
     showRestoreBookmark = false;
     searchRequested = true;
     searchEl.value = "";
-    setOptionsOpen(false);
+    setSettingsOpen(false);
     await render();
     searchEl.focus();
   },
@@ -210,9 +217,9 @@ const inputController = WAYPOINTS_CREATE_POPUP_INPUT({
   getTrash: () => trashVideos,
   searchEl,
   clearSearchEl,
-  optionsToggle,
-  isOptionsOpen: () => optionsOpen,
-  setOptionsOpen,
+  settingsToggle,
+  isSettingsOpen: () => settingsOpen,
+  setSettingsOpen,
   updateHeaderMode,
   escapeClosesPopup: WAYPOINTS_ESCAPE_CLOSES_POPUP,
   requestSearch() {
@@ -262,8 +269,8 @@ function showingBookmarkButton() {
 
 function updateHeaderMode() {
   const showButton = showingBookmarkButton();
-  searchControl.hidden = optionsOpen || showButton;
-  restoreBookmarkEl.hidden = optionsOpen || !showButton;
+  searchControl.hidden = settingsOpen || showButton;
+  restoreBookmarkEl.hidden = settingsOpen || !showButton;
   restoreBookmarkEl.textContent =
     showRestoreBookmark || trashVideos[currentId] ? "Restore bookmark" : "Add bookmark";
   restoreBookmarkEl.title =
@@ -271,7 +278,7 @@ function updateHeaderMode() {
       ? `Restore ${deletedBookmark.title || deletedBookmark.id}`
       : "Bookmark the current video";
   if (
-    !optionsOpen &&
+    !settingsOpen &&
     ((showButton && document.activeElement === searchEl) ||
       (!showButton && document.activeElement === restoreBookmarkEl))
   ) {
@@ -310,14 +317,15 @@ async function init() {
   onVideo = WATCH_RE.test(tab?.url || "") && Boolean(videoIdOf(tab.url));
   currentId = onVideo ? videoIdOf(tab.url) : null;
   settingsController.initControls();
+  fileSaveController.init();
   exportsController.init();
   updateSettingsUI();
   dialogs.init();
   annotationEditor.init();
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   inputController.initControls();
-  optionsToggle.addEventListener("click", () => {
-    setOptionsOpen(!optionsOpen);
+  settingsToggle.addEventListener("click", () => {
+    setSettingsOpen(!settingsOpen);
   });
   emptyTrashEl.addEventListener("click", () => enqueue(emptyTrash));
   // Only bookmark on popup activation, never as a side effect of rendering.
@@ -334,7 +342,7 @@ async function init() {
   }
   await render();
   searchEl.disabled = false;
-  optionsToggle.disabled = false;
+  settingsToggle.disabled = false;
   settingsController.enable();
   const currentRow = currentId
     ? listEl.querySelector(`.main[data-id="${CSS.escape(currentId)}"]`)

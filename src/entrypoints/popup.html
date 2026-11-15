@@ -16,11 +16,8 @@
         <button id="clear-search" type="button" aria-label="Clear search" title="Clear search" hidden>×</button>
       </div>
       <button id="restore-bookmark" type="button" hidden>Add bookmark</button>
-      <button id="options-toggle" type="button" aria-label="Settings" aria-expanded="false" aria-controls="options-panel" disabled>
-        <svg class="settings-icon" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
-          <path d="m9.5 3-.6 2.4-1.3.8-2.4-.7-2.5 4.3 1.8 1.7v1.5l-1.8 1.7L5.2 19l2.4-.7 1.3.8.6 2.4h5l.6-2.4 1.3-.8 2.4.7 2.5-4.3-1.8-1.7v-1.5l1.8-1.7-2.5-4.3-2.4.7-1.3-.8L14.5 3Z"/>
-          <circle cx="12" cy="12.25" r="3"/>
-        </svg>
+      <button id="settings-toggle" type="button" aria-label="Settings" aria-expanded="false" aria-controls="settings-panel" disabled>
+        <span class="settings-icon" aria-hidden="true"></span>
         <span id="settings-toggle-label" hidden>Hide settings</span>
       </button>
       <button id="help-toggle" type="button" aria-label="Help" aria-haspopup="dialog" aria-controls="help-dialog"><span aria-hidden="true">?</span></button>
@@ -32,10 +29,11 @@
   </header>
   <section id="annotation-editor" aria-labelledby="annotation-heading" hidden>
     <div class="annotation-content">
-      <strong id="annotation-heading">Edit note</strong>
-      <p id="annotation-target"></p>
-      <label for="annotation-text">Annotation</label>
-      <textarea id="annotation-text" rows="3" aria-describedby="annotation-error"></textarea>
+      <div class="annotation-heading-line">
+        <strong id="annotation-heading">Edit Annotation</strong>
+        <span id="annotation-target"></span>
+      </div>
+      <textarea id="annotation-text" rows="3" aria-labelledby="annotation-heading" aria-describedby="annotation-target annotation-error"></textarea>
       <p id="annotation-error" role="alert"></p>
       <div class="annotation-actions">
         <button id="annotation-save" class="secondary-button" type="button" title="Save annotation (Ctrl/Command+Enter)">Save</button>
@@ -43,12 +41,13 @@
       </div>
     </div>
   </section>
-  <ul id="list"></ul>
-  <section id="options-panel" aria-label="Settings" hidden>
-    <p class="options-intro">Changes save automatically. Expand a group to adjust its settings.</p>
-    <details class="option-group" id="options-appearance">
-      <summary><span class="option-group-title">Appearance</span><span class="option-group-state" id="appearance-summary"></span></summary>
-      <div class="option-group-content">
+  <!-- Rows own keyboard focus; skip the browser's automatic scroll-container Tab stop. -->
+  <ul id="list" tabindex="-1"></ul>
+  <section id="settings-panel" aria-label="Settings" hidden>
+    <p class="settings-intro">Changes save automatically. Expand a group to adjust its settings.</p>
+    <details class="settings-group" id="settings-appearance">
+      <summary><span class="settings-group-title">Appearance</span><span class="settings-group-state" id="appearance-summary"></span></summary>
+      <div class="settings-group-content">
         <label class="setting" for="theme-select">
           <span class="setting-title">Theme</span>
           <select id="theme-select" aria-describedby="theme-help"></select>
@@ -64,22 +63,22 @@
         </label>
       </div>
     </details>
-    <details class="option-group" id="options-bookmarks">
-      <summary><span class="option-group-title">Bookmarks &amp; search</span><span class="option-group-state" id="bookmarks-summary"></span></summary>
-      <div class="option-group-content">
+    <details class="settings-group" id="settings-bookmarks">
+      <summary><span class="settings-group-title">Bookmarks &amp; search</span><span class="settings-group-state" id="bookmarks-summary"></span></summary>
+      <div class="settings-group-content">
         <label class="setting">
           <span class="setting-title"><span>Auto-bookmark</span><input id="auto-bookmark" type="checkbox" aria-describedby="auto-bookmark-help"></span>
           <p id="auto-bookmark-help">Save an unsaved video when you open this popup. Changes apply next time you open it. When off, use Add bookmark to save it yourself.</p>
         </label>
         <label class="setting">
           <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox" aria-describedby="channel-search-help"></span>
-          <p id="channel-search-help">Match video titles or channel names. Channel names are saved when you bookmark or revisit a video.</p>
+          <p id="channel-search-help">Also match channel names and the last part of channel URLs, such as @Business. Channel information is saved when you bookmark or revisit a video.</p>
         </label>
       </div>
     </details>
-    <details class="option-group" id="options-playback">
-      <summary><span class="option-group-title">Playback &amp; keyboard</span><span class="option-group-state" id="playback-summary"></span></summary>
-      <div class="option-group-content">
+    <details class="settings-group" id="settings-playback">
+      <summary><span class="settings-group-title">Playback &amp; keyboard</span><span class="settings-group-state" id="playback-summary"></span></summary>
+      <div class="settings-group-content">
         <label class="setting" for="scrub-seconds">
           <span class="setting-title"><span>Arrow-key scrub</span><output id="scrub-value" for="scrub-seconds"></output></span>
           <p id="scrub-help">Seconds to move with ← or → on a bookmark. An open video seeks; a closed video updates its saved position.</p>
@@ -93,9 +92,9 @@
         <p id="shortcut-help"></p>
       </div>
     </details>
-    <details class="option-group" id="options-trash">
-      <summary><span class="option-group-title">Trash &amp; deletion</span><span class="option-group-state" id="trash-summary"></span></summary>
-      <div class="option-group-content">
+    <details class="settings-group" id="settings-trash">
+      <summary><span class="settings-group-title">Trash &amp; deletion</span><span class="settings-group-state" id="trash-summary"></span></summary>
+      <div class="settings-group-content">
         <div class="setting trash-settings">
           <label class="setting-title" for="deletion-mode">Deletion mode</label>
           <select id="deletion-mode" aria-describedby="deletion-help" disabled>
@@ -112,9 +111,9 @@
         </div>
       </div>
     </details>
-    <details class="option-group" id="options-transcripts">
-      <summary><span class="option-group-title">Transcripts</span><span class="option-group-state" id="transcripts-summary"></span></summary>
-      <div class="option-group-content">
+    <details class="settings-group" id="settings-transcripts">
+      <summary><span class="settings-group-title">Transcripts</span><span class="settings-group-state" id="transcripts-summary"></span></summary>
+      <div class="settings-group-content">
         <div class="setting transcript-setting">
           <label id="transcript-format-label" class="setting-title">Transcript format</label>
           <p>Used when copying or saving a transcript.</p>
@@ -137,9 +136,9 @@
         </div>
       </div>
     </details>
-    <details class="option-group" id="options-backup">
-      <summary><span class="option-group-title">Backup &amp; files</span><span class="option-group-state" id="backup-summary"></span></summary>
-      <div class="option-group-content">
+    <details class="settings-group" id="settings-backup">
+      <summary><span class="settings-group-title">Backup &amp; files</span><span class="settings-group-state" id="backup-summary"></span></summary>
+      <div class="settings-group-content">
         <div class="setting export-videos">
           <div class="export-heading"><strong>Export saved videos</strong><button id="copy-videos" type="button" aria-describedby="export-help">Copy JSON</button></div>
           <p id="export-help">Copy all current bookmarks, including markers and annotations even when hidden. Trash and preferences are excluded. Paste JSON into a Waypoints popup to import or merge; unrelated bookmarks are kept.</p>
@@ -167,7 +166,9 @@
   <dialog id="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
     <div class="help-heading"><strong id="about-title">YT Waypoints</strong><button id="about-close" class="secondary-button" type="button" autofocus>Close</button></div>
     <p id="about-version"></p>
-    <p id="about-description">Save, search, and resume your place in YouTube videos. Bookmarks stay in this browser.</p>
+    <p id="about-description">Save, search, and resume your place in YouTube videos. Waypoints stay local.</p>
+    <p>© 2026 Daniel Smith · <a href="https://github.com/DanielSmith" target="_blank" rel="noopener noreferrer">GitHub ↗</a></p>
+    <p>Licensed under Apache 2.0.</p>
     <p class="support-footer"><a href="https://ko-fi.com/dansmithcreativetech" target="_blank" rel="noopener noreferrer">Support development on Ko-fi ↗</a></p>
   </dialog>
   <dialog id="help-dialog" aria-labelledby="help-title">

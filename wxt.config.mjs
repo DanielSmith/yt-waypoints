@@ -22,7 +22,7 @@ export default defineConfig({
     "build:publicAssets"(_wxt, files) {
       // Shared JS is imported and bundled, never copied as unused runtime code.
       for (let i = files.length - 1; i >= 0; i--) {
-        if (!/\.(css|png)$/.test(files[i].relativeDest)) files.splice(i, 1);
+        if (!/\.(css|png|svg)$/.test(files[i].relativeDest)) files.splice(i, 1);
       }
     },
   },

@@ -231,7 +231,15 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     }
     timeline.append(overlay);
   }
+  function annotationPreview(video) {
+    const selected = current.get(video.id);
+    if (!selected) return "";
+    // Match the editor's effective annotation, including explicit clears and
+    // chapter-title defaults. A multiline note becomes a single preview line.
+    return data.annotation(find(video, selected.markerId)).replace(/\s+/g, " ").trim();
+  }
   return Object.freeze({
+    annotationPreview,
     toggle,
     remove,
     select,

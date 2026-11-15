@@ -5,6 +5,21 @@ const context = vm.createContext({ URL, URLSearchParams });
 for (const name of ["player-results.js", "transfer.js", "transcript.js", "player-client.js"])
   vm.runInContext(readModule(name), context);
 const values = context.WAYPOINTS_YOUTUBE_VALUES;
+for (const [url, expected] of [
+  ["https://www.youtube.com/@Business", "@Business"],
+  ["https://www.youtube.com/@Business/?ignored=tracking#fragment", "@Business"],
+  ["https://www.youtube.com/channel/UCExample", "UCExample"],
+  ["https://www.youtube.com/user/Example/", "Example"],
+  ["https://www.youtube.com/@Caf%C3%A9", "@Café"],
+  [undefined, ""],
+  [null, ""],
+  ["", ""],
+  ["invalid", ""],
+  ["https://www.youtube.com/", ""],
+  ["https://example.com/@Other", ""],
+  ["https://www.youtube.com/@bad%", ""],
+])
+  assert.equal(values.channelUrlSegment(url), expected);
 const schema = context.WAYPOINTS_PLAYER_RESULTS;
 const transfer = context.WAYPOINTS_TRANSFER;
 const formats = context.WAYPOINTS_TRANSCRIPT;

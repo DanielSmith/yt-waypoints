@@ -9,7 +9,7 @@ as the installable extension; supply it separately to AMO for code review.
 
 - Python 3.9 or newer (standard library only).
 - Node.js 22.12 or newer and npm with lockfile v3 support (npm 9 or newer).
-- WXT **0.21.5** and Vite **7.3.1**, pinned exactly with transitive dependencies
+- WXT **0.21.5** and Vite **7.3.8**, pinned exactly with transitive dependencies
   in package-lock.json.
 - Validation environment: macOS 15.8, Node v26.13.1, npm 11.20.0,
   Python 3.14.7. macOS, Linux, and Windows are supported build environments;
@@ -44,6 +44,129 @@ The npm cache populated by the initial install must remain available for that
 offline reproducibility check. A cache failure is an environment failure, not
 permission to skip comparison.
 
+## Test runner and source checks
+
+`npm test` runs the complete build, dependency-free source checks, all existing
+pure and adapter suites (Firefox then Chrome), and package/reviewer-source
+reproducibility. The runner executes argument arrays without a shell, stops at the
+first failure and preserves a nonzero child exit code. Builds remain sequential.
+
+```sh
+npm test
+npm test -- --list
+npm test -- --suite storage --flavor firefox
+npm test -- --suite popup --suite player-results --flavor chrome --skip-build
+node tests/run.cjs --suite packages
+npm run check
+```
+
+Repeat `--suite` or `--flavor` to select several; without selectors, every default
+suite runs. Unknown options/names fail before any commands execute. Adapter
+selection filters adapter tests only: builds and package checks still cover both
+outputs. Source-only suites need no build. Adapter/package suites rebuild both
+packages unless `--skip-build` is explicitly supplied with fresh existing outputs.
+The popup runner below still supports selecting an individual popup feature.
+
+Real-DOM tests remain opt-in, preserving the previous default test scope:
+
+```sh
+node tests/run.cjs --suite keyboard-browser --flavor chrome --skip-build
+```
+
+`npm run check` uses only the existing Node/Python standard libraries. It parses
+JavaScript with Node `--check`, Python with `ast.parse` (no bytecode/cache writes),
+JSON with JSON.parse, and checks trailing whitespace/final newlines. It checks
+source, scripts, tests, textual assets and shipped root configuration/docs;
+generated packages, node_modules and private development notes are excluded.
+It also runs within the default test command and works without Git.
+
+These are syntax/whitespace checks, not semantic linting, type checking or CSS/HTML
+validation. `.prettierrc.json` sets preferences, but no formatter/linter is pinned
+in package.json or package-lock.json. A locally cached **Prettier 3.9.6** was used
+manually on step 14's two new JavaScript files; that cache is not a reproducible
+project tool. A future decision must explicitly pin a formatter/linter (and its
+scope/configuration) or provide another versioned toolchain. This step adds no
+package, performs no automatic download and claims no project-wide format/lint gate.
+
+## Focused popup integration tests
+
+Build the browser packages first. The popup runner loads the actual generated
+bundle into independent fake browser/DOM contexts. These integration tests do
+not establish native browser acceptance.
+
+```sh
+node tests/popup.cjs --list
+node tests/popup.cjs firefox seeking
+node tests/popup.cjs chrome exports transfer
+node tests/popup.cjs firefox                 # all popup suites
+node tests/popup.cjs chrome                  # all popup suites
+```
+
+With no suite names, the runner executes every registered suite in order. A
+failure stops the run and identifies its adapter and suite. Unknown adapters or
+suite names fail before running cases. `npm test` continues to run all popup
+suites for both adapters, alongside the other existing tests and package checks.
+
+| Suite             | Coverage                                                                            |
+| ----------------- | ----------------------------------------------------------------------------------- |
+| policy            | Defaults, ranges and initialized controls                                           |
+| refresh           | Ordered/coalesced reads, external updates and recovery                              |
+| markers           | Chapters, marker commands, annotation drafts and lifetime/session races             |
+| appearance        | Themes and serialized bundled page actions                                          |
+| navigation        | About, list/search focus, Settings transitions and auto-bookmarking                 |
+| exports           | Playback shortcuts, transcript formats, clipboard-first file offers and URL cleanup |
+| bookmarks         | Undo, thumbnails, paste navigation and channel metadata/search                      |
+| seeking           | Saved/live seeks, slider commit/cancel and one-key/one-seek ownership               |
+| transfer          | Row/global clipboard, Help isolation, strict import and cross-context round trips   |
+| trash-settings    | Trash/expiry/purge, delayed settings writes, previews and failure recovery          |
+| player-boundaries | Hostile/partial page results, delayed lifetimes and transcript completeness         |
+
+`tests/popup/harness.cjs` owns fixture construction; each fixture creates fresh
+storage data, document, browser API, listeners and VM. `seeds.cjs` supplies fresh
+input objects. Related delayed actions stay within their feature suite; no live
+fixture or mutable test state is handed from one suite to another.
+
+## Real-DOM checks and previews
+
+Build first, then run the separate Chrome-engine fixture. Both adapter names use
+headless Chrome/Chromium with a fresh temporary profile, fake extension data and
+the actual bundled popup. This does not establish native Firefox/Chrome/Brave
+acceptance and does not use an installed extension's profile or bookmarks.
+
+```sh
+node tests/keyboard-browser.cjs chrome
+node tests/keyboard-browser.cjs firefox
+node tests/keyboard-browser.cjs chrome --preview-settings
+node tests/keyboard-browser.cjs firefox --preview-editor --dark
+node tests/keyboard-browser.cjs chrome --preview-help-expanded
+```
+
+Ordinary and preview commands run every feature check before preview staging.
+They share a 500×650 browser window; the report records the actual content viewport
+and checks that it fits the full 360×520 popup. Preview flags only select the final
+screen and request a screenshot. Other flags: `--preview` (list),
+`--preview-settings-expanded`, `--preview-settings-bookmarks`,
+`--preview-settings-transcripts`, and `--preview-help`. `--dark` selects the dark
+preview. Existing WAYPOINTS_MARKER_PREVIEW / WAYPOINTS_PREVIEW_THEME environment
+settings remain available. Set WAYPOINTS_CHROME_BINARY to select the browser.
+
+The command prints an evidence directory containing result.json, dom.html,
+browser.stderr.log and the generated fixture. Previews also save popup.png.
+Reports identify Chrome as the engine, the selected adapter, viewport and completed
+feature counts. Failure reports identify the active stage. The temporary profile
+is retained there for diagnosis; it is separate from user profiles.
+
+`tests/keyboard/` separates setup, test helpers, seven feature files, preview staging,
+fixture generation, options and browser launch/reporting. Normal command waits
+finish editor animations explicitly; dedicated motion cases still sample 500ms
+opening/closing, intermediate heights and reversal. Initialization/layout polling
+and queue checks are bounded, and the browser process has a 45-second deadline.
+Current coverage is 50 cases, including Settings focus-ring clearance,
+compact annotation editing/previews,
+reduced motion, native controls, focus,
+scroll/outline geometry, modal cancellation and preserved annotation drafts. New
+cases can update the feature expectations in cases.cjs without a fixed count cap.
+
 ## Outputs and transformations
 
 `scripts/build.py` invokes `scripts/build-wxt.mjs` (the WXT build API) in a
@@ -68,7 +191,10 @@ source map containing original source contents. A conservative 5,000,000-byte
 per-JavaScript-file guard runs before replacing a loadable folder. Neither
 production manifest adds permissions, host access, or a background worker.
 
-CSS/icons are copied unchanged, HTML is processed by Vite, manifests receive the
+CSS and PNG/SVG icon assets are copied unchanged. The settings gear is an external
+SVG used as a CSS mask; its visible color comes from the existing theme token.
+Both prefixed and standard mask rules support the configured browser targets.
+HTML is processed by Vite, manifests receive the
 package.json version, and ZIP entries have stable ordering, timestamps, and
 permissions. No build timestamp, absolute workspace path, or environment version
 is embedded in the packages. Source map paths are relative and deterministic.

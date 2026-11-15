@@ -13,9 +13,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   getTrash,
   searchEl,
   clearSearchEl,
-  optionsToggle,
-  isOptionsOpen,
-  setOptionsOpen,
+  settingsToggle,
+  isSettingsOpen,
+  setSettingsOpen,
   requestSearch,
   updateHeaderMode,
   escapeClosesPopup,
@@ -75,7 +75,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
     if (!link && document.activeElement === searchEl) return;
     event.preventDefault();
     requestSearch();
-    setOptionsOpen(false);
+    setSettingsOpen(false);
     searchEl.value = text;
     renderList();
     searchEl.focus();
@@ -144,9 +144,9 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
       return false;
     e.preventDefault();
     if (!e.repeat) {
-      const open = !isOptionsOpen();
-      setOptionsOpen(open);
-      if (!open) optionsToggle.focus();
+      const open = !isSettingsOpen();
+      setSettingsOpen(open);
+      if (!open) settingsToggle.focus();
     }
     return true;
   }
@@ -210,7 +210,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   }
 
   function usesNativeListInput(e, active) {
-    if (active === optionsToggle) return true;
+    if (active === settingsToggle) return true;
     if (active === searchEl && !matches("selectVideo", e.key)) return true;
     // Document capture runs before a slider can stop propagation itself.
     const target = e.target || active;
@@ -314,7 +314,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
     if (handleControlOrModalContext(e, active)) return;
     if (e.ctrlKey || e.altKey || e.metaKey) return;
     if (handleGlobalCommand(e, active)) return;
-    if (isOptionsOpen()) return;
+    if (isSettingsOpen()) return;
     if (handleSearchShortcut(e, active)) return;
     if (usesNativeListInput(e, active)) return;
     handleListCommands(e, active);

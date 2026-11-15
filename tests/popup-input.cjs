@@ -17,7 +17,7 @@ function createRoutingFixture(profile = {}, factory = currentFactory) {
     help: false,
     file: false,
     format: false,
-    options: false,
+    settingsOpen: false,
     ...profile,
   };
   const log = [];
@@ -183,10 +183,10 @@ function createRoutingFixture(profile = {}, factory = currentFactory) {
     getTrash: () => (state.trash ? { [ID]: videos[ID] } : {}),
     searchEl: nodes.search,
     clearSearchEl: node("clear", "BUTTON"),
-    optionsToggle: nodes.gear,
-    isOptionsOpen: () => state.options,
-    setOptionsOpen(open) {
-      state.options = open;
+    settingsToggle: nodes.gear,
+    isSettingsOpen: () => state.settingsOpen,
+    setSettingsOpen(open) {
+      state.settingsOpen = open;
       log.push(["settings", open]);
     },
     requestSearch() {
@@ -246,7 +246,7 @@ function createRoutingFixture(profile = {}, factory = currentFactory) {
           help: state.help,
           file: state.file,
           format: state.format,
-          options: state.options,
+          settingsOpen: state.settingsOpen,
         },
         search: nodes.search.value,
       }),
@@ -318,11 +318,11 @@ async function run() {
     [{ active: "search" }, "ArrowDown", {}, "focus", true],
     [{ active: "slider" }, "ArrowRight", {}, null, false],
     [{ target: "slider" }, "ArrowLeft", {}, null, false],
-    [{ options: true, active: "settingSlider" }, "ArrowRight", {}, null, false],
-    [{ options: true, active: "theme" }, "h", {}, null, false],
-    [{ options: true, active: "theme" }, "*", {}, "settings", true],
-    [{ options: true, active: "checkbox" }, "*", { code: "NumpadMultiply" }, "settings", true],
-    [{ options: true, active: "checkbox" }, "t", {}, null, false],
+    [{ settingsOpen: true, active: "settingSlider" }, "ArrowRight", {}, null, false],
+    [{ settingsOpen: true, active: "theme" }, "h", {}, null, false],
+    [{ settingsOpen: true, active: "theme" }, "*", {}, "settings", true],
+    [{ settingsOpen: true, active: "checkbox" }, "*", { code: "NumpadMultiply" }, "settings", true],
+    [{ settingsOpen: true, active: "checkbox" }, "t", {}, null, false],
     [{ active: "note", editor: true }, "m", {}, null, false],
     [{ active: "note", editor: true }, "Enter", { ctrlKey: true }, "saveNote", true],
     [{ active: "note", editor: true }, "Enter", { metaKey: true }, "saveNote", true],
@@ -340,9 +340,9 @@ async function run() {
     [{ file: true, active: "filename" }, "Escape", {}, null, false],
     [{ file: true, active: "button", firefox: true }, "Escape", {}, "closeFile", true],
     [{ file: true, active: "button" }, "*", {}, null, false],
-    [{ format: true, options: true, active: "button" }, "*", {}, "settings", true],
+    [{ format: true, settingsOpen: true, active: "button" }, "*", {}, "settings", true],
     [
-      { format: true, options: true, active: "button", firefox: true },
+      { format: true, settingsOpen: true, active: "button", firefox: true },
       "Escape",
       {},
       "format",

@@ -8,14 +8,14 @@ stored locally. Search text is used only to filter the list in the open panel.
 
 The extension reads YouTube pages and controls video playback to provide its
 bookmark, resume, and scrubbing features. Auto-bookmarking is enabled by default
-when the panel is opened on an unsaved video and can be disabled in Options.
+when the panel is opened on an unsaved video and can be disabled in Settings.
 Only bookmarked videos have their progress tracked by the extension.
 
 The extension does not send bookmarks, preferences, or search text to its
 developer or any analytics service. It contains no telemetry, advertising,
 account system, developer-operated server, or cloud synchronization.
 
-Thumbnails are on by default and can be disabled in Options or with the t key.
+Thumbnails are on by default and can be disabled in Settings or with the t key.
 While enabled, the extension loads
 images from YouTube's image service (`i.ytimg.com`) for displayed bookmarks.
 These requests include the video IDs and expose your IP address and normal
@@ -29,7 +29,7 @@ a cleaned URL. Clipboard text is accessed only when you paste, and is not stored
 as a search history or sent to the developer. Ordinary pasted search text is
 used locally to filter the list.
 
-You can explicitly export all saved videos as JSON from Options. Clicking Copy
+You can explicitly export all saved videos as JSON from Settings. Clicking Copy
 JSON places video IDs, titles, playback positions, durations, timestamps, and
 available channel metadata on your system clipboard. You can save that text or
 paste it into another Waypoints installation to merge bookmarks. Preferences
@@ -38,7 +38,7 @@ imports are processed locally; no import/export service or account is used.
 
 Pressing uppercase T on a selected bookmark reads that video's transcript from
 an open YouTube tab and copies it to your system clipboard in your chosen format.
-Options also offers transcript copying and format explanations. Your format
+Settings also offers transcript copying and format explanations. Your format
 preference and the shared offer to save to file preference are stored locally.
 The save offer defaults off; when enabled it asks after a successful transcript
 or all-bookmarks JSON copy whether you want a file too, then lets you choose its

@@ -35,6 +35,9 @@ for browser in ('firefox', 'chrome'):
     assert 'web_accessible_resources' not in manifest
     assert manifest['content_scripts'][0]['js'] == ['content-scripts/content.js']
     popup = (package / 'popup.html').read_text()
+    assert '<svg' not in popup.lower(), 'UI SVGs must remain external assets'
+    assert (package / 'icons/settings.svg').read_bytes() == (shared / 'icons/settings.svg').read_bytes()
+    assert 'icons/settings.svg' in (package / 'popup.css').read_text()
     scripts = re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', popup)
     assert len(scripts) == 2 and scripts[0] == '/theme.js'
     assert 'type="module"' in popup
@@ -58,7 +61,7 @@ for browser in ('firefox', 'chrome'):
             assert any(name.endswith('/youtube-values.js') for name in mapping['sources'])
             assert not (package / 'youtube-values.js').exists()
         if entry == popup_script:
-            for helper in ('display-time.js', 'popup-dom.js', 'popup-shortcuts.js', 'popup-annotation-editor.js'):
+            for helper in ('display-time.js', 'popup-dom.js', 'popup-shortcuts.js', 'popup-annotation-editor.js', 'popup-file-save.js'):
                 assert any(name.endswith('/' + helper) for name in mapping['sources'])
                 assert not (package / helper).exists()
             assert any(name.endswith('/popup-refresh.mjs') for name in mapping['sources'])
@@ -99,8 +102,12 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
         assert json.loads(z.read('package.json'))['license'] == 'Apache-2.0'
         assert 'src/shared/popup.js' in names and 'src/entrypoints/popup.html' in names
         assert 'scripts/build.py' in names and 'README.md' in names
+        for folder in ('popup', 'keyboard'):
+            for suite in (ROOT / 'tests' / folder).rglob('*.cjs'):
+                relative = suite.relative_to(ROOT).as_posix()
+                assert z.read(relative) == suite.read_bytes(), relative
         assert z.read('.prettierrc.json') == (ROOT / '.prettierrc.json').read_bytes()
-        for name in ('package-lock.json', 'scripts/build-wxt.mjs', 'wxt.config.mjs', 'BUILDING.md'):
+        for name in ('package-lock.json', 'scripts/build-wxt.mjs', 'wxt.config.mjs', 'BUILDING.md', 'tests/run.cjs', 'tests/quality.cjs'):
             assert z.read(name) == (ROOT / name).read_bytes()
         assert 'STORE-SUBMISSION.md' not in names
         assert not any(p.startswith(('artifacts/', 'backups/', 'yt-waypoints-')) for p in names)

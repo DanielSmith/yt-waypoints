@@ -42,7 +42,14 @@
     return { url: canonical, issue: null };
   }
 
+  function channelUrlSegment(value) {
+    const channel = normalizeChannelUrl(value);
+    if (channel.issue) return "";
+    return decodeURIComponent(new URL(channel.url).pathname.split("/").at(-1));
+  }
+
   globalThis.WAYPOINTS_YOUTUBE_VALUES = Object.freeze({
+    channelUrlSegment,
     isVideoId,
     normalizeChannelUrl,
     CHANNEL_URL_ISSUE,

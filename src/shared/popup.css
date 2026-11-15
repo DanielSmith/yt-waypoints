@@ -37,7 +37,7 @@ select {
   background: var(--color-accent-hover);
 }
 
-#options-toggle:hover {
+#settings-toggle:hover {
   background: var(--color-surface-hover);
 }
 
@@ -52,8 +52,8 @@ body {
 }
 
 /* All expanded views reserve the same outer frame; content scrolls inside. */
-html.options-open,
-body.options-open,
+html.settings-open,
+body.settings-open,
 html.annotation-open,
 body.annotation-open,
 html.help-open,
@@ -65,18 +65,18 @@ body.help-open {
 }
 
 /* Settings and inline editing use the normal shell; Help keeps its own dialog. */
-body.options-open,
+body.settings-open,
 body.annotation-open {
   display: flex;
   flex-direction: column;
 }
 
-body.options-open header,
+body.settings-open header,
 body.annotation-open header {
   flex: none;
 }
 
-#options-panel,
+#settings-panel,
 body.annotation-open #list {
   flex: 1;
   min-height: 0;
@@ -111,7 +111,7 @@ header {
   cursor: pointer;
 }
 
-.actions.options-open {
+.actions.settings-open {
   grid-template-columns: minmax(0, 1fr) auto auto;
 }
 
@@ -188,7 +188,7 @@ header {
   background: var(--color-positive-hover);
 }
 
-#options-toggle {
+#settings-toggle {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -198,15 +198,18 @@ header {
   box-shadow: inset 0 0 0 1px var(--color-border);
 }
 
-#options-toggle[aria-expanded="true"] .settings-icon {
+#settings-toggle[aria-expanded="true"] .settings-icon {
   display: none;
 }
 
 .settings-icon {
-  fill: none;
-  stroke: var(--color-text);
   display: block;
+  width: 18px;
+  height: 18px;
   flex: none;
+  background-color: var(--color-text);
+  -webkit-mask: url("icons/settings.svg") center / contain no-repeat;
+  mask: url("icons/settings.svg") center / contain no-repeat;
 }
 
 button:disabled {
@@ -220,32 +223,34 @@ button:disabled {
 
 /* Settings and preferences */
 
-body.options-open header {
+body.settings-open header {
   max-height: 140px;
   overflow-y: auto;
   overflow-wrap: anywhere;
 }
 
-#options-panel {
+#settings-panel {
+  --settings-focus-clearance: 4px;
   padding: 8px 10px var(--popup-bottom-clearance);
+  scroll-padding-block: var(--settings-focus-clearance);
 }
 
-.options-intro {
+.settings-intro {
   margin: 0 8px 10px;
   color: var(--color-text-muted);
   font-size: var(--text-secondary);
 }
 
-.option-group {
+.settings-group {
   padding-inline: 8px;
   border-bottom: 1px solid var(--color-border);
 }
 
-.option-group:last-child {
+.settings-group:last-child {
   border-bottom: 0;
 }
 
-.option-group > summary {
+.settings-group > summary {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 10px;
   gap: 3px 6px;
@@ -254,11 +259,11 @@ body.options-open header {
   cursor: pointer;
 }
 
-.option-group > summary::-webkit-details-marker {
+.settings-group > summary::-webkit-details-marker {
   display: none;
 }
 
-.option-group > summary::after {
+.settings-group > summary::after {
   content: "+";
   grid-column: 2;
   grid-row: 1 / 3;
@@ -267,51 +272,59 @@ body.options-open header {
   text-align: center;
 }
 
-.option-group[open] > summary::after {
+.settings-group[open] > summary::after {
   content: "−";
 }
 
-.option-group-title {
+.settings-group-title {
   font-weight: 600;
 }
 
-.option-group-state {
+.settings-group-state {
   grid-column: 1;
   color: var(--color-text-muted);
   font-size: var(--text-small);
   overflow-wrap: anywhere;
 }
 
-.option-group[open],
-.option-group:focus-within {
+.settings-group[open],
+.settings-group:focus-within {
   background: var(--color-selected);
 }
 
-.option-group > summary:hover {
+.settings-group > summary:hover {
   background: var(--color-surface-hover);
 }
 
-.option-group:focus-within {
+.settings-group:focus-within {
   /* Paint above the content and divider, keeping all four edges visible. */
   outline: 1px solid var(--color-current-border);
   outline-offset: -1px;
   border-bottom-color: var(--color-current-border);
 }
 
-.option-group > summary:focus {
+.settings-group > summary:focus {
   outline: none;
 }
 
-.option-group-content {
+.settings-group-content {
   display: flow-root;
+  /* Keep controls aligned with summaries, but let their outward focus rings
+     fit inside the clipped disclosure used by the height animation. */
+  margin-inline: calc(-1 * var(--settings-focus-clearance));
+  padding: var(--settings-focus-clearance);
   overflow: hidden;
 }
 
-.option-group-content > :first-child {
+#settings-panel :is(input, select, button, a) {
+  scroll-margin-block: var(--settings-focus-clearance);
+}
+
+.settings-group-content > :first-child {
   margin-top: 4px;
 }
 
-.option-group-content > :last-child {
+.settings-group-content > :last-child {
   margin-bottom: 14px;
 }
 
@@ -403,7 +416,12 @@ select:focus-visible {
 #annotation-target {
   color: var(--color-text-muted);
   font-size: var(--text-secondary);
-  margin: 6px 0;
+}
+.annotation-heading-line {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
 }
 body.annotation-open #list {
   max-height: none;
@@ -424,10 +442,6 @@ body.annotation-open #list {
   display: flow-root;
   padding: 10px var(--annotation-control-clearance) var(--annotation-control-clearance);
   border-top: 1px solid var(--color-border);
-}
-#annotation-editor label {
-  display: block;
-  margin: 8px 0 4px;
 }
 #annotation-text {
   display: block;
@@ -679,11 +693,34 @@ li:hover {
 }
 
 .channel-name {
+  display: flex;
+  align-items: baseline;
+  gap: .35em;
   color: var(--color-text-muted);
   font-size: var(--text-small);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+.channel-title,
+.annotation-excerpt {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.channel-name:has(.channel-annotation) .channel-title {
+  max-width: 60%;
+  flex-shrink: 0;
+}
+.channel-annotation {
+  display: flex;
+  min-width: 0;
+}
+.channel-annotation::before {
+  content: "(";
+}
+.channel-annotation::after {
+  content: ")";
 }
 
 .meta {
@@ -828,6 +865,7 @@ li:hover {
   max-height: 180px;
   overflow-y: auto;
   padding: 4px;
+  scroll-padding-block: var(--settings-focus-clearance);
   scrollbar-gutter: stable;
 }
 

@@ -135,7 +135,10 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
           !query ||
           (v.title || "").toLocaleLowerCase().includes(query) ||
           (settings.includeChannelNames &&
-            (v.channelName || "").toLocaleLowerCase().includes(query)),
+            ((v.channelName || "").toLocaleLowerCase().includes(query) ||
+              WAYPOINTS_YOUTUBE_VALUES.channelUrlSegment(v.channelUrl)
+                .toLocaleLowerCase()
+                .includes(query))),
       )
       .sort(
         (a, b) =>
@@ -201,7 +204,21 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
       if (v.channelName) {
         const channel = document.createElement("div");
         channel.className = "channel-name";
-        channel.textContent = v.channelName;
+        const channelTitle = document.createElement("span");
+        channelTitle.className = "channel-title";
+        channelTitle.textContent = v.channelName;
+        channel.append(channelTitle);
+        const preview = inTrash ? "" : markers.annotationPreview(v);
+        if (preview) {
+          const annotation = document.createElement("span");
+          annotation.className = "channel-annotation";
+          const excerpt = document.createElement("span");
+          excerpt.className = "annotation-excerpt";
+          excerpt.textContent = preview;
+          annotation.append(excerpt);
+          channel.append(annotation);
+          channel.title = `${v.channelName} (${preview})`;
+        }
         details.append(channel);
       }
       if (inTrash) meta.textContent = `Trash · ${meta.textContent}`;
