@@ -215,6 +215,23 @@ validation leaves the previously loadable extension intact. Preserve installed
 extension identities, output paths, and real browser data; reload existing
 installations and YouTube tabs after a successful build.
 
+## Signing material and uploads
+
+Keep signing keys outside this repository. Git ignores common signing-key
+filenames, but the build independently checks all distributed source inputs
+before building either browser. Every archive entry is checked again before
+publication. Common key containers (`.pem`, `.key`, `.p12`, `.pfx`, `.pkcs8`,
+`.ppk` and standard SSH private-key names) and PEM private-key headers are
+rejected. A rejection preserves the existing archive. These checks are targeted
+packaging protection, not a general-purpose secret scan or cryptographic audit.
+
+The build creates ZIPs only. If the existing Chrome Web Store listing requires
+Verified CRX Uploads, pack `yt-waypoints-chrome/` with the existing private key
+matching its registered public key and upload that CRX instead of the Chrome
+ZIP. Never generate a replacement key as part of an ordinary release. Keep the
+key out of the folder being packed. Firefox uses its own ZIP for AMO submission;
+the reviewer-source ZIP is supplied separately when requested for source review.
+
 ## Vite development
 
 ```sh

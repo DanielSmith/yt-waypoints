@@ -3,6 +3,7 @@
 import hashlib
 import json
 import re
+import runpy
 from pathlib import Path
 import struct
 import subprocess
@@ -12,6 +13,42 @@ import zipfile
 ROOT = Path(__file__).resolve().parent.parent
 version = json.loads((ROOT / 'package.json').read_text())['version']
 shared = ROOT / 'src/shared'
+
+# Signing material must never replace a previously valid archive, including
+# when a private key has been renamed to an ordinary distributable filename.
+build_tools = runpy.run_path(str(ROOT / 'scripts/build.py'))
+with tempfile.TemporaryDirectory(prefix='waypoints-key-guard-') as td:
+    directory = Path(td)
+    package = directory / 'package'
+    package.mkdir()
+    destination = directory / 'package.zip'
+    destination.write_bytes(b'previous archive')
+    cases = [(name, b'not a real key') for name in
+             ('signing.PEM', 'signing.key', 'signing.p12', 'signing.pfx',
+              'signing.pkcs8', 'signing.ppk', 'id_rsa', 'id_ed25519')]
+    for label in ('PRIVATE KEY', 'RSA PRIVATE KEY', 'EC PRIVATE KEY',
+                  'OPENSSH PRIVATE KEY', 'ENCRYPTED PRIVATE KEY'):
+        header = b'-----BEGIN ' + label.encode() + b'-----'
+        cases.append(('renamed.txt', header + b'\nsynthetic test data\n'))
+    for name, data in cases:
+        item = package / name
+        item.write_bytes(data)
+        try:
+            build_tools['write_zip'](package, destination)
+        except ValueError as error:
+            assert name in str(error)
+            assert 'synthetic test data' not in str(error)
+        else:
+            raise AssertionError(f'Signing material accepted: {name}')
+        assert destination.read_bytes() == b'previous archive'
+        assert not destination.with_suffix('.zip.tmp').exists()
+        item.unlink()
+    public = b'-----BEGIN ' + b'PUBLIC KEY-----\npublic fixture\n'
+    (package / 'public.txt').write_bytes(public)
+    build_tools['write_zip'](package, destination)
+    with zipfile.ZipFile(destination) as archive:
+        assert archive.read('public.txt') == public
+print('PASS: key filenames and renamed private-key content rejected without replacing archives; public content allowed')
 
 for browser in ('firefox', 'chrome'):
     package = ROOT / f'yt-waypoints-{browser}'
@@ -122,6 +159,20 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
     for browser in ('firefox', 'chrome', 'source'):
         name = f'yt-waypoints-{browser}-{version}.zip'
         assert (clone / 'artifacts' / name).read_bytes() == (ROOT / 'artifacts' / name).read_bytes(), name
+    # Source-only assets are not necessarily present in a browser bundle. The
+    # preflight must still reject them before changing any browser/archive.
+    protected = [clone / f'yt-waypoints-{browser}' / 'manifest.json' for browser in ('firefox', 'chrome')]
+    protected.extend((clone / 'artifacts').glob('*.zip'))
+    before_keys = {item: item.read_bytes() for item in protected}
+    for name, data in [('signing.pem', b'synthetic fixture'),
+                       ('renamed.txt', b'-----BEGIN ' + b'PRIVATE KEY-----\nsynthetic fixture\n')]:
+        item = clone / 'assets' / name
+        item.write_bytes(data)
+        rejected = subprocess.run(['python3', str(clone / 'scripts/build.py')], capture_output=True, text=True)
+        assert rejected.returncode != 0
+        assert 'cannot be distributed' in rejected.stderr and name in rejected.stderr
+        assert all(path.read_bytes() == before for path, before in before_keys.items())
+        item.unlink()
     # A missing required file must leave an already built package unchanged.
     old_manifest = (clone / 'yt-waypoints-firefox/manifest.json').read_bytes()
     (clone / 'src/firefox/platform.js').unlink()
@@ -141,4 +192,4 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
         assert 'Invalid Chromium shortcut' in rejected.stderr
         assert (clone / 'yt-waypoints-chrome/manifest.json').read_bytes() == before
 
-print('PASS: reviewer source ZIP rebuilds identical packages; missing resources/invalid Chromium shortcuts rejected without replacing existing packages')
+print('PASS: reviewer source ZIP rebuilds identical packages; signing material/missing resources/invalid Chromium shortcuts rejected without replacing existing packages')

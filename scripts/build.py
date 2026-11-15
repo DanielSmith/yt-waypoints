@@ -7,6 +7,7 @@ import argparse
 from html.parser import HTMLParser
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -14,6 +15,35 @@ import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = ('firefox', 'chrome')
+SOURCE_DIRECTORIES = ('src', 'tests', 'assets')
+SOURCE_FILES = ('scripts/build.py', 'scripts/build-wxt.mjs', 'package.json',
+                'package-lock.json', 'wxt.config.mjs', 'BUILDING.md', '.prettierrc.json',
+                'README.md', 'PRIVACY.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md',
+                'THEMES.md', 'CHANGELOG.md')
+KEY_SUFFIXES = {'.pem', '.key', '.p12', '.pfx', '.pkcs8', '.ppk'}
+KEY_NAMES = {'id_rsa', 'id_dsa', 'id_ecdsa', 'id_ed25519'}
+PRIVATE_KEY_HEADER = re.compile(rb'-----BEGIN (?:[A-Z0-9]+ )*PRIVATE KEY-----')
+
+
+def validate_distribution_file(item, name):
+    # Fail closed on common key containers, including binary formats. Inspect
+    # content too, so a PEM private key renamed as text cannot enter an archive.
+    # Report only its path, never key bytes. This is not a general secret scanner.
+    if item.suffix.lower() in KEY_SUFFIXES or item.name.lower() in KEY_NAMES:
+        raise ValueError(f'Signing-key file cannot be distributed: {name}')
+    if PRIVATE_KEY_HEADER.search(item.read_bytes()):
+        raise ValueError(f'Private-key content cannot be distributed: {name}')
+
+
+def validate_source_inputs():
+    # Check before either browser build changes output. Git ignores alone do
+    # not protect copytree(), WXT public assets, or the reviewer-source archive.
+    for directory in SOURCE_DIRECTORIES:
+        for item in sorted((ROOT / directory).rglob('*')):
+            if item.is_file() and '__pycache__' not in item.parts and item.name != '.DS_Store' and item.suffix != '.pyc':
+                validate_distribution_file(item, item.relative_to(ROOT))
+    for name in SOURCE_FILES:
+        validate_distribution_file(ROOT / name, name)
 
 
 def validate(package):
@@ -63,6 +93,7 @@ def write_zip(package, destination):
         with zipfile.ZipFile(temporary, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
             for item in sorted(package.rglob('*')):
                 if item.is_file():
+                    validate_distribution_file(item, item.relative_to(package))
                     info = zipfile.ZipInfo(item.relative_to(package).as_posix(), (2020, 1, 1, 0, 0, 0))
                     info.compress_type = zipfile.ZIP_DEFLATED
                     info.external_attr = 0o100644 << 16
@@ -120,13 +151,11 @@ def write_sources():
     artifacts.mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='.waypoints-source-', dir=ROOT) as td:
         stage = Path(td)
-        for name in ('src', 'tests', 'assets'):
+        for name in SOURCE_DIRECTORIES:
             shutil.copytree(ROOT / name, stage / name,
                             ignore=shutil.ignore_patterns('__pycache__', '*.pyc', '.DS_Store'))
         (stage / 'scripts').mkdir()
-        shutil.copy2(ROOT / 'scripts/build.py', stage / 'scripts/build.py')
-        shutil.copy2(ROOT / 'scripts/build-wxt.mjs', stage / 'scripts/build-wxt.mjs')
-        for name in ('package.json', 'package-lock.json', 'wxt.config.mjs', 'BUILDING.md', '.prettierrc.json', 'README.md', 'PRIVACY.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md', 'THEMES.md', 'CHANGELOG.md'):
+        for name in SOURCE_FILES:
             shutil.copy2(ROOT / name, stage / name)
         write_zip(stage, artifacts / f'yt-waypoints-source-{version}.zip')
     print(f'Reviewer sources: artifacts/yt-waypoints-source-{version}.zip')
@@ -136,6 +165,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('browser', nargs='?', choices=(*TARGETS, 'all'), default='all')
     args = parser.parse_args()
+    validate_source_inputs()
     for browser in TARGETS if args.browser == 'all' else (args.browser,):
         build(browser)
     write_sources()
