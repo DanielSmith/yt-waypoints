@@ -38,6 +38,21 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   const themeSelect = document.getElementById("theme-select");
+  let themeChoices = "";
+  function populateThemeChoices() {
+    const choices = themeService.choices;
+    const signature = JSON.stringify(choices);
+    if (signature === themeChoices) return;
+    themeChoices = signature;
+    themeSelect.replaceChildren(
+      ...choices.map((theme) => {
+        const option = document.createElement("option");
+        option.value = theme.id;
+        option.textContent = theme.label;
+        return option;
+      }),
+    );
+  }
   const deletionModeEl = document.getElementById("deletion-mode");
   const trashDaysEl = document.getElementById("trash-days");
   const showTrashEl = document.getElementById("show-trash");
@@ -99,6 +114,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   }
 
   function updateSettingsUI() {
+    populateThemeChoices();
     const settings = getSettings();
     const themeLabel = themeService.choices.find((theme) => theme.id === settings.theme)?.label;
     const summaries = {
@@ -114,7 +130,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
     deletionModeEl.value = settings.deletionMode;
     trashDaysEl.value = String(settings.trashDays);
     themeSelect.value = settings.theme;
-    themeService.apply(settings.theme);
+    if (themeService.sync) themeService.sync(settings.theme);
+    else themeService.apply(settings.theme);
     for (const [name, control] of checkboxControls) control.checked = settings[name];
     thumbnailsEl.checked = settings.showThumbnails;
     thumbnailsEl.disabled = thumbnailChangePending;
@@ -126,21 +143,25 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
 
   function changeSetting(name, value) {
     // Capture intent at the event, before an earlier save refreshes the form.
-    return enqueue(() => persistSettings(normalizeSettings({ ...getSettings(), [name]: value })));
+    return enqueue(() =>
+      persistSettings(normalizeSettings({ ...getSettings(), [name]: value }), [name]),
+    );
   }
   function toggleMarkers() {
     // Shortcut toggles must observe preceding queued writes. They are not
     // absolute form values to capture early or enqueue again via changeSetting.
     return enqueue(async () => {
       const showMarkers = !getSettings().showMarkers;
-      await persistSettings({ ...getSettings(), showMarkers });
+      await persistSettings({ ...getSettings(), showMarkers }, ["showMarkers"]);
       setStatus(showMarkers ? "Markers shown." : "Markers hidden.");
     });
   }
 
-  async function persistSettings(next) {
+  async function persistSettings(next, fields) {
     const autoBookmarkChanged = next.autoBookmark !== getSettings().autoBookmark;
-    await api.storage.local.set({ settings: next });
+    if (themeService.persistSettings) {
+      next = normalizeSettings(await themeService.persistSettings(next, fields, normalizeSettings));
+    } else await api.storage.local.set({ settings: next });
     onPersisted(next, autoBookmarkChanged);
     updateSettingsUI();
     await storage.expire();
@@ -180,14 +201,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
         disclosures.toggle(group);
       });
     }
-    themeSelect.replaceChildren(
-      ...themeService.choices.map((theme) => {
-        const option = document.createElement("option");
-        option.value = theme.id;
-        option.textContent = theme.label;
-        return option;
-      }),
-    );
+    populateThemeChoices();
     themeSelect.addEventListener("change", () =>
       changeSetting("theme", themeService.normalize(themeSelect.value)),
     );

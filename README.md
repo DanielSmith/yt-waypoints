@@ -88,7 +88,8 @@ Select a saved video row. Marker controls are keyboard driven:
 - **m** toggles a marker at the live playback position, or the saved position
   for a closed video. A marker within two seconds is removed instead of creating
   a duplicate. Removing a marker also deletes its annotation.
-- **[** / **]** navigate previous/next markers without wrapping. Playing/paused
+- **[** / **]** navigate previous/next markers, falling back to the beginning/end
+  of the video without wrapping. Playing/paused
   state is preserved; a closed video's saved resume point changes. Navigation
   requires a known duration.
 - **a** adds or edits the current marker's annotation. Without a current marker,

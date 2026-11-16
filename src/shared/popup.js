@@ -117,7 +117,6 @@ function setSettingsOpen(open) {
 // Factories expose methods first; init() binds controls after all wiring exists.
 const dialogs = WAYPOINTS_CREATE_POPUP_DIALOGS({
   document,
-  api,
   getSettings: () => settings,
   escapeClosesPopup: WAYPOINTS_ESCAPE_CLOSES_POPUP,
   isFileSaveOpen: () => exportsController.fileSaveOpen,
@@ -312,6 +311,7 @@ async function init() {
   const [{ settings: saved }, tab] = await Promise.all([
     api.storage.local.get("settings"),
     activeTab(),
+    WAYPOINTS_THEME.ready,
   ]);
   settings = normalizeSettings(saved);
   onVideo = WATCH_RE.test(tab?.url || "") && Boolean(videoIdOf(tab.url));
@@ -375,6 +375,10 @@ async function refreshOpenChapters() {
 inputController.installKeyboard();
 
 // Refresh live when bookmarks or preferences change.
+WAYPOINTS_THEME.subscribe?.((theme) => {
+  settings = normalizeSettings({ ...settings, theme });
+  updateSettingsUI();
+});
 api.storage.onChanged.addListener((changes, area) => {
   if (area !== "local") return;
   if (changes.settings) {

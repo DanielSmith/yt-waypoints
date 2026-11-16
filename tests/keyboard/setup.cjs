@@ -1,5 +1,5 @@
 // Runs before the production module in a disposable page, never a user profile.
-module.exports = function setupFixture() {
+module.exports = function setupFixture(themeFixtures) {
   const data = {
     settings: { autoBookmark: false, showThumbnails: false, scrubSeconds: 7, shiftMultiplier: 4 },
     videos: {
@@ -14,6 +14,7 @@ module.exports = function setupFixture() {
   };
   const subscribers = [];
   const fixture = (globalThis.keyboardFixture = {
+    themeFixtures,
     operations: [],
     open: true,
     position: 700,

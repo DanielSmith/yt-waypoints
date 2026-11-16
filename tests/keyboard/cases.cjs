@@ -8,4 +8,5 @@ module.exports = [
   { name: "settings", expectedCases: 10, run: require("./cases/settings.cjs") },
   { name: "editor", expectedCases: 3, run: require("./cases/editor.cjs") },
   { name: "annotations", expectedCases: 3, run: require("./cases/annotation-preview.cjs") },
+  { name: "customThemes", expectedCases: 3, run: require("./cases/theme-library.cjs") },
 ];

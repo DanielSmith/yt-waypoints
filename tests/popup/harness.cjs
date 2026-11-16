@@ -44,6 +44,9 @@ function createPopupHarness(flavor) {
         this.children = [];
         this.dataset = {};
         this.style = {
+          removeProperty(name) {
+            delete this[name];
+          },
           setProperty(name, value) {
             this[name] = value;
           },
@@ -325,6 +328,7 @@ function createPopupHarness(flavor) {
       URL,
       URLSearchParams,
       Blob,
+      TextEncoder,
       setTimeout: (fn) => timers.push(fn),
       CSS: { escape: (s) => s },
       console,

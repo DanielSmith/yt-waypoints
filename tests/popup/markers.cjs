@@ -256,16 +256,25 @@ module.exports = async ({ createPopupFixture }) => {
   await markerNav.settle();
   await markerKey(markerNav, "[");
   assert.equal(markerNav.data.videos[markerId].t, 10);
-  markerWrites = markerNav.writes();
   await markerKey(markerNav, "[");
-  assert.equal(markerNav.writes(), markerWrites);
-  assert.match(markerNav.els.status.textContent, /No previous marker/);
+  assert.equal(markerNav.data.videos[markerId].t, 0);
+  assert.match(markerNav.els.status.textContent, /Moved to beginning/);
+  await markerKey(markerNav, "[");
+  assert.equal(markerNav.data.videos[markerId].t, 0, "beginning does not wrap");
+  await markerKey(markerNav, "]");
+  assert.equal(markerNav.data.videos[markerId].t, 10);
   await markerKey(markerNav, "]");
   assert.equal(markerNav.data.videos[markerId].t, 20);
   await markerKey(markerNav, "]");
   assert.equal(markerNav.data.videos[markerId].t, 30);
   await markerKey(markerNav, "]");
-  assert.match(markerNav.els.status.textContent, /No next marker/);
+  assert.equal(markerNav.data.videos[markerId].t, 100);
+  assert.match(markerNav.els.status.textContent, /Moved to the end/);
+  await markerKey(markerNav, "]");
+  assert.equal(markerNav.data.videos[markerId].t, 100, "end does not wrap");
+  assert.equal(markerNav.data.videos[markerId].markers.length, 3);
+  await markerKey(markerNav, "[");
+  assert.equal(markerNav.data.videos[markerId].t, 30);
   await markerKey(markerNav, "a");
   markerNav.els["annotation-text"].value = "Chapter annotation";
   markerNav.els["annotation-save"].click();
@@ -286,6 +295,33 @@ module.exports = async ({ createPopupFixture }) => {
   assert.equal(hiddenReopen.els["show-markers"].checked, false);
 
   const openMarkerTab = { id: 4, windowId: 1, url: `https://www.youtube.com/watch?v=${markerId}` };
+  // With no markers, boundaries still work for saved and live positions.
+  for (const live of [false, true]) {
+    let liveTime = 15;
+    const boundaries = await markerFixture(
+      markerSeed(),
+      live
+        ? {
+            tabs: [openMarkerTab],
+            executeScript: async (request) => {
+              if (request.func.name === "seekTo") liveTime = request.args[0];
+              return [{ result: { id: markerId, t: liveTime, duration: 100, paused: true } }];
+            },
+          }
+        : {},
+    );
+    boundaries.els.list.querySelectorAll(".main")[0].focus();
+    for (const [key, time, status] of [
+      ["[", 0, /Moved to beginning/],
+      ["]", 100, /Moved to the end/],
+    ]) {
+      await markerKey(boundaries, key);
+      assert.equal(boundaries.data.videos[markerId].t, time);
+      assert.match(boundaries.els.status.textContent, status);
+      assert.equal(boundaries.data.videos[markerId].markers, undefined);
+      if (live) assert.equal(liveTime, time);
+    }
+  }
   const liveMarker = await markerFixture(markerSeed(), {
     tabs: [openMarkerTab],
     executeScript: async () => [{ result: { id: markerId, t: 70, duration: 100, paused: false } }],

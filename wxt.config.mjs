@@ -27,6 +27,13 @@ export default defineConfig({
     },
   },
   vite: ({ browser }) => ({
+    // Preserve the full SemVer label in About on both browsers. WXT emits a
+    // numeric manifest version and a Chrome-only version_name automatically.
+    define: {
+      __WAYPOINTS_APP_VERSION__: JSON.stringify(
+        JSON.parse(readFileSync(new URL("./package.json", import.meta.url))).version,
+      ),
+    },
     resolve: {
       alias: {
         "@platform": fileURLToPath(new URL(`./src/${browser}/platform.js`, import.meta.url)),

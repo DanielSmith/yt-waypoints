@@ -53,7 +53,13 @@ print('PASS: key filenames and renamed private-key content rejected without repl
 for browser in ('firefox', 'chrome'):
     package = ROOT / f'yt-waypoints-{browser}'
     manifest = json.loads((package / 'manifest.json').read_text())
-    assert manifest['version'] == version
+    assert re.fullmatch(r'(?:0|[1-9]\d*)(?:\.(?:0|[1-9]\d*)){0,3}', manifest['version'])
+    assert all(int(part) <= 65535 for part in manifest['version'].split('.'))
+    assert manifest['version'] == version.split('-', 1)[0].split('+', 1)[0]
+    if browser == 'chrome' and manifest['version'] != version:
+        assert manifest['version_name'] == version
+    else:
+        assert 'version_name' not in manifest
     assert manifest['name'] == 'YT Waypoints'
     assert (package / 'LICENSE').read_bytes() == (ROOT / 'LICENSE').read_bytes()
     assert (package / 'THIRD-PARTY-NOTICES.md').read_bytes() == (ROOT / 'THIRD-PARTY-NOTICES.md').read_bytes()

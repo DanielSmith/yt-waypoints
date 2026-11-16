@@ -9,7 +9,19 @@ const source = read("theme.js");
 function fixture({ dark = false, settings = {}, pending = false, failed = false } = {}) {
   let resolveRead;
   const listeners = [];
-  const document = { documentElement: { dataset: {} } };
+  const document = {
+    documentElement: {
+      dataset: {},
+      style: {
+        setProperty(name, value) {
+          this[name] = value;
+        },
+        removeProperty(name) {
+          delete this[name];
+        },
+      },
+    },
+  };
   const media = { matches: dark, addEventListener: (event, fn) => listeners.push(fn) };
   const api = {
     storage: {
@@ -25,6 +37,7 @@ function fixture({ dark = false, settings = {}, pending = false, failed = false 
   };
   const context = vm.createContext({
     document,
+    TextEncoder,
     matchMedia: () => media,
     [flavor === "firefox" ? "browser" : "chrome"]: api,
   });
@@ -97,6 +110,13 @@ const structuralWords = new Set([
   "closest-corner",
   "farthest-corner",
 ]);
+function checkPaletteOwner(js, filename) {
+  if (path.basename(filename) === "theme.js") return;
+  assert.ok(
+    !/\.style\.(?:setProperty|removeProperty)\(\s*[`"'](?:--color-|color-scheme)/.test(js),
+    `${filename}: palette writes belong to the validated theme owner`,
+  );
+}
 function checkStyleBoundary(css, filename) {
   css = css.replace(/\/\*[\s\S]*?\*\//g, "");
   for (const [, property, value] of css.matchAll(/(?:^|[;{}])\s*([-a-z]+)\s*:\s*([^;{}]+)/gi)) {
@@ -146,6 +166,7 @@ function checkUiFiles(directory = extension) {
       );
     } else if (item.name.endsWith(".js")) {
       const js = fs.readFileSync(filename, "utf8");
+      checkPaletteOwner(js, filename);
       assert.ok(
         !/\.style\.(?:color|background(?:Color|Image)?|border(?:Color)?|outline(?:Color)?|accentColor|fill|stroke|boxShadow|cssText)\s*=/i.test(
           js,
@@ -194,6 +215,12 @@ function checkUiFiles(directory = extension) {
   assert.equal(failure.document.documentElement.dataset.theme, "dark");
   assert.equal(system.api.normalize("bad"), "system");
   const components = checkUiFiles().join("\n");
+  assert.throws(() =>
+    checkPaletteOwner("root.style.setProperty(`--color-${role}`, value)", "popup.js"),
+  );
+  assert.throws(() =>
+    checkPaletteOwner('root.style.setProperty("color-scheme", value)', "popup.js"),
+  );
   // Prove the guard catches named/modern colors and fallback/alias bypasses.
   for (const css of [
     ".trash { background: lightcoral; }",

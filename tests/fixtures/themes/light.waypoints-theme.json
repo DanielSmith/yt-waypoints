@@ -1,0 +1,58 @@
+{
+  "format": "yt-waypoints-theme",
+  "version": 1,
+  "theme": {
+    "id": "theme:00000002-1111-4111-8111-111111111111",
+    "name": "Fixture Light",
+    "appearance": "light",
+    "colors": {
+      "surface": "#f4f1ec",
+      "surface-raised": "#ebe6de",
+      "surface-hover": "#dfd8ce",
+      "text": "#222222",
+      "text-muted": "#222222",
+      "border": "#222222",
+      "control-border": "#222222",
+      "current-border": "#222222",
+      "trash-border": "#222222",
+      "accent": "#222222",
+      "accent-hover": "#222222",
+      "on-accent": "#222222",
+      "positive": "#222222",
+      "positive-hover": "#222222",
+      "on-positive": "#222222",
+      "checkbox": "#222222",
+      "track": "#222222",
+      "marker-chapter": "#204080",
+      "marker-user": "#205030",
+      "focus": "#222222",
+      "selected": "#222222",
+      "trash-surface": "#222222",
+      "trash-hover": "#222222",
+      "danger": "#222222",
+      "backdrop": "#10101080"
+    },
+    "source": {
+      "format": "iterm",
+      "converterVersion": 1,
+      "name": "Synthetic light palette",
+      "palette": {
+        "background": "#f4f1ec",
+        "foreground": "#222222",
+        "selectionBackground": "#dfd8ce",
+        "palette": {
+          "1": "#cc4455",
+          "2": "#339966",
+          "4": "#4477cc",
+          "255": "#aaaaaa"
+        }
+      },
+      "attribution": {
+        "author": "Theme fixture contributors",
+        "license": "Synthetic test data",
+        "url": "https://example.com/theme",
+        "notice": "Synthetic fixture only.\nNot a converted third-party theme."
+      }
+    }
+  }
+}

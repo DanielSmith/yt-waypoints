@@ -1,0 +1,58 @@
+{
+  "format": "yt-waypoints-theme",
+  "version": 1,
+  "theme": {
+    "id": "theme:00000001-1111-4111-8111-111111111111",
+    "name": "Fixture Dark",
+    "appearance": "dark",
+    "colors": {
+      "surface": "#20242a",
+      "surface-raised": "#282e36",
+      "surface-hover": "#303844",
+      "text": "#eeeeee",
+      "text-muted": "#eeeeee",
+      "border": "#eeeeee",
+      "control-border": "#eeeeee",
+      "current-border": "#eeeeee",
+      "trash-border": "#eeeeee",
+      "accent": "#eeeeee",
+      "accent-hover": "#eeeeee",
+      "on-accent": "#eeeeee",
+      "positive": "#eeeeee",
+      "positive-hover": "#eeeeee",
+      "on-positive": "#eeeeee",
+      "checkbox": "#eeeeee",
+      "track": "#eeeeee",
+      "marker-chapter": "#80bfff",
+      "marker-user": "#80e0a0",
+      "focus": "#eeeeee",
+      "selected": "#eeeeee",
+      "trash-surface": "#eeeeee",
+      "trash-hover": "#eeeeee",
+      "danger": "#eeeeee",
+      "backdrop": "#10101080"
+    },
+    "source": {
+      "format": "ghostty",
+      "converterVersion": 1,
+      "name": "Synthetic dark palette",
+      "palette": {
+        "background": "#20242a",
+        "foreground": "#eeeeee",
+        "selectionBackground": "#303844",
+        "palette": {
+          "1": "#cc4455",
+          "2": "#339966",
+          "4": "#4477cc",
+          "255": "#aaaaaa"
+        }
+      },
+      "attribution": {
+        "author": "Theme fixture contributors",
+        "license": "Synthetic test data",
+        "url": "https://example.com/theme",
+        "notice": "Synthetic fixture only.\nNot a converted third-party theme."
+      }
+    }
+  }
+}

@@ -8,7 +8,18 @@ const features = require("./cases.cjs");
 const preparePreview = require("./preview.cjs");
 
 function writeFixture({ extension, temporary, options }) {
-  const setup = `<base href="${pathToFileURL(extension + path.sep).href}"><script>(${setupFixture.toString()})();</script>`;
+  const themeFixtures = Object.fromEntries(
+    ["light", "dark"].map((name) => [
+      name,
+      JSON.parse(
+        fs.readFileSync(
+          path.join(__dirname, `../fixtures/themes/${name}.waypoints-theme.json`),
+          "utf8",
+        ),
+      ).theme,
+    ]),
+  );
+  const setup = `<base href="${pathToFileURL(extension + path.sep).href}"><script>(${setupFixture.toString()})(${JSON.stringify(themeFixtures).replace(/</g, "\\u003c")});</script>`;
   const runs = features
     .map(
       ({ name, run }) => `

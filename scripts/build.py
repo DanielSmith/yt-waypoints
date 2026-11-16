@@ -115,7 +115,8 @@ def build(browser):
             if script.stat().st_size > 5_000_000:
                 raise ValueError(f'JavaScript exceeds conservative 5 MB package limit: {script.name}')
         manifest = json.loads((staged / 'manifest.json').read_text())
-        manifest['version'] = version
+        # WXT normalizes SemVer prereleases for browser manifests. Keep that
+        # numeric version; package/archive names retain the complete label.
         (staged / 'manifest.json').write_text(json.dumps(manifest, indent=2) + '\n')
         (staged / 'BUILD-INFO.txt').write_text(
             'Generated extension. Edit src/shared/ and src/' + browser + '/, then rebuild.\n'

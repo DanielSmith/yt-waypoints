@@ -142,7 +142,7 @@ node tests/keyboard-browser.cjs chrome --preview-help-expanded
 ```
 
 Ordinary and preview commands run every feature check before preview staging.
-They share a 500×650 browser window; the report records the actual content viewport
+They share a 500×650 layout viewport; the report records the actual content viewport
 and checks that it fits the full 360×520 popup. Preview flags only select the final
 screen and request a screenshot. Other flags: `--preview` (list),
 `--preview-settings-expanded`, `--preview-settings-bookmarks`,
@@ -156,12 +156,15 @@ Reports identify Chrome as the engine, the selected adapter, viewport and comple
 feature counts. Failure reports identify the active stage. The temporary profile
 is retained there for diagnosis; it is separate from user profiles.
 
-`tests/keyboard/` separates setup, test helpers, seven feature files, preview staging,
+`tests/keyboard/` separates setup, test helpers, eight feature files, preview staging,
 fixture generation, options and browser launch/reporting. Normal command waits
 finish editor animations explicitly; dedicated motion cases still sample 500ms
 opening/closing, intermediate heights and reversal. Initialization/layout polling
 and queue checks are bounded, and the browser process has a 45-second deadline.
-Current coverage is 50 cases, including Settings focus-ring clearance,
+The CDP runner waits in real time so native Web Lock delivery cannot be outrun
+by a simulated clock. Current coverage is 53 cases, including custom palette
+application, exact backup export, unsaved preview/cancel, selected-theme removal,
+Settings focus-ring clearance,
 compact annotation editing/previews,
 reduced motion, native controls, focus,
 scroll/outline geometry, modal cancellation and preserved annotation drafts. New
@@ -199,15 +202,28 @@ package.json version, and ZIP entries have stable ordering, timestamps, and
 permissions. No build timestamp, absolute workspace path, or environment version
 is embedded in the packages. Source map paths are relative and deterministic.
 
-For version `2.3.0`, the outputs are:
+For the current development version `3.0.0-alpha.1`, the outputs are:
 
 ```text
 yt-waypoints-firefox/                 loadable Firefox extension
 yt-waypoints-chrome/                  loadable Chrome/Brave extension
-artifacts/yt-waypoints-firefox-2.3.0.zip
-artifacts/yt-waypoints-chrome-2.3.0.zip
-artifacts/yt-waypoints-source-2.3.0.zip  original sources for reviewers
+artifacts/yt-waypoints-firefox-3.0.0-alpha.1.zip
+artifacts/yt-waypoints-chrome-3.0.0-alpha.1.zip
+artifacts/yt-waypoints-source-3.0.0-alpha.1.zip  original sources for reviewers
 ```
+
+`package.json` owns the full SemVer version. Archive names and About retain
+`3.0.0-alpha.1`; WXT emits numeric `version: "3.0.0"` for both browser manifests
+and `version_name: "3.0.0-alpha.1"` for Chrome. Firefox omits `version_name`.
+About receives its label at build time so it shows the same alpha on both browsers.
+The same configuration is used by production builds and WXT development mode.
+
+These alpha builds are for local development, not store submission. WXT strips
+the prerelease suffix: alpha.1, alpha.2 and final 3.0.0 would share a numeric
+version. A separately versioned store prerelease channel would need an explicit
+update-ordering policy before publishing alphas. This branch does not enroll one.
+Existing 2.3.0 archives/CRX remain in artifacts; the main branch retains 2.3 for
+bug fixes. Switching branches does not itself rebuild the ignored loadable folders.
 
 Tests compare rebuilt ZIP bytes with the originals, including source maps and
 the reviewer-source archive. They also verify that a failed bundle or manifest

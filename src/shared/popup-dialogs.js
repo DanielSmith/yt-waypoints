@@ -1,7 +1,6 @@
 // Help and About lifecycle, including return to a surviving row/control.
 globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   document,
-  api,
   getSettings,
   escapeClosesPopup,
   isFileSaveOpen,
@@ -74,7 +73,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
     if (aboutDialog.open || helpDialog.open || isFileSaveOpen()) return;
     closeFormatMenu(false);
     document.getElementById("about-version").textContent =
-      `Version ${api.runtime.getManifest().version}`;
+      `Version ${__WAYPOINTS_APP_VERSION__}`;
     document.body.classList.add("about-open");
     aboutDialog.showModal();
   }

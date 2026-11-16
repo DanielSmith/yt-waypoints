@@ -7,13 +7,13 @@ const { parseOptions } = require("./keyboard/options.cjs");
 const { writeFixture } = require("./keyboard/fixture.cjs");
 const { runBrowser } = require("./keyboard/browser.cjs");
 
-function main() {
+async function main() {
   const options = parseOptions(process.argv.slice(2));
   const extension = path.resolve(__dirname, "../yt-waypoints-" + options.flavor);
   const temporary = fs.mkdtempSync(path.join(os.tmpdir(), "waypoints-keyboard-"));
   try {
     const fixturePath = writeFixture({ extension, temporary, options });
-    const report = runBrowser({ fixturePath, temporary, options });
+    const report = await runBrowser({ fixturePath, temporary, options });
     console.log(
       `PASS: ${options.flavor} adapter, ${report.cases.length} real-DOM cases in headless Chrome (${report.viewport.width}×${report.viewport.height})`,
     );
@@ -22,9 +22,7 @@ function main() {
   }
 }
 
-try {
-  main();
-} catch (error) {
+main().catch((error) => {
   console.error(error);
   process.exitCode = 1;
-}
+});

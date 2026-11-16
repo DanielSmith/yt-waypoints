@@ -1,5 +1,16 @@
 # Changelog
 
+## 3.0.0-alpha.1 — Unreleased
+
+- Move to the beginning/end of a video with `[` / `]` when no further marker
+  exists, with status text confirming the move. No extra marker indicators.
+- Add the 3.0 local-theme application/storage and native JSON backup backend,
+  preserving System/Light/Dark and saved resolved colors. Shared terminal-palette
+  readers/conversion are available for development; extension file import and
+  backup controls remain planned.
+- Keep the complete alpha version in About and artifact filenames while using
+  WXT's browser-compatible numeric manifest version.
+
 ## Unreleased — 2026-11-14
 
 - Include the last segment of a channel URL, such as @Business, when

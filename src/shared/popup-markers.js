@@ -96,14 +96,17 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     const marker = find(snapshot.videos[id], markerId);
     if (!marker) throw new Error("This marker is no longer available.");
     const actual = suppliedPosition || (await position(snapshot, id));
+    await seek(id, snapshot, actual, marker.t, markerId);
+  }
+  async function seek(id, snapshot, actual, time, markerId, boundary) {
     if (!actual.duration)
       throw new Error("Open this video on YouTube to read its duration before navigating markers.");
-    if (marker.t > actual.duration)
+    if (time > actual.duration)
       throw new Error("This marker is outside the available video duration.");
     await stillCurrent(snapshot, id);
-    let result = { t: Math.floor(marker.t), duration: actual.duration };
+    let result = { t: Math.floor(time), duration: actual.duration };
     if (actual.tab) {
-      result = await player.inPlayer(actual.tab.id, "seekTo", [marker.t, id]);
+      result = await player.inPlayer(actual.tab.id, "seekTo", [time, id]);
       if (!result || result.error)
         throw new Error(result?.error || "The player could not seek to this marker.");
     }
@@ -112,11 +115,14 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
     snapshot.videos[id].duration = result.duration;
     await storage.save(snapshot);
     const latest = await stillCurrent(snapshot, id);
-    if (!find(latest.videos[id], markerId))
+    if (markerId && !find(latest.videos[id], markerId))
       throw new Error("This marker was removed while seeking.");
-    current.set(id, { markerId, life: life(snapshot, id) });
+    if (markerId) current.set(id, { markerId, life: life(snapshot, id) });
+    else current.delete(id);
     await refresh();
-    setStatus(`Marker at ${fmt(marker.t)}${actual.tab ? "" : " (saved resume point)"}.`);
+    setStatus(
+      `${boundary ? `Moved to ${boundary}` : `Marker at ${fmt(time)}`}${actual.tab ? "" : " (saved resume point)"}.`,
+    );
   }
   async function navigate(id, direction) {
     const snapshot = await snapshotFor(id);
@@ -129,7 +135,15 @@ globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({
         : direction > 0
           ? available.find((point) => point.t > actual.t + MARKER_PROXIMITY_SECONDS)
           : available.filter((point) => point.t < actual.t - MARKER_PROXIMITY_SECONDS).at(-1);
-    if (!marker) return setStatus(direction > 0 ? "No next marker." : "No previous marker.");
+    if (!marker)
+      return seek(
+        id,
+        snapshot,
+        actual,
+        direction > 0 ? actual.duration : 0,
+        null,
+        direction > 0 ? "the end" : "beginning",
+      );
     await select(id, marker.id, snapshot, actual);
   }
   async function refreshChapters(id) {

@@ -1,6 +1,6 @@
 {
   "name": "yt-waypoints",
-  "version": "2.3.0",
+  "version": "3.0.0-alpha.1",
   "private": true,
   "description": "Local YouTube bookmarks and resume points for Firefox, Chrome, and Brave.",
   "scripts": {
