@@ -33,9 +33,14 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   const { closeAbout, closeHelp, openHelp } = dialogs;
   const { closeFileSave, copyVideos, copyText, exportTranscript } = exportsController;
   const { renderList, focusables } = listController;
-  const nativeControls = ["theme-select", "deletion-mode", "trash-days"].map((id) =>
-    document.getElementById(id),
-  );
+  const nativeControls = [
+    "theme-select",
+    "theme-import-choice",
+    "theme-import-appearance",
+    "theme-import-conflict",
+    "deletion-mode",
+    "trash-days",
+  ].map((id) => document.getElementById(id));
 
   async function openPastedVideo(link) {
     const { videos } = await loadSnapshot();

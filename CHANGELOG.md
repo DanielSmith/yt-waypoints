@@ -2,14 +2,53 @@
 
 ## 3.0.0-alpha.1 — Unreleased
 
+### Color themes
+
+- Import local Ghostty palettes, supported sRGB XML iTerm `.itermcolors` files,
+  and native Waypoints theme backups from Settings → Appearance. Preserve the
+  existing System, Light and Dark choices. No new permissions or online service.
+- Preview a terminal theme before saving. Adjust its name or Auto/Light/Dark
+  appearance, inspect color adjustments and source credits, then Save and use
+  or Cancel. Cancelling returns to the latest saved selection, including changes
+  from another open context; closing Settings also cancels the draft.
+- Store validated, complete color palettes locally, separately from bookmarks.
+  Derive missing shades, check contrast and keep chapter/personal marker colors
+  distinct. Preserve source palettes and converter revisions for saved themes;
+  converter updates do not silently recolor native backups.
+- Export one saved theme or back up the entire collection directly to JSON files,
+  independently of clipboard access or the bookmark/transcript file-save offer.
+  Restore resolved colors and provenance without needing the original terminal
+  file. Collection restore preserves the current selection; conflicting records
+  require an explicit replace or keep-both choice.
+- Remove a selected custom theme or return to System without deleting other
+  saved palettes. Keep duplicate names distinct and preserve unrelated themes
+  and bookmark data during imports and concurrent settings changes.
+- On Firefox, open file selection in a persistent local theme tab so a native
+  chooser cannot destroy the importing toolbar popup. Explain this Firefox
+  limitation and how saved themes are shared with the popup. Accept theme-file
+  drops anywhere in that tab, and provide Close tab / Done (close tab) actions
+  that retain saved themes and cancel unsaved previews. Chromium keeps its
+  existing picker flow.
+
+### Playback
+
 - Move to the beginning/end of a video with `[` / `]` when no further marker
   exists, with status text confirming the move. No extra marker indicators.
-- Add the 3.0 local-theme application/storage and native JSON backup backend,
-  preserving System/Light/Dark and saved resolved colors. Shared terminal-palette
-  readers/conversion are available for development; extension file import and
-  backup controls remain planned.
+
+### Development and verification
+
+- Add a private local converter and comparison page with multi-file sessions,
+  a horizontal theme switcher, 20 extension-state previews, held hover/focus
+  states, and all 25 color roles. This development page is not shipped as an
+  extension feature.
+- Add bounded theme-library, conversion, preview, restore/conflict, concurrency,
+  direct-download and failure/recovery coverage. Both adapters pass 62 DOM
+  cases in headless Chrome; an isolated native Firefox probe covers the theme
+  tab's file input, preview/save, focus changes, page-wide drops and exit target.
+  Native OS chooser behavior is user-confirmed, not automated by those probes.
 - Keep the complete alpha version in About and artifact filenames while using
-  WXT's browser-compatible numeric manifest version.
+  WXT's browser-compatible numeric manifest version. Expand packaging checks
+  for the persistent theme page and refresh the source guide and privacy docs.
 
 ## Unreleased — 2026-11-14
 

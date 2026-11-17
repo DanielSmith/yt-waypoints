@@ -12,6 +12,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   updateFormatUI,
   setStatus,
   closeFormatMenu,
+  onThemeChange = () => {},
 }) => {
   const { navigateSummaries } = WAYPOINTS_POPUP_DOM;
   const policy = WAYPOINTS_SETTINGS_POLICY;
@@ -202,9 +203,10 @@ globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
       });
     }
     populateThemeChoices();
-    themeSelect.addEventListener("change", () =>
-      changeSetting("theme", themeService.normalize(themeSelect.value)),
-    );
+    themeSelect.addEventListener("change", () => {
+      onThemeChange();
+      changeSetting("theme", themeService.normalize(themeSelect.value));
+    });
     for (const [name, control] of checkboxControls)
       control.addEventListener("change", () => changeSetting(name, control.checked));
     deletionModeEl.addEventListener("change", () =>

@@ -77,6 +77,8 @@ def validate(package):
                 refs.append(attrs['href'])
 
     Page().feed((package / manifest['action']['default_popup']).read_text())
+    refs.append('themes.html')
+    Page().feed((package / 'themes.html').read_text())
     for ref in refs:
         if ref.startswith('/') and not ref.startswith('//'):
             ref = ref[1:]  # WXT/Vite uses extension-root asset URLs.

@@ -1,4 +1,5 @@
 import { createPopupRefresh } from "./popup-refresh.mjs";
+import { createThemeImportController } from "./popup-theme-import.mjs";
 
 const api = globalThis.browser ?? globalThis.chrome;
 const fmt = WAYPOINTS_TIME_FORMAT.displayTimestamp;
@@ -59,6 +60,8 @@ const settingsController = WAYPOINTS_CREATE_POPUP_SETTINGS({
   setStatus,
   closeFormatMenu: (restoreFocus) => exportsController.closeFormatMenu(restoreFocus),
   updateFormatUI: (formatId) => exportsController.updateFormatUI(formatId),
+  onThemeChange: () =>
+    themeImports.cancel({ focus: false }).catch((error) => setStatus(error.message)),
 });
 const { normalizeSettings, updateSettingsUI, changeSetting, setThumbnails } = settingsController;
 settings = normalizeSettings();
@@ -91,13 +94,25 @@ const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
   fileSave: fileSaveController,
 });
 const { closeFormatMenu } = exportsController;
+const themeImports = createThemeImportController({
+  document,
+  service: WAYPOINTS_THEME,
+  getSelection: () => settings.theme,
+  setStatus,
+  openPicker: WAYPOINTS_THEME_PICKER_IN_TAB
+    ? () => api.tabs.create({ url: api.runtime.getURL("themes.html") })
+    : undefined,
+});
 function setSettingsOpen(open) {
   if (open && markers.editorOpen) return setStatus("Save or cancel the open note first.");
   const opening = open && !settingsOpen;
   if (open) {
     exportsController.captureTarget();
     if (!settingsOpen) settingsController.resetGroups();
-  } else closeFormatMenu(false);
+  } else {
+    closeFormatMenu(false);
+    themeImports.cancel({ focus: false }).catch((error) => setStatus(error.message));
+  }
   settingsOpen = open;
   settingsPanel.hidden = !open;
   document.body.classList.toggle("settings-open", open);
@@ -317,6 +332,7 @@ async function init() {
   onVideo = WATCH_RE.test(tab?.url || "") && Boolean(videoIdOf(tab.url));
   currentId = onVideo ? videoIdOf(tab.url) : null;
   settingsController.initControls();
+  themeImports.init();
   fileSaveController.init();
   exportsController.init();
   updateSettingsUI();

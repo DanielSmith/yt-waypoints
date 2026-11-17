@@ -19,9 +19,13 @@ module.exports = function setupFixture(themeFixtures) {
     open: true,
     position: 700,
     settingsWrites: 0,
+    themeTabs: [],
   });
   const api = {
-    runtime: { getManifest: () => ({ version: "test" }) },
+    runtime: {
+      getManifest: () => ({ version: "test" }),
+      getURL: (name) => `https://extension.test/${name}`,
+    },
     storage: {
       local: {
         async get(keys) {
@@ -54,6 +58,10 @@ module.exports = function setupFixture(themeFixtures) {
       onChanged: { addListener: (fn) => subscribers.push(fn) },
     },
     tabs: {
+      async create(options) {
+        fixture.themeTabs.push(options);
+        return { id: 99, ...options };
+      },
       async query(query) {
         return query.active
           ? [{ id: 1, url: "https://example.com/" }]

@@ -6,6 +6,14 @@ ID, title, saved time, duration, and an update timestamp. The channel name and
 channel URL are also saved when available from the video page. Preferences are also
 stored locally. Search text is used only to filter the list in the open panel.
 
+Local theme files you choose or drop into Appearance are processed in the
+popup or its local theme-management tab without uploading them. Saved themes contain resolved colors, the source
+palette, name, converter revision and any supplied attribution. Attribution URLs
+are metadata and are not fetched. Unsaved previews are kept in memory; saving or
+restoring writes browser-local theme data. Explicit theme exports use browser
+downloads, independently of clipboard access. Theme backups exclude bookmarks
+and are not automatic cloud backups. Uninstalling can remove saved themes.
+
 The extension reads YouTube pages and controls video playback to provide its
 bookmark, resume, and scrubbing features. Auto-bookmarking is enabled by default
 when the panel is opened on an unsaved video and can be disabled in Settings.

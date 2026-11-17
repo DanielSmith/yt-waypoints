@@ -85,6 +85,7 @@ export function initializeTheme() {
         ...builtins,
         ...themes.map((theme) => ({
           id: theme.id,
+          name: theme.name,
           label:
             themes.filter((other) => other.name === theme.name).length > 1
               ? `${theme.name} (${theme.id.slice(6)})`

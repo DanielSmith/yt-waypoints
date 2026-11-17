@@ -1,0 +1,10 @@
+{
+  "tags": ["nyc", "politics", "urban_planning"],
+  "library": {
+    "version": 1,
+    "macros": {
+      "cities": { "linkItems": "(.sf | .nyc)" },
+      "city_politics": { "linkItems": ".politics + @cities - .finished" }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "tags": [["new-york"], ["New_York"], ["new york"], ["_nyc"], ["nyc", "nyc"], [null]],
+  "macros": [
+    { "bad-name": { "linkItems": ".nyc" } },
+    { "a": { "linkItems": "@missing" } },
+    { "a": { "linkItems": "@b" }, "b": { "linkItems": "@a" } },
+    { "a": { "linkItems": ".nyc *limit:2*" } },
+    { "a": { "linkItems": ":time:7d:" } },
+    { "a": { "linkItems": "/pattern/" } },
+    { "a": { "linkItems": ".nyc +" } },
+    { "a": { "linkItems": ".nyc", "extra": true } }
+  ]
+}

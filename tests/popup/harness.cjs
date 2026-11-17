@@ -205,6 +205,35 @@ function createPopupHarness(flavor) {
       els[id] = new FakeElement();
     els["deletion-mode"].tag = "select";
     els["theme-select"] = new FakeElement("select");
+    for (const id of [
+      "theme-import",
+      "theme-import-help",
+      "theme-file",
+      "theme-import-preview",
+      "theme-import-choice-label",
+      "theme-import-choice",
+      "theme-import-name",
+      "theme-import-appearance-label",
+      "theme-import-appearance",
+      "theme-import-conflict-label",
+      "theme-import-conflict",
+      "theme-import-save",
+      "theme-import-cancel",
+      "theme-import-format",
+      "theme-import-notes",
+      "theme-import-credits",
+      "theme-import-description",
+      "theme-message",
+      "theme-export",
+      "theme-backup",
+      "theme-remove",
+      "theme-reset",
+    ])
+      els[id] = new FakeElement();
+    for (const id of ["theme-import-choice", "theme-import-appearance", "theme-import-conflict"])
+      els[id].tag = "select";
+    els["theme-import-name"].tag = "input";
+    els["theme-import-name"].type = "text";
     doc.documentElement = new FakeElement("html");
     els["file-save-dialog"].showModal = function () {
       this.open = true;
@@ -224,7 +253,10 @@ function createPopupHarness(flavor) {
     // No runtime or permissions API is supplied: the popup must work without
     // thumbnail consent plumbing on both platforms.
     const browser = {
-      runtime: { getManifest: () => ({ version: require("../../package.json").version }) },
+      runtime: {
+        getManifest: () => ({ version: require("../../package.json").version }),
+        getURL: (name) => `https://extension.test/${name}`,
+      },
       storage: {
         local: {
           get: async (key) =>

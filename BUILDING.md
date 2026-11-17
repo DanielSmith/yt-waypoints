@@ -147,7 +147,8 @@ and checks that it fits the full 360×520 popup. Preview flags only select the f
 screen and request a screenshot. Other flags: `--preview` (list),
 `--preview-settings-expanded`, `--preview-settings-bookmarks`,
 `--preview-settings-transcripts`, and `--preview-help`. `--dark` selects the dark
-preview. Existing WAYPOINTS_MARKER_PREVIEW / WAYPOINTS_PREVIEW_THEME environment
+preview. `--preview-theme-import` shows an active theme draft (also accepts
+`--dark`). Existing WAYPOINTS_MARKER_PREVIEW / WAYPOINTS_PREVIEW_THEME environment
 settings remain available. Set WAYPOINTS_CHROME_BINARY to select the browser.
 
 The command prints an evidence directory containing result.json, dom.html,
@@ -156,13 +157,13 @@ Reports identify Chrome as the engine, the selected adapter, viewport and comple
 feature counts. Failure reports identify the active stage. The temporary profile
 is retained there for diagnosis; it is separate from user profiles.
 
-`tests/keyboard/` separates setup, test helpers, eight feature files, preview staging,
+`tests/keyboard/` separates setup, test helpers, nine feature files, preview staging,
 fixture generation, options and browser launch/reporting. Normal command waits
 finish editor animations explicitly; dedicated motion cases still sample 500ms
 opening/closing, intermediate heights and reversal. Initialization/layout polling
 and queue checks are bounded, and the browser process has a 45-second deadline.
 The CDP runner waits in real time so native Web Lock delivery cannot be outrun
-by a simulated clock. Current coverage is 53 cases, including custom palette
+by a simulated clock. Current coverage is 62 cases, including custom palette
 application, exact backup export, unsaved preview/cancel, selected-theme removal,
 Settings focus-ring clearance,
 compact annotation editing/previews,
@@ -263,3 +264,8 @@ access. These are excluded from production. Never submit development outputs.
 Production builds above retain the existing `yt-waypoints-*` install paths.
 Do not run concurrent builds against the same checkout; WXT's `.wxt` metadata
 is shared. The Python all-browser build runs targets sequentially.
+
+The packaged `themes.html` / `theme-manager.js` page reuses trusted Appearance
+markup and the same import controller. Firefox opens it before native file
+selection; it initializes no bookmark or player controller. Both pages use the
+same validated theme owner and local storage. No additional permission is needed.

@@ -3,6 +3,7 @@ const assert = require("node:assert/strict");
 // Ordinary and screenshot runs must exercise exactly the same layout viewport.
 const windowSize = Object.freeze({ width: 500, height: 650 });
 const previewFlags = {
+  "--preview-theme-import": "theme-import",
   "--preview-settings-expanded": "settings-expanded",
   "--preview-settings-transcripts": "settings-transcripts",
   "--preview-settings-bookmarks": "settings-bookmarks",

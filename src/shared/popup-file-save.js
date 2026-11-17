@@ -1,3 +1,4 @@
+import { downloadFile } from "./file-download.mjs";
 // Optional save UI owns only transient copied output, focus and download resources.
 // Export orchestration decides whether to offer a file after a successful copy.
 globalThis.WAYPOINTS_CREATE_FILE_SAVE = ({
@@ -8,7 +9,6 @@ globalThis.WAYPOINTS_CREATE_FILE_SAVE = ({
   beforeOpen,
 }) => {
   const { restoreFocus, bindDialogDismissal } = WAYPOINTS_POPUP_DOM;
-  const DOWNLOAD_URL_REVOKE_DELAY_MS = 30000;
   const fileSaveDialog = document.getElementById("file-save-dialog");
   const fileNameFields = document.getElementById("file-name-fields");
   const fileSaveName = document.getElementById("file-save-name");
@@ -71,22 +71,7 @@ globalThis.WAYPOINTS_CREATE_FILE_SAVE = ({
     const extension = fileSaveOutput.filename.split(".").at(-1);
     if (!filename.toLowerCase().endsWith(`.${extension}`)) filename += `.${extension}`;
     try {
-      const url = URL.createObjectURL(
-        new Blob([fileSaveOutput.text], { type: fileSaveOutput.mime }),
-      );
-      try {
-        const link = document.createElement("a");
-        try {
-          link.href = url;
-          link.download = filename;
-          document.body.append(link);
-          link.click();
-        } finally {
-          link.remove();
-        }
-      } finally {
-        setTimeout(() => URL.revokeObjectURL(url), DOWNLOAD_URL_REVOKE_DELAY_MS);
-      }
+      downloadFile(document, { ...fileSaveOutput, filename });
       closeFileSave();
       setStatus(`Copied to clipboard. File download requested: ${filename}`);
     } catch (error) {

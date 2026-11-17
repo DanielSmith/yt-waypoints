@@ -270,6 +270,14 @@ Letter shortcuts leave search typing and Command/Ctrl/Alt combinations alone.
 Single-row copy commands require a focused row; Shift+C also works in Settings.
 The in-popup help shows your configured scrub distance and multiplier.
 
+## Custom color themes (3.0 alpha)
+
+In **Settings → Appearance**, import a local Ghostty/iTerm theme or a Waypoints
+backup, preview it, then save or cancel. Firefox opens the file picker from a
+persistent theme tab. Export individual themes or back up the
+collection to keep them after uninstall. System, Light and Dark remain available.
+See [theme import and backup details](THEMES.md#import-and-back-up-themes).
+
 ## Privacy and limitations
 
 Bookmarks and preferences stay in this browser. There is no account,

@@ -1,0 +1,42 @@
+/* A persistent theme page uses the same palette and controls as Appearance. */
+html {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+body {
+  width: min(100%, 560px);
+  margin: 32px auto;
+  padding: 0 16px;
+}
+h1 {
+  font-size: 20px;
+  margin: 0 0 10px;
+}
+.theme-manager-intro {
+  color: var(--color-text-muted);
+}
+#settings-panel {
+  overflow: visible;
+  padding: 8px 4px;
+}
+#theme-manager-status {
+  overflow-wrap: anywhere;
+}
+.theme-manager-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.theme-manager-heading h1 {
+  margin: 0;
+}
+.theme-manager-footer {
+  margin-top: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+.theme-manager-footer p {
+  color: var(--color-text-muted);
+  font-size: var(--text-secondary);
+}

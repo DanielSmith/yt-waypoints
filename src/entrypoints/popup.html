@@ -53,6 +53,26 @@
           <select id="theme-select" aria-describedby="theme-help"></select>
           <p id="theme-help">System follows your device’s light or dark appearance.</p>
         </label>
+        <div class="theme-tools">
+          <button id="theme-import" class="secondary-button theme-drop" type="button" aria-describedby="theme-import-help">Import theme file or drop it here</button>
+          <input id="theme-file" type="file" hidden>
+          <p id="theme-import-help">Ghostty, iTerm .itermcolors, or Waypoints theme JSON. Files stay local.</p>
+          <section id="theme-import-preview" aria-labelledby="theme-import-heading" hidden>
+            <strong id="theme-import-heading">Preview theme</strong>
+            <p id="theme-import-format"></p>
+            <label id="theme-import-choice-label" for="theme-import-choice" hidden>Theme to preview<select id="theme-import-choice"></select></label>
+            <label for="theme-import-name">Name<input id="theme-import-name" type="text" maxlength="80" autocomplete="off"></label>
+            <label id="theme-import-appearance-label" for="theme-import-appearance">Appearance<select id="theme-import-appearance"><option value="auto">Automatic</option><option value="light">Light</option><option value="dark">Dark</option></select></label>
+            <label id="theme-import-conflict-label" for="theme-import-conflict" hidden>Existing theme IDs<select id="theme-import-conflict"><option value="error">Stop if content differs</option><option value="keep-both">Keep both copies</option><option value="replace">Replace matching IDs</option></select></label>
+            <p id="theme-import-description"></p>
+            <details class="theme-import-details"><summary>Color adjustments and source credits</summary><p id="theme-import-notes"></p><p id="theme-import-credits"></p></details>
+            <div class="theme-actions"><button id="theme-import-save" class="secondary-button" type="button">Save and use</button><button id="theme-import-cancel" class="secondary-button" type="button">Cancel</button></div>
+          </section>
+          <p id="theme-message" role="status" aria-live="polite"></p>
+          <div class="theme-actions"><button id="theme-export" class="secondary-button" type="button" disabled>Export theme</button><button id="theme-backup" class="secondary-button" type="button" disabled>Back up themes</button></div>
+          <div class="theme-actions"><button id="theme-remove" class="secondary-button" type="button" disabled>Remove selected theme</button><button id="theme-reset" class="secondary-button" type="button">Use System</button></div>
+          <p>Export your themes to keep them after uninstall. Theme backups are separate from saved videos.</p>
+        </div>
         <label class="setting">
           <span class="setting-title"><span>Show thumbnails (t)</span><input id="show-thumbnails" type="checkbox" aria-describedby="thumbnail-help"></span>
           <p id="thumbnail-help">Loads images from YouTube’s image server, sharing the requested video IDs with Google. Bookmarks stay local. Press t outside search to toggle.</p>

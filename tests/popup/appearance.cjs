@@ -1,7 +1,7 @@
 const assert = require("node:assert/strict");
 const vm = require("node:vm");
 
-module.exports = async ({ createPopupFixture }) => {
+module.exports = async ({ createPopupFixture, flavor }) => {
   const themed = await createPopupFixture(
     {
       settings: { autoBookmark: false },
@@ -13,6 +13,11 @@ module.exports = async ({ createPopupFixture }) => {
   // Serialize functions from the actual Vite bundle, without its enclosing
   // scope or any factory globals, just as scripting.executeScript does.
   const bundledActions = themed.context.WAYPOINTS_PLAYER_ACTIONS;
+  assert.equal(
+    themed.context.WAYPOINTS_THEME_PICKER_IN_TAB,
+    flavor === "firefox",
+    "Only Firefox must route theme picking out of the transient popup",
+  );
   const id = "aaaaaaaaaaa";
   const video = {
     currentTime: 10,

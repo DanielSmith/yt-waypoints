@@ -85,7 +85,10 @@ for browser in ('firefox', 'chrome'):
     assert len(scripts) == 2 and scripts[0] == '/theme.js'
     assert 'type="module"' in popup
     popup_script = scripts[1].lstrip('/')
-    expected_scripts = ['theme.js', 'content-scripts/content.js', popup_script]
+    assert (package / 'themes.html').read_bytes() == (shared / 'themes.html').read_bytes()
+    manager_scripts = re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', (package / 'themes.html').read_text())
+    assert manager_scripts == ['/theme.js', '/theme-manager.js']
+    expected_scripts = ['theme.js', 'theme-manager.js', 'content-scripts/content.js', popup_script]
     assert sorted(str(p.relative_to(package)) for p in package.rglob('*.js')) == sorted(expected_scripts)
     for entry in expected_scripts:
         script = package / entry
@@ -95,9 +98,13 @@ for browser in ('firefox', 'chrome'):
         assert mapping['sources'] and len(mapping['sources']) == len(mapping['sourcesContent'])
         for name, content in zip(mapping['sources'], mapping['sourcesContent']):
             assert not name.startswith('/') and str(ROOT) not in name, name
-            original = (script.parent / name).resolve()
+            original = (script.parent / name.split('?', 1)[0]).resolve()
             if original.is_relative_to(ROOT / 'src'):
-                assert original.read_text() == content, name
+                if name.endswith('?raw'):
+                    assert content.startswith('export default '), name
+                    assert original.read_text() == json.loads(content.removeprefix('export default ').rstrip(';\n ')), name
+                else:
+                    assert original.read_text() == content, name
         if entry in (popup_script, 'content-scripts/content.js'):
             assert any(name.endswith('/settings-policy.js') for name in mapping['sources'])
             assert not (package / 'settings-policy.js').exists()

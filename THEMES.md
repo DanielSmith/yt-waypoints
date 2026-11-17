@@ -3,11 +3,51 @@
 Choose **Settings (gear) → Appearance → Theme** to use System, Light, or Dark. The preference
 is local to this browser and is not part of bookmark JSON transfers.
 
+## Import and back up themes
+
+Open **Settings → Appearance**. Keep System, Light or Dark, or use **Import theme
+file or drop it here** to choose one local Ghostty, XML iTerm, or Waypoints theme
+backup. On Firefox, **Import themes in a tab…** opens a persistent theme tab;
+choose the file there so the toolbar popup closing cannot interrupt the import.
+The Firefox theme tab accepts file drops anywhere and explains the popup
+limitation. Close tab / Done (close tab) exits without losing saved themes;
+unsaved previews are cancelled. In the toolbar popup, only the import area
+accepts theme-file drops; normal search, paste and
+bookmark controls keep their usual behavior.
+
+Terminal files show an unsaved preview. Adjust the name or Automatic/Light/Dark
+appearance, inspect the colors, then choose **Save and use** or **Cancel**.
+Cancel returns to the latest saved selection, including changes in another
+popup. Closing Settings also cancels the draft. Expand **Color adjustments and
+source credits** for the conversion report and supplied attribution.
+
+Native `.waypoints-theme.json` and `.waypoints-themes.json` backups preserve saved
+colors and converter metadata. **Restore themes** merges the records without
+switching the current selection. Collections let you choose a theme to preview;
+the entire validated collection is restored. Identical records are kept. If a
+matching ID has different content, choose Stop, Keep both copies, or Replace
+matching IDs explicitly. Duplicate names remain separate and are disambiguated
+in the Theme selector. A deliberate native rename creates a new identity.
+
+**Export theme** downloads the selected saved theme. **Back up themes** downloads
+all saved themes. Both are direct file actions, independent of the clipboard or
+the bookmark/transcript file-offer preference. They do not include bookmarks or
+theme selection. Export and removal are disabled for built-ins and while a draft
+is active; collection backup still covers the saved library only.
+
+**Remove selected theme** removes that custom theme, returning to System if it
+was selected. **Use System** is always reachable and keeps saved themes. Browser
+uninstall/profile removal can delete local themes, so keep exported backups.
+Files are processed locally; imported metadata URLs are never fetched.
+
 ## Files and responsibilities
 
 | File | Responsibility |
 | --- | --- |
 | `src/shared/theme.js` | Validated palette owner, startup/selection, unsaved preview/cancel, and System/storage updates |
+| `src/shared/theme-manager.mjs` | Persistent theme page reusing the Appearance markup/controller, without bookmark/player startup |
+| `src/shared/popup-theme-import.mjs` | Appearance import/preview/restore/removal and direct backup controls |
+| `src/shared/file-download.mjs` | Shared direct download and temporary URL cleanup |
 | `src/shared/theme-library.mjs` | Bounded local library, serialized mutations, merge/restore and backup serialization |
 | `src/shared/theme-data.mjs` | Portable theme/backup validation and bounds (3.0 development) |
 | `src/shared/theme-readers.mjs` | Ghostty/iTerm color-only readers (3.0 development) |
@@ -82,11 +122,11 @@ indicators/control boundaries at least 3:1 against the main surface.
 The System/Light/Dark CSS palettes remain dependable startup/reset fallbacks.
 Custom records are validated complete color maps, applied through the same roles
 by the single owner in `theme.js`. They do not supply fonts, dimensions, CSS,
-selectors or executable code. The existing Theme selector lists saved records;
-file import/backup controls are a separate step and are not implemented yet.
+selectors or executable code. The existing Theme selector lists saved records; Appearance provides local
+file import/preview/restore and direct backup controls.
 
-The storage/application backend is available on `WAYPOINTS_THEME` for the future
-import controller. It does not require editing CSS files or registering each ID:
+The storage/application backend is available on `WAYPOINTS_THEME` for the
+Appearance import controller. It does not require editing CSS files or registering each ID:
 
 - `ready`: finishes the initial combined library/preference read before popup
   Settings normalization. `choices` lists built-ins and validated saved themes;
@@ -136,8 +176,8 @@ available, so an unrelated preference change cannot restore a stale theme ID.
 `--color-*` values and native `color-scheme`. It clears all owned overrides before
 applying another palette or returning to a built-in; component code cannot set
 palette colors. Initial reads and asynchronous refreshes use revision guards.
-These are backend/application capabilities; the end-user import/picker/backup
-controls remain step 6.
+Appearance uses these backend/application capabilities for the file controls
+described above; bookmark and transcript transfers remain separate.
 
 ## Verify a theme
 
@@ -277,7 +317,7 @@ an existing ID requires an explicit replace/keep-both choice. Keep-both assigns 
 fresh local UUID. No automatic overwrite or merge of color fields. A collection
 must validate in full before any mutation, and unrelated themes remain intact.
 These restore behaviors are implemented by the theme-library backend; file
-controls and user-facing conflict choices remain step 6.
+controls expose these explicit conflict choices in Appearance.
 
 ### Conversion policy (revision 2)
 

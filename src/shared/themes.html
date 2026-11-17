@@ -1,0 +1,25 @@
+<!doctype html>
+<html data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YT Waypoints · Themes</title>
+  <script src="/theme.js"></script>
+  <link rel="stylesheet" href="/styles/tokens.css">
+  <link rel="stylesheet" href="/themes/light.css">
+  <link rel="stylesheet" href="/themes/dark.css">
+  <link rel="stylesheet" href="/popup.css">
+  <link rel="stylesheet" href="/styles/theme-manager.css">
+</head>
+<body>
+  <main>
+    <div class="theme-manager-heading"><h1>Theme settings</h1><button id="theme-manager-close" class="secondary-button" type="button">Close tab</button></div>
+    <p class="theme-manager-intro">Firefox can close the toolbar popup when a file picker opens. This local Waypoints tab stays open so you can finish importing; nothing is uploaded.</p>
+    <p class="theme-manager-intro">Drop a theme file anywhere in this tab. Saved themes are shared with the toolbar popup.</p>
+    <section id="settings-panel" aria-label="Theme settings"></section>
+    <p id="theme-manager-status" role="status" aria-live="polite"></p>
+    <footer class="theme-manager-footer"><button id="theme-manager-done" class="secondary-button" type="button">Done (close tab)</button><p>Closing cancels unsaved previews. Saved themes stay in Waypoints.</p></footer>
+  </main>
+  <script src="/theme-manager.js"></script>
+</body>
+</html>

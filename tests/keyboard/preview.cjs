@@ -1,6 +1,19 @@
 // Preview staging runs only after every feature check passes. It never skips
 // checks or changes the launcher viewport. Stringified into the popup scope.
 module.exports = async function preparePreview({ preview, theme }, { flush, waitFor }) {
+  if (preview === "theme-import") {
+    setSettingsOpen(true);
+    document.getElementById("settings-appearance").open = true;
+    const source =
+      theme === "dark"
+        ? "background=#20242a\nforeground=#f0f0f0"
+        : "background=#fafafa\nforeground=#222222";
+    await themeImports.loadFile(new File([source], "preview-theme.ghostty"));
+    const save = document.getElementById("theme-import-save");
+    save.focus();
+    save.scrollIntoView({ block: "nearest" });
+    return;
+  }
   if (preview.startsWith("settings")) {
     setSettingsOpen(true);
     if (preview === "settings-expanded") document.getElementById("settings-appearance").open = true;
