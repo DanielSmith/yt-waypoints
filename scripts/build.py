@@ -16,7 +16,7 @@ import zipfile
 ROOT = Path(__file__).resolve().parent.parent
 TARGETS = ('firefox', 'chrome')
 SOURCE_DIRECTORIES = ('src', 'tests', 'assets')
-SOURCE_FILES = ('scripts/build.py', 'scripts/build-wxt.mjs', 'package.json',
+SOURCE_FILES = ('scripts/build.py', 'scripts/build-wxt.mjs', 'scripts/check-alap-boundary.mjs', 'package.json',
                 'package-lock.json', 'wxt.config.mjs', 'BUILDING.md', '.prettierrc.json',
                 'README.md', 'PRIVACY.md', 'LICENSE', 'THIRD-PARTY-NOTICES.md',
                 'THEMES.md', 'CHANGELOG.md')
@@ -169,6 +169,7 @@ def main():
     parser.add_argument('browser', nargs='?', choices=(*TARGETS, 'all'), default='all')
     args = parser.parse_args()
     validate_source_inputs()
+    subprocess.run(['node', str(ROOT / 'scripts/check-alap-boundary.mjs')], cwd=ROOT, check=True)
     for browser in TARGETS if args.browser == 'all' else (args.browser,):
         build(browser)
     write_sources()

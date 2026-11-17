@@ -1,0 +1,43 @@
+{
+  "name": "Waypoints Alap tag core",
+  "revision": "waypoints-refiners-r2",
+  "upstream": {
+    "repository": "https://github.com/DanielSmith/alap",
+    "commit": "cb211f81271506cf6508059394390d869d99d5d2",
+    "path": "src/core/ExpressionParser.ts",
+    "sha256": "cbd37f54e8fb1e40169591ee0080e8b7d71f8dea5c33a0cb58d1e2ed702504b2"
+  },
+  "license": "Apache-2.0",
+  "retained": [
+    "tag catalog matching",
+    "left-to-right intersection/union/subtraction",
+    "parenthesized grouping",
+    "trailing local refiner pipelines on segments and parenthesized groups",
+    "sort/reverse/limit/skip/shuffle array operations"
+  ],
+  "changes": [
+    "Converted selected TypeScript parser methods into standalone JavaScript.",
+    "Removed upstream framework imports and all atoms except tags; reviewed local syntax/pipeline imports are added in R1.",
+    "Removed protocol resolution/registries, remote/local data sources, regex, DOM/item references, comma queries and upstream macro expansion.",
+    "Made tokenization and grammar fail closed instead of skipping unsupported input.",
+    "Tightened catalog input to copied tag arrays; macros are expanded separately from validated bounded local definitions into the supported tag/operator/group/refiner grammar.",
+    "Added fixed character/token/group limits and private catalog state.",
+    "R1 splits strict shared syntax and a generic local refiner pipeline into reviewed modules; whole AST validates before evaluation.",
+    "Refiners accept strict arities/allowlisted fields and bounded integer arguments; unique/settings/custom stages remain pruned.",
+    "R1 preserves tag-only catalog; sort metadata projection, typed comparison and shared-adapter result order are deferred to R2.",
+    "R2 adds copied allowlisted scalars, generic string/number type descriptors with stable natural comparison and missing-last ascending order, explicit evaluation randomness and resolve counts/flags. Bookmark field policy stays outside the derivative."
+  ],
+  "derivativeSha256": "807dedf181fa2a0f79c980920ba6381ffcfe899b48d52afc01d6c1de917ff36a",
+  "additionalUpstream": [
+    {
+      "path": "src/refiners/RefinerPipeline.ts",
+      "commit": "cb211f81271506cf6508059394390d869d99d5d2",
+      "sha256": "8e7731b75c52dfd3606b54644f027044cb9bf68cef0d88dff42029b07a420e1e"
+    }
+  ],
+  "derivativeFiles": {
+    "index.mjs": "807dedf181fa2a0f79c980920ba6381ffcfe899b48d52afc01d6c1de917ff36a",
+    "syntax.mjs": "9290f791965cf0fbf6402b9f4bf346963b2bb7b040a92d965d53f4ed961a10ea",
+    "refiners.mjs": "f4e25d858742cb464db4154e8b6b1f4e7fa5f53686a432abe871837274132cb7"
+  }
+}

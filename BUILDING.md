@@ -269,3 +269,28 @@ The packaged `themes.html` / `theme-manager.js` page reuses trusted Appearance
 markup and the same import controller. Firefox opens it before native file
 selection; it initializes no bookmark or player controller. Both pages use the
 same validated theme owner and local storage. No additional permission is needed.
+
+## Restricted Alap query source
+
+The checked-in `src/vendor/alap-tags-core/` is a deliberately pruned, readable
+Alap derivative pinned by commit/provenance and derivative SHA-256. Builds do not
+fetch Alap, install its npm package, use a sibling checkout or regenerate the
+module. See its README and license. Protocol handlers, data-source registries,
+regex and dynamic execution are absent. R1 adds bounded sort/reverse/limit/skip/shuffle
+pipelines; macros expand to supported selection expressions or reusable modifier
+chains. R2 adds copied scalar sort values, typed comparisons and ordered refined
+results; current popup entries remain unwired. Publication-time sorting accepts
+known exact timestamps but does not collect them from YouTube or persist them.
+Definitions can reference other
+local macros with a 10-definition depth limit, cycle rejection and bounded output.
+
+`scripts/build.py` runs `node scripts/check-alap-boundary.mjs` before modifying
+outputs. That check rejects unrestricted Alap dependencies/imports, new query
+module dependencies, host/dynamic execution primitives and unreviewed derivative
+changes. The reviewer-source archive includes the check and the pruned module.
+A purposeful derivative update requires reviewing the source and provenance/hash
+together; this guard is an accidental-regression tripwire, not a security proof.
+
+Step 2 supplies shared modules and the standalone development consumer. The popup
+and content-script entries do not yet import the adapter; this does not enable
+Alap search, tag storage or macros in the installed extension.

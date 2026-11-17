@@ -152,6 +152,11 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
         assert json.loads(z.read('package.json'))['license'] == 'Apache-2.0'
         assert 'src/shared/popup.js' in names and 'src/entrypoints/popup.html' in names
         assert 'scripts/build.py' in names and 'README.md' in names
+        assert 'scripts/check-alap-boundary.mjs' in names
+        assert not any('node_modules/alap/' in name for name in names)
+        for name in ('index.mjs', 'syntax.mjs', 'refiners.mjs', 'PROVENANCE.json', 'LICENSE', 'README.md'):
+            relative = 'src/vendor/alap-tags-core/' + name
+            assert z.read(relative) == (ROOT / relative).read_bytes()
         for folder in ('popup', 'keyboard'):
             for suite in (ROOT / 'tests' / folder).rglob('*.cjs'):
                 relative = suite.relative_to(ROOT).as_posix()
@@ -172,6 +177,18 @@ with tempfile.TemporaryDirectory(prefix='waypoints-clean-build-') as td:
     for browser in ('firefox', 'chrome', 'source'):
         name = f'yt-waypoints-{browser}-{version}.zip'
         assert (clone / 'artifacts' / name).read_bytes() == (ROOT / 'artifacts' / name).read_bytes(), name
+    # A query-source capability regression must fail before changing outputs.
+    parser_guard_target = clone / 'src/shared/alap-query.mjs'
+    original_query = parser_guard_target.read_text()
+    guarded_outputs = [*list((clone / 'artifacts').glob('*.zip')),
+                       clone / 'yt-waypoints-firefox/manifest.json',
+                       clone / 'yt-waypoints-chrome/manifest.json']
+    before_guard = {item: item.read_bytes() for item in guarded_outputs}
+    parser_guard_target.write_text(original_query + '\nimport "alap/core";\n')
+    guard_result = subprocess.run(['python3', str(clone / 'scripts/build.py')], capture_output=True, text=True)
+    assert guard_result.returncode != 0 and 'Alap submission boundary' in guard_result.stderr
+    assert all(item.read_bytes() == before for item, before in before_guard.items())
+    parser_guard_target.write_text(original_query)
     # Source-only assets are not necessarily present in a browser bundle. The
     # preflight must still reject them before changing any browser/archive.
     protected = [clone / f'yt-waypoints-{browser}' / 'manifest.json' for browser in ('firefox', 'chrome')]

@@ -4,7 +4,7 @@
     { "bad-name": { "linkItems": ".nyc" } },
     { "a": { "linkItems": "@missing" } },
     { "a": { "linkItems": "@b" }, "b": { "linkItems": "@a" } },
-    { "a": { "linkItems": ".nyc *limit:2*" } },
+    { "a": { "linkItems": ".nyc *limit:2abc*" } },
     { "a": { "linkItems": ":time:7d:" } },
     { "a": { "linkItems": "/pattern/" } },
     { "a": { "linkItems": ".nyc +" } },

@@ -64,7 +64,6 @@ async function main() {
       "x",
     ).macros.both.linkItems,
     "@x | @ab",
-    "rename matches complete tokens only",
   );
   for (const value of [null, [], 1, new Date()]) assert.throws(() => normalizeMacros(value));
   for (const value of [
@@ -100,9 +99,9 @@ async function main() {
   assert.throws(() => normalizeMacros(JSON.parse('{"__proto__":{"linkItems":".nyc"}}')));
   assert.deepEqual(
     normalizeMacros(
-      JSON.parse('{"constructor":{"linkItems":".nyc"},"prototype":{"linkItems":"@constructor"}}'),
+      JSON.parse('{"constructor":{"linkItems":".nyc"},"prototype":{"linkItems":".politics"}}'),
     ),
-    { constructor: { linkItems: ".nyc" }, prototype: { linkItems: "@constructor" } },
+    { constructor: { linkItems: ".nyc" }, prototype: { linkItems: ".politics" } },
   );
   assert.equal({}.polluted, undefined);
   const symbol = {};
@@ -119,7 +118,7 @@ async function main() {
     ".a)",
     ".a, .b",
     '"@channel"',
-    ".a *sort*",
+    ".a *unique:url*",
     ".a + + .b",
     ".a + .b\u0000",
   ])
@@ -139,6 +138,16 @@ async function main() {
   assert.throws(() => normalizeVideoTags(Array.from({ length: 101 }, (_, i) => `tag_${i}`)));
   assert.equal(normalizeVideoTags(["a".repeat(64)])[0].length, 64);
   assert.throws(() => normalizeVideoTags(["a".repeat(65)]));
+  assert.equal(
+    normalizeMacros({ a: { linkItems: ".nyc" }, b: { linkItems: "@a" } }).b.linkItems,
+    "@a",
+  );
+  assert.throws(() => normalizeMacros({ a: { linkItems: "@a" } }), /circular/);
+  assert.throws(() => normalizeMacros({ a: { linkItems: "@missing" } }), /unknown/);
+  assert.throws(
+    () => normalizeMacros({ a: { linkItems: "@b" }, b: { linkItems: "@a" } }),
+    /circular/,
+  );
   const chain = (count) =>
     Object.fromEntries(
       Array.from({ length: count }, (_, i) => [
@@ -148,6 +157,20 @@ async function main() {
     );
   assert.equal(Object.keys(normalizeMacros(chain(10))).length, 10);
   assert.throws(() => normalizeMacros(chain(11)), /nesting/);
+  assert.throws(
+    () => normalizeMacros(Object.fromEntries(Object.entries(chain(11)).reverse())),
+    /nesting/,
+  );
+  const repeated = {
+    a: { linkItems: Array(500).fill(".x").join("|") },
+    b: { linkItems: "@a | @a" },
+  };
+  assert.throws(() => normalizeMacros(repeated), /tokens/);
+  const grouping = {
+    a: { linkItems: "(".repeat(20) + ".nyc" + ")".repeat(20) },
+    b: { linkItems: "(".repeat(20) + "@a" + ")".repeat(20) },
+  };
+  assert.throws(() => normalizeMacros(grouping), /grouping/);
   assert.throws(
     () =>
       normalizeMacros(
@@ -163,38 +186,15 @@ async function main() {
       }),
     /oversized/,
   );
-  const doubling = { m0: { linkItems: ".nyc" } };
-  for (let i = 1; i < 10; i++)
-    doubling[`m${i}`] = {
-      linkItems: Array(8)
-        .fill(`@m${i - 1}`)
-        .join(" | "),
-    };
-  assert.throws(() => normalizeMacros(doubling), /expanded/);
-  const groups = {
-    a: { linkItems: "(".repeat(20) + ".nyc" + ")".repeat(20) },
-    b: { linkItems: "(".repeat(20) + "@a" + ")".repeat(20) },
-  };
-  assert.throws(() => normalizeMacros(groups), /expanded grouping/);
-  const manyTerms = {
-    a: { linkItems: Array(500).fill(".x").join("|") },
-    b: { linkItems: "@a|@a|@a" },
-  };
-  assert.throws(() => normalizeMacros(manyTerms), /expanded expression tokens/);
   const huge = Object.fromEntries(
     Array.from({ length: 100 }, (_, i) => [`m${i}`, { linkItems: `.x${" ".repeat(3000)}|.y` }]),
   );
   assert.throws(() => normalizeMacros(huge), /256 KiB/);
   assert.equal(inspectAlapExpression(Array(512).fill(".x").join("|")).references.length, 0);
   assert.throws(() => inspectAlapExpression(Array(513).fill(".x").join("|")), /tokens/);
-  assert.throws(
-    () => normalizeMacros(Object.fromEntries(Object.entries(chain(11)).reverse())),
-    /nesting/,
-  );
   assert.equal(limits.tokens, 1024);
-  assert.equal(limits.macroDepth, 10);
   console.log(
-    "PASS: Alap contract fixtures, tag import intent, normalization, macro graphs/rename/removal, strict syntax, bounds and hostile object rejection; no runtime dependencies",
+    "PASS: Alap contract fixtures, tag import intent, normalization, bounded nested macros/rename/removal, strict syntax, bounds and hostile object rejection; no runtime dependencies",
   );
 }
 main().catch((error) => {

@@ -1,0 +1,80 @@
+{
+  "upstreamCommit": "cb211f81271506cf6508059394390d869d99d5d2",
+  "catalog": {
+    "a": {
+      "tags": ["anime", "watchlist"]
+    },
+    "b": {
+      "tags": ["documentary", "watchlist"]
+    },
+    "c": {
+      "tags": ["anime", "documentary"]
+    }
+  },
+  "cases": [
+    {
+      "expression": ".anime",
+      "ids": ["a", "c"]
+    },
+    {
+      "expression": ".anime | .documentary",
+      "ids": ["a", "c", "b"]
+    },
+    {
+      "expression": ".anime + .documentary",
+      "ids": ["c"]
+    },
+    {
+      "expression": ".watchlist *reverse* *limit:1*",
+      "ids": ["b"]
+    },
+    {
+      "expression": ".watchlist *limit:1* *reverse*",
+      "ids": ["a"]
+    },
+    {
+      "expression": ".watchlist *skip:1*",
+      "ids": ["b"]
+    },
+    {
+      "expression": ".watchlist *skip:0* *limit:0002*",
+      "ids": ["a", "b"]
+    },
+    {
+      "expression": ".watchlist *skip:1000000*",
+      "ids": []
+    },
+    {
+      "expression": ".watchlist *limit:0*",
+      "ids": []
+    },
+    {
+      "expression": "(.anime *limit:1*) | (.documentary *limit:1*)",
+      "ids": ["a", "b"]
+    },
+    {
+      "expression": "(.documentary *reverse*) | .anime",
+      "ids": ["c", "b", "a"]
+    },
+    {
+      "expression": "(.anime | .documentary) *limit:1*",
+      "ids": ["a"]
+    },
+    {
+      "expression": "(.anime *reverse*) + .documentary",
+      "ids": ["c"]
+    },
+    {
+      "expression": "(.anime *reverse*) - .documentary",
+      "ids": ["a"]
+    },
+    {
+      "expression": ".missing *sort* *limit:5*",
+      "ids": []
+    },
+    {
+      "expression": ".anime *sort*",
+      "ids": ["a", "c"]
+    }
+  ]
+}

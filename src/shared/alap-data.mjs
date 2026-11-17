@@ -1,5 +1,9 @@
 // Pure production contract for video-wide tags and global named Alap queries.
-// No parser dependency, evaluation, DOM, storage or bookmark-transfer wiring.
+// Shared syntax dependency only: no evaluation, DOM, storage or transfer wiring.
+import { inspectExpression as inspectSyntax } from "../vendor/alap-tags-core/syntax.mjs";
+import { ALAP_SORT_FIELDS } from "./alap-refiner-profile.mjs";
+import { createMacroExpander } from "./alap-macro-expansion.mjs";
+
 export const ALAP_MACROS_VERSION = 1;
 // Reserved for the future persistence owner; this module never reads/writes it.
 export const ALAP_MACROS_STORAGE_KEY = "waypoints.macros.v1";
@@ -13,6 +17,8 @@ export const ALAP_LIMITS = Object.freeze({
   tokens: 1024,
   groupDepth: 32,
   macroDepth: 10,
+  refiners: 32,
+  refinerCount: 1000000,
   macroLibraryBytes: 262144,
 });
 const NAME = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
@@ -100,120 +106,47 @@ export function resolveImportedTags(localRecord, incomingRecord) {
   return tagField(incomingRecord) ?? local;
 }
 
-// Syntax checks only: matching/evaluation remains the shared Alap parser's job.
-// Stored macro definitions contain complete expressions, never token fragments.
-export function inspectAlapExpression(value) {
-  if (
-    typeof value !== "string" ||
-    value.length > ALAP_LIMITS.expressionCharacters ||
-    /[^\x20-\x7e\t\r\n]/.test(value)
-  )
-    fail("invalid or oversized expression");
-  const expression = value.trim();
-  if (!expression) fail("empty expression");
-  const references = new Set();
-  let position = 0,
-    count = 0,
-    depth = 0,
-    needsTerm = true;
-  while (position < expression.length) {
-    const ch = expression[position];
-    if (/[ \t\r\n]/.test(ch)) {
-      position++;
-      continue;
-    }
-    if (++count > ALAP_LIMITS.tokens) fail("too many expression tokens");
-    if (ch === "." || ch === "@") {
-      if (!needsTerm) fail("missing operator between terms");
-      const match = /^[a-z0-9_]+/.exec(expression.slice(position + 1));
-      if (!match) fail("expected a canonical tag or macro name");
-      validateAlapName(match[0]);
-      if (ch === "@") references.add(match[0]);
-      position += match[0].length + 1;
-      needsTerm = false;
-    } else if (ch === "(") {
-      if (!needsTerm || ++depth > ALAP_LIMITS.groupDepth) fail("invalid or excessive grouping");
-      position++;
-    } else if (ch === ")") {
-      if (needsTerm || --depth < 0) fail("unmatched or empty group");
-      needsTerm = false;
-      position++;
-    } else if (ch === "+" || ch === "|" || ch === "-") {
-      if (needsTerm) fail("operator without a left term");
-      needsTerm = true;
-      position++;
-    } else fail("only .tags, @macros, +, |, -, and parentheses are supported");
+// Selection and modifier definitions share the same grammar as direct evaluation.
+function inspectExpression(value, characterLimit, modifier = false) {
+  try {
+    return inspectSyntax(value, {
+      macros: true,
+      modifier,
+      fields: ALAP_SORT_FIELDS,
+      characters: characterLimit,
+    });
+  } catch (error) {
+    fail(error.message);
   }
-  if (needsTerm || depth) fail("incomplete expression or group");
-  return { expression, references: [...references].sort() };
 }
-function checkExpanded(expression) {
-  // Reuse syntax bounds after expansion without applying the source-length cap.
-  if (expression.length > ALAP_LIMITS.expandedCharacters) fail("expanded expression is too large");
-  // Split into canonical tokens after source definitions have been inspected.
-  const tokens = expression.match(/\.[a-z0-9_]+|[()+|\-]/g) || [];
-  if (tokens.length > ALAP_LIMITS.tokens) fail("too many expanded expression tokens");
-  let depth = 0;
-  for (const token of tokens) {
-    if (token === "(" && ++depth > ALAP_LIMITS.groupDepth) fail("excessive expanded grouping");
-    if (token === ")") depth--;
-  }
+export function inspectAlapExpression(value) {
+  return inspectExpression(value, ALAP_LIMITS.expressionCharacters);
+}
+export function inspectMacroExpression(value) {
+  return inspectExpression(value, ALAP_LIMITS.expressionCharacters, true);
+}
+export function inspectExpandedAlapExpression(value, { modifier = false } = {}) {
+  const result = inspectExpression(value, ALAP_LIMITS.expandedCharacters, true);
+  if (result.references.length) fail("unresolved macro in expanded expression");
+  if (!modifier && result.kind === "modifier") fail("Choose a tag or view before this modifier");
+  return result;
 }
 export function normalizeMacros(value) {
   object(value);
   const keys = Reflect.ownKeys(value);
   if (keys.length > ALAP_LIMITS.macros) fail("too many macros");
-  const macros = Object.create(null),
-    inspections = new Map();
+  const macros = Object.create(null);
   for (const name of keys) {
     validateAlapName(name);
     const descriptor = Object.getOwnPropertyDescriptor(value, name);
     if (!descriptor.enumerable || !own(descriptor, "value")) fail("expected macro data fields");
     const item = fields(descriptor.value, ["linkItems"]);
-    const inspection = inspectAlapExpression(item.linkItems);
+    const inspection = inspectMacroExpression(item.linkItems);
     macros[name] = { linkItems: inspection.expression };
-    inspections.set(name, inspection);
   }
-  // Check graph first; no partial registry escapes when any name is invalid.
-  const heights = new Map();
-  function visit(name, chain) {
-    if (!own(macros, name)) fail(`unknown macro @${name}`);
-    if (chain.includes(name)) fail(`circular macro reference @${name}`);
-    if (chain.length >= ALAP_LIMITS.macroDepth) fail("macro nesting exceeds 10 levels");
-    if (heights.has(name)) return heights.get(name);
-    let height = 1;
-    for (const ref of inspections.get(name).references) {
-      height = Math.max(height, 1 + visit(ref, [...chain, name]));
-    }
-    if (height > ALAP_LIMITS.macroDepth) fail("macro nesting exceeds 10 levels");
-    heights.set(name, height);
-    return height;
-  }
-  for (const name of keys) visit(name, []);
-  // Alap substitutes text without injecting grouping. Bound allocation while
-  // expanding, rather than creating an unbounded intermediate string first.
-  const expansions = new Map();
-  function expand(name) {
-    if (expansions.has(name)) return expansions.get(name);
-    const source = macros[name].linkItems;
-    const pattern = /@([a-z0-9_]+)/g;
-    let result = "",
-      previous = 0;
-    for (const match of source.matchAll(pattern)) {
-      const part = source.slice(previous, match.index) + expand(match[1]);
-      if (result.length + part.length > ALAP_LIMITS.expandedCharacters)
-        fail("expanded expression is too large");
-      result += part;
-      previous = match.index + match[0].length;
-    }
-    const tail = source.slice(previous);
-    if (result.length + tail.length > ALAP_LIMITS.expandedCharacters)
-      fail("expanded expression is too large");
-    const expanded = result + tail;
-    expansions.set(name, expanded);
-    return expanded;
-  }
-  for (const name of keys) checkExpanded(expand(name));
+  const expander = createMacroExpander(macros, ALAP_LIMITS);
+  for (const name of keys)
+    inspectExpandedAlapExpression(expander.expandMacro(name), { modifier: true });
   const sorted = Object.fromEntries(
     Object.keys(macros)
       .sort()
@@ -252,7 +185,7 @@ export function removeMacro(value, name) {
   validateAlapName(name);
   if (!own(library.macros, name)) fail(`unknown macro @${name}`);
   for (const [other, item] of Object.entries(library.macros)) {
-    if (other !== name && inspectAlapExpression(item.linkItems).references.includes(name))
+    if (other !== name && inspectMacroExpression(item.linkItems).references.includes(name))
       fail(`@${other} depends on @${name}`);
   }
   delete library.macros[name];
