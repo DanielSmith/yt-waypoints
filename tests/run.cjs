@@ -11,6 +11,7 @@ const suites = {
   "alap-query": { file: "alap-query.cjs" },
   "alap-refiners": { file: "alap-refiners.cjs" },
   "alap-sorting": { file: "alap-sorting.cjs" },
+  "alap-transfer": { file: "alap-transfer.cjs" },
   "popup-ui": { file: "popup-ui.cjs" },
   "popup-input": { file: "popup-input.cjs" },
   popup: { file: "popup.cjs", flavored: true },

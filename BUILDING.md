@@ -302,6 +302,8 @@ changes. The reviewer-source archive includes the check and the pruned module.
 A purposeful derivative update requires reviewing the source and provenance/hash
 together; this guard is an accidental-regression tripwire, not a security proof.
 
-Step 2 supplies shared modules and the standalone development consumer. The popup
-and content-script entries do not yet import the adapter; this does not enable
-Alap search, tag storage or macros in the installed extension.
+Step 2 supplies shared query modules and the standalone development consumer.
+Step 3 adds bookmark tag storage and the macro registry. Step 4 uses the shared
+validators in the popup backup path. The popup bundles macro syntax validation,
+while ordered query evaluation and refiner execution remain in the private editor
+until the popup search integration.

@@ -83,7 +83,7 @@
     if (record.startNote !== undefined) video.startNote = WAYPOINTS_MARKERS.note(record.startNote);
     return video;
   }
-  function parse(text) {
+  function parseJSON(text) {
     if (typeof text !== "string") throw new Error("Import must be JSON text.");
     if (text.length > MAX_IMPORT_CHARACTERS)
       throw new Error(
@@ -95,6 +95,9 @@
     } catch {
       throw new Error("Invalid JSON. Paste the complete videos export.");
     }
+    return parsed;
+  }
+  function parseLegacy(parsed) {
     if (!isObject(parsed) && !Array.isArray(parsed))
       throw new Error("Paste a videos export, not a single JSON value.");
     if (
@@ -181,5 +184,13 @@
       2,
     );
   }
-  globalThis.WAYPOINTS_TRANSFER = Object.freeze({ parse, merge, stringify });
+  globalThis.WAYPOINTS_TRANSFER = Object.freeze({
+    parse: (text) => parseLegacy(parseJSON(text)),
+    parseJSON,
+    parseLegacy,
+    normalize,
+    merge,
+    stringify,
+    MAX_IMPORT_CHARACTERS,
+  });
 })();

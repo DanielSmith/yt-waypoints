@@ -929,7 +929,8 @@ body.file-save-open {
   min-height: 260px;
 }
 
-#file-save-dialog {
+#file-save-dialog,
+#macro-import-dialog {
   width: 330px;
   max-width: calc(100% - 20px);
   padding: 16px;
@@ -940,7 +941,8 @@ body.file-save-open {
   font: inherit;
 }
 
-#file-save-dialog::backdrop {
+#file-save-dialog::backdrop,
+#macro-import-dialog::backdrop {
   background: var(--color-backdrop);
 }
 
@@ -976,6 +978,13 @@ body.file-save-open {
   display: flex;
   justify-content: flex-end;
   gap: 8px;
+}
+
+#macro-import-dialog p {
+  overflow-wrap: anywhere;
+}
+.macro-import-actions {
+  flex-wrap: wrap;
 }
 
 /* Trash status and deletion preferences */

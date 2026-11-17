@@ -142,7 +142,10 @@ preferences are excluded. Import merges bookmarks without removing videos
 absent from the copy. For a matching video, the imported saved position takes
 precedence and is applied to matching open players too.
 
-Press lowercase **c** on a selected row to copy only that bookmark as JSON.
+Backups also include saved tags and macros when present. Lowercase **c** copies
+only the selected bookmark and its tags. If pasted macros conflict with saved
+names, choose whether to keep saved definitions, replace them, or rename the
+incoming definitions and their references.
 See the [transfer reference](docs/behavior-reference.md#bookmark-transfer-and-validation)
 for accepted formats and validation rules.
 

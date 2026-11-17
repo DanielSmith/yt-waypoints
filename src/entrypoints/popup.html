@@ -185,6 +185,19 @@
       <button id="file-save-confirm" class="secondary-button" type="button">Yes</button>
     </div>
   </dialog>
+  <dialog id="macro-import-dialog" aria-labelledby="macro-import-title" aria-describedby="macro-import-names">
+    <form id="macro-import-form" method="dialog">
+      <strong id="macro-import-title">Macro names already in use</strong>
+      <p id="macro-import-names"></p>
+      <p>Keep uses your saved definitions. Replace uses the backup definitions. Rename keeps both and updates references in the backup.</p>
+      <div class="file-save-actions macro-import-actions">
+        <button class="secondary-button" value="cancel" autofocus>Cancel</button>
+        <button class="secondary-button" value="keep">Keep saved</button>
+        <button class="secondary-button" value="replace">Replace</button>
+        <button class="secondary-button" value="rename">Rename</button>
+      </div>
+    </form>
+  </dialog>
   <dialog id="about-dialog" aria-labelledby="about-title" aria-describedby="about-description">
     <div class="help-heading"><strong id="about-title">YT Waypoints</strong><button id="about-close" class="secondary-button" type="button" autofocus>Close</button></div>
     <p id="about-version"></p>

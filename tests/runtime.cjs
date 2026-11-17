@@ -18,7 +18,9 @@ function readModule(name) {
   }
   if (name === "storage.js") {
     source =
-      fs.readFileSync(path.join(__dirname, "../src/shared/settings-policy.js"), "utf8") +
+      ["settings-policy.js", "alap-tags.js"]
+        .map((file) => fs.readFileSync(path.join(__dirname, "../src/shared", file), "utf8"))
+        .join("\n") +
       "\n" +
       source;
   }

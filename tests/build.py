@@ -115,6 +115,10 @@ for browser in ('firefox', 'chrome'):
             assert any(name.endswith('/youtube-values.js') for name in mapping['sources'])
             assert not (package / 'youtube-values.js').exists()
         if entry == popup_script:
+            assert any(name.endswith('/alap-transfer.mjs') for name in mapping['sources'])
+            assert any(name.endswith('/alap-macro-store.mjs') for name in mapping['sources'])
+            assert not any(name.endswith(('/alap-query.mjs', '/alap-tags-core/index.mjs',
+                                          '/alap-tags-core/refiners.mjs')) for name in mapping['sources'])
             for helper in ('display-time.js', 'popup-dom.js', 'popup-shortcuts.js', 'popup-annotation-editor.js', 'popup-file-save.js'):
                 assert any(name.endswith('/' + helper) for name in mapping['sources'])
                 assert not (package / helper).exists()

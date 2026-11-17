@@ -2,17 +2,21 @@
 // SPDX-License-Identifier: Apache-2.0
 // Pure production contract for video-wide tags and global named Alap queries.
 // Shared syntax dependency only: no evaluation, DOM, storage or transfer wiring.
+import "./alap-tags.js";
 import { inspectExpression as inspectSyntax } from "../vendor/alap-tags-core/syntax.mjs";
 import { ALAP_SORT_FIELDS } from "./alap-refiner-profile.mjs";
 import { createMacroExpander } from "./alap-macro-expansion.mjs";
 
+const { MAX_TAGS, MAX_NAME, normalizeVideoTags, validateAlapName } = globalThis.WAYPOINTS_ALAP_TAGS;
+export { normalizeVideoTags, validateAlapName };
+
 export const ALAP_MACROS_VERSION = 1;
-// Reserved for the future persistence owner; this module never reads/writes it.
+// Local registry key. This module validates data and does not access storage.
 export const ALAP_MACROS_STORAGE_KEY = "waypoints.macros.v1";
 export const ALAP_LIMITS = Object.freeze({
-  nameCharacters: 64,
+  nameCharacters: MAX_NAME,
   rawTagCharacters: 256,
-  tagsPerVideo: 100,
+  tagsPerVideo: MAX_TAGS,
   macros: 100,
   expressionCharacters: 4096,
   expandedCharacters: 16384,
@@ -23,7 +27,6 @@ export const ALAP_LIMITS = Object.freeze({
   refinerCount: 1000000,
   macroLibraryBytes: 262144,
 });
-const NAME = /^[a-z0-9]+(?:_[a-z0-9]+)*$/;
 const own = (object, key) => Object.hasOwn(object, key);
 const fail = (message) => {
   throw new Error(`Invalid Alap data: ${message}.`);
@@ -48,12 +51,6 @@ function fields(value, allowed, required = allowed) {
   if (required.some((key) => !own(result, key))) fail("missing required field");
   return result;
 }
-export function validateAlapName(value) {
-  if (typeof value !== "string" || value.length > ALAP_LIMITS.nameCharacters || !NAME.test(value)) {
-    fail("names require 1–64 lowercase ASCII letters/digits with single underscores between words");
-  }
-  return value;
-}
 // Explicit suggestion/editor operation. Stored/imported names use validation,
 // never silent sanitization. Non-Latin letters require deliberate transliteration.
 export function suggestTagSlug(value) {
@@ -71,25 +68,6 @@ export function suggestTagSlug(value) {
       .replace(/[^a-z0-9]+/g, "_")
       .replace(/^_|_$/g, ""),
   );
-}
-export function normalizeVideoTags(value) {
-  if (!Array.isArray(value) || value.length > ALAP_LIMITS.tagsPerVideo)
-    fail("expected at most 100 video tags");
-  // Reject sparse arrays, getters, symbols and custom properties before access.
-  for (const key of Reflect.ownKeys(value)) {
-    if (key === "length") continue;
-    if (typeof key !== "string" || !/^(0|[1-9]\d*)$/.test(key) || Number(key) >= value.length)
-      fail("invalid tag array field");
-    const d = Object.getOwnPropertyDescriptor(value, key);
-    if (!d.enumerable || !own(d, "value")) fail("expected tag data elements");
-  }
-  const tags = [];
-  for (let i = 0; i < value.length; i++) {
-    if (!own(value, i)) fail("sparse tags are unsupported");
-    tags.push(validateAlapName(value[i]));
-  }
-  if (new Set(tags).size !== tags.length) fail("duplicate video tag");
-  return tags.sort();
 }
 function tagField(record) {
   object(record);

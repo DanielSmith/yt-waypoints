@@ -10,6 +10,7 @@ import "../shared/popup-dom.js";
 import "../shared/popup-shortcuts.js";
 import "../shared/marker-data.js";
 import "../shared/transfer.js";
+import "../shared/alap-tags.js";
 import "../shared/storage.js";
 import "../shared/metadata.js";
 import "../shared/transcript-reader.js";

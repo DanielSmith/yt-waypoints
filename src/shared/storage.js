@@ -1,6 +1,6 @@
 // Copyright 2026 Daniel Smith
 // SPDX-License-Identifier: Apache-2.0
-// Shared bookmark mutations without a background process or read/modify/write lock.
+// Playback and annotation writes merge without a background process or lock.
 // Each write owns a unique key. Reads merge field versions and bookmark lifetimes;
 // deletion/import/re-add starts a new lifetime, so stale patches cannot revive it.
 (() => {
@@ -11,6 +11,15 @@
   const MILLISECONDS_PER_DAY = 86400000;
   const LEGACY = [0, "legacy"];
   const COMPACT_AT = 64;
+  const TAG_PREFIX = "$tag:";
+  const { normalizeVideoTags } = WAYPOINTS_ALAP_TAGS;
+  const bookmarkLock = "yt-waypoints-bookmark-tags-v1";
+  function withBookmarkLock(action, required = false) {
+    const locks = globalThis.navigator?.locks;
+    if (locks?.request) return locks.request(bookmarkLock, action);
+    if (required) throw new Error("Tag saving requires browser support for Web Locks.");
+    return action();
+  }
   const cloneJson = (value) => JSON.parse(JSON.stringify(value));
   const compareVersions = (leftVersion, rightVersion) =>
     leftVersion[0] - rightVersion[0] ||
@@ -23,7 +32,11 @@
   // Version each marker property independently. Playback writes never touch
   // these fields; simultaneous edits to different markers/notes can both win.
   function flattenVideo(video) {
-    const fields = Object.fromEntries(Object.entries(video).filter(([name]) => name !== "markers"));
+    const fields = Object.fromEntries(
+      Object.entries(video).filter(
+        ([name]) => name !== "markers" && name !== "tags" && !name.startsWith(TAG_PREFIX),
+      ),
+    );
     if (Object.hasOwn(video, "startNote"))
       fields.startNote = WAYPOINTS_MARKERS.note(video.startNote);
     if (Object.hasOwn(video, "markers")) {
@@ -40,9 +53,15 @@
   function materializeVideo(fields) {
     const video = Object.create(null);
     const markers = new Map();
+    const tags = [];
     let hasMarkers = false;
     for (const [name, field] of Object.entries(fields)) {
       if (field.removed) continue;
+      if (name.startsWith(TAG_PREFIX)) {
+        tags.push(name.slice(TAG_PREFIX.length));
+        continue;
+      }
+      if (name === "tags") continue; // Previously unsupported journal field.
       if (name === "$markers") {
         hasMarkers = true;
         continue;
@@ -56,16 +75,16 @@
       } else video[name] = cloneJson(field.value);
     }
     if (hasMarkers) video.markers = WAYPOINTS_MARKERS.normalize([...markers.values()]);
+    if (tags.length) video.tags = normalizeVideoTags(tags);
     return video;
   }
 
   // Keep the persisted field key `v`; callers supply the field-version tuple.
-  function versionedFields(video, fieldVersion) {
+  function versionedFields(video, fieldVersion, tags = []) {
+    const fields = flattenVideo(video);
+    for (const tag of tags) fields[TAG_PREFIX + tag] = true;
     return Object.fromEntries(
-      Object.entries(flattenVideo(video)).map(([name, value]) => [
-        name,
-        { v: fieldVersion, value },
-      ]),
+      Object.entries(fields).map(([name, value]) => [name, { v: fieldVersion, value }]),
     );
   }
 
@@ -278,7 +297,7 @@
           ? { v, value: afterFields[name] }
           : { v, removed: true };
       }
-      records[id] = { life: snapshot.records[id].life, fields };
+      if (Object.keys(fields).length) records[id] = { life: snapshot.records[id].life, fields };
     }
     await write(
       records,
@@ -288,19 +307,79 @@
     );
   }
 
-  async function importVideos(incoming) {
+  async function readTagDraft(id) {
     const snapshot = await read();
-    const { videos, counts } = WAYPOINTS_TRANSFER.merge(snapshot.videos, incoming);
+    const video = snapshot.videos[id];
+    if (!video) throw new Error("This bookmark is no longer active.");
+    return Object.freeze({
+      id,
+      lifetime: Object.freeze([...snapshot.records[id].life.v]),
+      tags: Object.freeze([...(video.tags || [])]),
+    });
+  }
+
+  async function saveTagDraft(draft, tags) {
+    const { id, lifetime } = draft;
+    const before = new Set(normalizeVideoTags(draft.tags));
+    const after = new Set(normalizeVideoTags(tags));
+    return withBookmarkLock(async () => {
+      const snapshot = await read();
+      const video = snapshot.videos[id];
+      if (!video || !sameVersion(snapshot.records[id].life.v, lifetime))
+        throw new Error("This bookmark changed lifetime. Reopen the tag editor.");
+      const current = new Set(video.tags || []);
+      const fields = Object.create(null);
+      const v = [snapshot.clock + 1, crypto.randomUUID()];
+      for (const tag of before) {
+        if (!after.has(tag) && current.delete(tag)) fields[TAG_PREFIX + tag] = { v, removed: true };
+      }
+      for (const tag of after) {
+        if (!before.has(tag) && !current.has(tag)) {
+          current.add(tag);
+          fields[TAG_PREFIX + tag] = { v, value: true };
+        }
+      }
+      const savedTags = normalizeVideoTags([...current]);
+      if (Object.keys(fields).length) {
+        await write({ [id]: { life: snapshot.records[id].life, fields } }, v[0], "tags");
+      }
+      return savedTags;
+    }, true);
+  }
+
+  async function importVideos(incoming, { includeTags = false } = {}) {
+    const snapshot = await read();
+    const originals = { ...snapshot.videos };
+    for (const id of Object.keys(incoming)) {
+      if (!Object.hasOwn(originals, id) || !Object.hasOwn(originals[id], "tags")) continue;
+      const { tags: _tags, ...withoutTags } = originals[id];
+      originals[id] = withoutTags;
+    }
+    const { videos, counts } = WAYPOINTS_TRANSFER.merge(originals, incoming);
     const v = [snapshot.clock + 1, crypto.randomUUID()];
     const records = Object.create(null);
     const positions = Object.create(null);
     for (const id of Object.keys(incoming)) {
       const video = videos[id];
+      const localTags = (snapshot.videos[id] || snapshot.trash[id])?.tags || [];
+      const suppliedTags = includeTags && Object.getOwnPropertyDescriptor(incoming[id], "tags");
+      if (suppliedTags && !Object.hasOwn(suppliedTags, "value"))
+        throw new Error("Invalid imported tags.");
+      const tags = suppliedTags ? normalizeVideoTags(suppliedTags.value) : localTags;
+      if (
+        counts.kept &&
+        Object.hasOwn(snapshot.videos, id) &&
+        video === originals[id] &&
+        !sameValue(localTags, tags)
+      ) {
+        counts.kept--;
+        counts.updated++;
+      }
       positions[id] = { t: video.t, duration: video.duration };
       // Even identical reimports start a new lifetime and renew player adoption.
       records[id] = {
         life: { v: nextLifetime(snapshot, id), deleted: false, imported: positions[id] },
-        fields: versionedFields(video, v),
+        fields: versionedFields(video, v, tags),
       };
     }
     await write(records, v[0], "import");
@@ -326,7 +405,7 @@
       {
         [id]: {
           life,
-          fields: versionedFields(video, v),
+          fields: versionedFields(video, v, video.tags),
         },
       },
       v[0],
@@ -380,15 +459,17 @@
   globalThis.WAYPOINTS_STORAGE = Object.freeze({
     read,
     save,
-    importVideos,
+    readTagDraft,
+    saveTagDraft,
+    importVideos: (incoming, options) => withBookmarkLock(() => importVideos(incoming, options)),
     compact,
     changed,
     imported,
     decode,
     retentionDays,
-    trash: (id) => move(id, true),
-    restore: (id) => move(id, false),
-    purge,
+    trash: (id) => withBookmarkLock(() => move(id, true)),
+    restore: (id) => withBookmarkLock(() => move(id, false)),
+    purge: (ids) => withBookmarkLock(() => purge(ids)),
     emptyTrash,
     expire,
   });

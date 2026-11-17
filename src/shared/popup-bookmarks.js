@@ -3,6 +3,7 @@
 // Bookmark operations retain pre-request snapshots and storage lifetime guards.
 globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
   storage,
+  storeBackup,
   player,
   watchPattern,
   getSettings,
@@ -28,10 +29,17 @@ globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
   const saveSnapshot = (snapshot) => storage.save(snapshot);
 
   async function importVideos(incoming) {
-    const { counts, positions } = await storage.importVideos(incoming);
+    let result;
+    try {
+      result = await storeBackup(incoming);
+    } catch (error) {
+      return setStatus(`Import failed: ${error.message}`);
+    }
+    if (!result) return setStatus("Import cancelled.");
+    const { counts, positions, macroSaved } = result;
     await onImport();
     setStatus(
-      `Import: ${counts.added} added, ${counts.updated} updated, ${counts.kept} unchanged.`,
+      `Import: ${counts.added} added, ${counts.updated} updated, ${counts.kept} unchanged.${macroSaved ? " Macro library updated." : ""}`,
     );
     if (Object.keys(positions).length) {
       try {

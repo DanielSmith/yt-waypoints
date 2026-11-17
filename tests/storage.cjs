@@ -20,7 +20,13 @@ function sharedStorage(seed = initial()) {
     let hold;
     const api = {
       storage: {
-        onChanged: { addListener: (fn) => subscribers.push(fn) },
+        onChanged: {
+          addListener: (fn) => subscribers.push(fn),
+          removeListener(fn) {
+            const index = subscribers.indexOf(fn);
+            if (index >= 0) subscribers.splice(index, 1);
+          },
+        },
         local: {
           async get(keys) {
             const snapshot = structuredClone(
@@ -85,10 +91,11 @@ function sharedStorage(seed = initial()) {
   }
   return { data, client };
 }
-function context(client, id = A) {
+function context(client, id = A, locks) {
   const video = { currentTime: id === A ? 100 : 200, duration: 1000, paused: false };
   const ctx = vm.createContext({
     browser: client.api,
+    navigator: { locks },
     crypto: { randomUUID },
     console,
     document: {
@@ -118,6 +125,140 @@ function context(client, id = A) {
 }
 async function videos(ctx) {
   return (await ctx.WAYPOINTS_STORAGE.read()).videos;
+}
+function sharedLocks() {
+  const queues = new Map();
+  return {
+    request(name, callback) {
+      const result = (queues.get(name) || Promise.resolve()).then(callback);
+      queues.set(
+        name,
+        result.catch(() => {}),
+      );
+      return result;
+    },
+  };
+}
+
+async function checkAlapPersistence() {
+  const shared = sharedStorage();
+  const locks = sharedLocks();
+  const client = shared.client();
+  const left = context(client, A, locks).ctx.WAYPOINTS_STORAGE;
+  const right = context(shared.client(), A, locks).ctx.WAYPOINTS_STORAGE;
+  const open = () => context(shared.client(), A, locks).ctx.WAYPOINTS_STORAGE;
+  const first = await left.readTagDraft(A);
+  const second = await right.readTagDraft(A);
+  assert.deepEqual([...first.tags], []);
+  assert.deepEqual(Object.keys(shared.data), ["videos"], "reading legacy data is write-free");
+  const playback = await right.read();
+  playback.videos[A].t = 763;
+  const held = client.hold("set");
+  const adding = left.saveTagDraft(first, ["research"]);
+  await held.entered;
+  await right.save(playback);
+  const secondEdit = right.saveTagDraft(second, ["history"]);
+  held.release();
+  await Promise.all([adding, secondEdit]);
+  const reopened = (await open().read()).videos[A];
+  assert.equal(reopened.t, 763);
+  assert.deepEqual([...reopened.tags], ["history", "research"]);
+
+  const removeHistory = await left.readTagDraft(A);
+  const addScience = await right.readTagDraft(A);
+  await Promise.all([
+    left.saveTagDraft(removeHistory, ["research"]),
+    right.saveTagDraft(addScience, ["history", "research", "science"]),
+  ]);
+  assert.deepEqual([...(await open().readTagDraft(A)).tags], ["research", "science"]);
+  const stale = await right.readTagDraft(A);
+  const inFlight = client.hold("set");
+  const tagSave = left.saveTagDraft(await left.readTagDraft(A), ["history", "research", "science"]);
+  await inFlight.entered;
+  const trash = right.trash(A);
+  inFlight.release();
+  await Promise.all([tagSave, trash]);
+  assert.deepEqual([...(await open().read()).trash[A].tags], ["history", "research", "science"]);
+  await right.restore(A);
+  await assert.rejects(right.saveTagDraft(stale, ["old_draft"]), /lifetime/);
+  const preImport = await left.readTagDraft(A);
+  await right.importVideos({ [A]: { ...initial().videos[A], t: 500 } });
+  assert.deepEqual([...(await open().readTagDraft(A)).tags], ["history", "research", "science"]);
+  await assert.rejects(left.saveTagDraft(preImport, ["old_draft"]), /lifetime/);
+  await right.purge([A]);
+  assert.ok(!JSON.stringify(shared.data).includes("$tag:science"), "purge drops old tag payload");
+  await right.importVideos({ [A]: initial().videos[A] });
+  assert.deepEqual([...(await open().readTagDraft(A)).tags], []);
+  await assert.rejects(left.saveTagDraft(preImport, ["old_draft"]), /lifetime/);
+
+  const many = Array.from({ length: 99 }, (_, index) => "tag_" + index);
+  await left.saveTagDraft(await left.readTagDraft(A), many);
+  const capA = await left.readTagDraft(A),
+    capB = await right.readTagDraft(A);
+  const cap = await Promise.allSettled([
+    left.saveTagDraft(capA, [...many, "alpha"]),
+    right.saveTagDraft(capB, [...many, "beta"]),
+  ]);
+  assert.equal(cap.filter((outcome) => outcome.status === "fulfilled").length, 1);
+  assert.match(
+    cap.find((outcome) => outcome.status === "rejected").reason.message,
+    /100 video tags/,
+  );
+  await left.compact(true);
+  assert.equal((await open().readTagDraft(A)).tags.length, 100);
+  const unsupported = context(shared.client()).ctx.WAYPOINTS_STORAGE;
+  await assert.rejects(
+    unsupported.saveTagDraft(await unsupported.readTagDraft(B), ["x"]),
+    /Web Locks/,
+  );
+
+  const { createMacroStore } = await import("../src/shared/alap-macro-store.mjs");
+  const macrosLeft = createMacroStore(shared.client().api, { locks });
+  const macrosRight = createMacroStore(shared.client().api, { locks });
+  const blank = await macrosLeft.read();
+  assert.equal(blank.revision, null);
+  const library = (macros) => ({ version: 1, macros });
+  let notifications = 0;
+  const unsubscribe = macrosRight.subscribe(() => notifications++);
+  const proposals = await Promise.allSettled([
+    macrosLeft.replace(
+      blank.revision,
+      library({ few: { linkItems: "*limit:2*" }, view: { linkItems: ".research @few" } }),
+    ),
+    macrosRight.replace(blank.revision, library({ other: { linkItems: ".science" } })),
+  ]);
+  assert.equal(proposals[0].status, "fulfilled");
+  assert.match(proposals[1].reason.message, /changed in another editor/);
+  const saved = await macrosRight.read();
+  assert.equal(notifications, 1);
+  const renamed = await macrosRight.rename(saved.revision, "few", "first_two");
+  assert.equal(renamed.library.macros.view.linkItems, ".research @first_two");
+  await assert.rejects(macrosLeft.remove(renamed.revision, "first_two"), /depends/);
+  await assert.rejects(
+    macrosLeft.replace(renamed.revision, library({ bad: { linkItems: "@missing" } })),
+    /unknown/i,
+  );
+  assert.deepEqual(await macrosLeft.read(), renamed);
+  unsubscribe();
+  const removed = await macrosLeft.remove(renamed.revision, "view");
+  assert.equal(notifications, 2);
+  await macrosLeft.remove(removed.revision, "first_two");
+  assert.deepEqual(
+    (await createMacroStore(shared.client().api, { locks }).read()).library,
+    library({}),
+  );
+  await assert.rejects(
+    macrosRight.rename(saved.revision, "few", "again"),
+    /changed in another editor/,
+  );
+  assert.equal(
+    (await open().readTagDraft(A)).tags.length,
+    100,
+    "macro edits leave bookmark storage intact",
+  );
+  console.log(
+    "PASS: persistent tags merge with playback and other editors across lifetimes, and macro mutations require a current revision",
+  );
 }
 async function main() {
   const shared = sharedStorage();
@@ -497,6 +638,7 @@ async function main() {
     assert.equal((await snapshot(tab)).videos[A].t, 10);
   }
   console.log("PASS: Empty trash cannot remove an explicitly restored row in a concurrent context");
+  await checkAlapPersistence();
 }
 const deadline = setTimeout(() => {
   console.error("Storage regression timed out at an asynchronous barrier");

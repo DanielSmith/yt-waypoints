@@ -7,6 +7,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 export const ALAP_QUERY_SOURCES = Object.freeze([
   "src/shared/alap-data.mjs",
+  "src/shared/alap-tags.js",
   "src/shared/alap-refiner-profile.mjs",
   "src/shared/alap-posted-time.mjs",
   "src/shared/alap-macro-expansion.mjs",

@@ -1,9 +1,35 @@
 // Copyright 2026 Daniel Smith
 // SPDX-License-Identifier: Apache-2.0
 import { createPopupRefresh } from "./popup-refresh.mjs";
+import { createAlapTransfer, importAlapBackup } from "./alap-transfer.mjs";
+import { createMacroStore } from "./alap-macro-store.mjs";
 import { createThemeImportController } from "./popup-theme-import.mjs";
 
 const api = globalThis.browser ?? globalThis.chrome;
+const backupTransfer = createAlapTransfer(WAYPOINTS_TRANSFER);
+const macroStore = createMacroStore(api);
+
+function chooseMacroConflicts(names) {
+  const dialog = document.getElementById("macro-import-dialog");
+  const form = document.getElementById("macro-import-form");
+  const preview = names
+    .slice(0, 8)
+    .map((name) => "@" + name)
+    .join(", ");
+  document.getElementById("macro-import-names").textContent =
+    preview + (names.length > 8 ? ` and ${names.length - 8} more` : "");
+  return new Promise((resolve) => {
+    function closed() {
+      const choice = dialog.returnValue;
+      resolve(["keep", "replace", "rename"].includes(choice) ? choice : null);
+    }
+    form.reset();
+    dialog.returnValue = "";
+    dialog.showModal();
+    dialog.addEventListener("close", closed, { once: true });
+  });
+}
+
 const fmt = WAYPOINTS_TIME_FORMAT.displayTimestamp;
 const shortcuts = WAYPOINTS_SHORTCUTS;
 const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
@@ -86,7 +112,8 @@ const fileSaveController = WAYPOINTS_CREATE_FILE_SAVE({
 const exportsController = WAYPOINTS_CREATE_POPUP_EXPORTS({
   document,
   formats: WAYPOINTS_TRANSCRIPT,
-  transfer: WAYPOINTS_TRANSFER,
+  transfer: backupTransfer,
+  readMacroLibrary: async () => (await macroStore.read()).library,
   player: playerClient,
   getSettings: () => settings,
   getVideos: () => savedVideos,
@@ -145,6 +172,12 @@ const { updateHint, closeHelp, closeAbout } = dialogs;
 
 const bookmarks = WAYPOINTS_CREATE_POPUP_BOOKMARKS({
   storage: WAYPOINTS_STORAGE,
+  storeBackup: (incoming) =>
+    importAlapBackup(incoming, {
+      storage: WAYPOINTS_STORAGE,
+      macroStore,
+      chooseConflicts: chooseMacroConflicts,
+    }),
   player: playerClient,
   watchPattern: WATCH_RE,
   getSettings: () => settings,
@@ -221,7 +254,8 @@ const { renderList } = listController;
 
 const inputController = WAYPOINTS_CREATE_POPUP_INPUT({
   document,
-  transfer: WAYPOINTS_TRANSFER,
+  transfer: backupTransfer,
+  isImportDialogOpen: () => document.getElementById("macro-import-dialog")?.open,
   player: playerClient,
   actions: bookmarks,
   dialogs,

@@ -5,6 +5,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   document,
   formats,
   transfer,
+  readMacroLibrary,
   player,
   getSettings,
   getVideos,
@@ -148,7 +149,13 @@ globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   }
 
   async function copyVideos(videos = getVideos(), allVideos = true) {
-    const text = transfer.stringify(videos);
+    let text;
+    try {
+      const library = allVideos ? await readMacroLibrary() : undefined;
+      text = transfer.stringify(videos, library);
+    } catch (error) {
+      return setStatus(`Could not prepare backup: ${error.message}`);
+    }
     const copied = await copyText(
       text,
       `Copied ${Object.keys(videos).length} videos as JSON.`,

@@ -83,7 +83,9 @@ Use **Copy JSON** or **Shift+C** when you want a backup or want to carry your
 bookmarks to another browser. The copy includes **all current bookmarks**, even
 those hidden by a search, along with their titles, saved positions, durations,
 update timestamps, and available channel details. Trash and browser preferences
-stay out of the copy. Transfers happen when you copy and paste them; there is
+stay out of the copy. A full backup also includes the saved macro library when
+it contains definitions, and a single-bookmark copy includes only that video
+and its tags. Transfers happen when you copy and paste them; there is
 no automatic browser sync.
 
 ### What happens when you paste a backup
@@ -110,6 +112,15 @@ incomplete, unsupported, or contains invalid video data, your existing bookmarks
 stay as they were. Be sure to copy all the JSON, including the outer braces.
 The size limit is 5 million characters.
 
+When macro names conflict, **Keep saved** keeps the local definitions and adds
+new names, **Replace** uses the incoming definitions, and **Rename** keeps both
+and updates references in the incoming macros. Identical definitions are
+reused. Cancel stops the import before any write.
+
+If the app saves the macros and then fails to save the bookmarks, it reports
+the partial import. Paste the same JSON again and repeat the same conflict
+choice to retry the bookmarks.
+
 ### If you're working with JSON yourself
 
 The usual Waypoints export is the easiest format to use. The importer also
@@ -117,9 +128,17 @@ accepts a video map, an array of videos, or a storage snapshot with a `videos`
 object. It ignores any `settings` in a snapshot. The JSON `version` describes
 the transfer format, rather than the extension's version.
 
-Only these video fields are kept: `id`, `title`, `t`, `duration`, `updated`,
-`channelName`, and `channelUrl`. Other fields are discarded during parsing,
-merging, and export. The checks for supported fields are:
+Versions 1 and 2, raw maps, and arrays remain readable. Version 3 carries
+`tags` and an optional `macroLibrary`. Backups that use neither can still be
+written in version 1 or 2. Waypoints also reads version 1 exports from its
+private Alap editor. Older versions of the extension may reject version 3.
+
+Supported bookmark fields include `id`, `title`, `t`, `duration`, `updated`,
+`channelName`, `channelUrl`, `markers`, and `startNote`. Version 3 and the
+private editor format also accept `tags`. Omitted tags preserve local tags.
+An empty array clears tags. A supplied nonempty array replaces that video's
+tag set. Version 3 and private editor imports reject unsupported fields.
+The checks for supported fields include:
 
 - Positions, durations, and timestamps must be nonnegative safe integers.
   Numeric strings, booleans, fractions, and `null` aren't accepted.

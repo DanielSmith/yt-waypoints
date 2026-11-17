@@ -4,6 +4,7 @@
 globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   document,
   transfer,
+  isImportDialogOpen = () => false,
   player,
   actions,
   dialogs,
@@ -56,6 +57,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   function pasteIntoPopup(event) {
     if (
       event.defaultPrevented ||
+      isImportDialogOpen() ||
       dialogs.helpOpen ||
       dialogs.aboutOpen ||
       exportsController.fileSaveOpen ||
@@ -314,7 +316,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   // Keep precedence here, not in shortcut metadata or a dispatch framework.
   function handleKeydown(e) {
     const active = document.activeElement;
-    if (e.isComposing) return;
+    if (e.isComposing || isImportDialogOpen()) return;
     if (handleEditingContext(e, active)) return;
     if (handleAboutContext(e)) return;
     if (handleSettingsShortcut(e, active)) return;

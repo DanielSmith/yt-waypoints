@@ -6,6 +6,7 @@ import "../shared/youtube-values.js";
 import "../shared/marker-data.js";
 import "../shared/metadata.js";
 import "../shared/player-results.js";
+import "../shared/alap-tags.js";
 import "../shared/storage.js";
 import { startAutosave } from "../shared/content.js";
 
