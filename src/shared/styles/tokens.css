@@ -1,3 +1,6 @@
+/* Copyright 2026 Daniel Smith
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* Shared typography and dimensions. Colors belong in themes/*.css. */
 :root {
   --font-ui: 13px/1.35 system-ui, -apple-system, sans-serif;

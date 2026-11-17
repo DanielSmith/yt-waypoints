@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Marker interactions own selection and annotation persistence. Storage snapshots bind every
 // delayed operation to its original bookmark lifetime, never to a later import.
 globalThis.WAYPOINTS_CREATE_POPUP_MARKERS = ({

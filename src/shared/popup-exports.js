@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Clipboard-first export flows, transcript format UI, and optional file offers.
 globalThis.WAYPOINTS_CREATE_POPUP_EXPORTS = ({
   document,

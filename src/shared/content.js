@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 export function startAutosave(context) {
   let active = true;
   context?.onInvalidated(() => {

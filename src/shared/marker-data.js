@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Marker transfer/storage contract. No page access, UI, or playback side effects.
 (() => {
   // Structural safety ceiling; the existing 5-million-character transfer and

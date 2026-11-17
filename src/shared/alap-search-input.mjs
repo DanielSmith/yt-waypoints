@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Dispatch only. No parsing, matching or browser state. Literal quoted-search
 // escape rules remain a separate step-5 compatibility decision.
 import { ALAP_LIMITS } from "./alap-data.mjs";

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Color-only terminal readers. XML uses the browser parser, with DTDs removed
 // before parsing. Neither reader follows includes, fetches URLs or executes data.
 import { normalizeSourcePalette, THEME_LIMITS } from "./theme-data.mjs";

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // The one on-demand annotation form. Domain snapshots stay in its bound save
 // operation; the UI receives only immutable identity, original note and lifetime.
 globalThis.WAYPOINTS_CREATE_ANNOTATION_EDITOR = ({

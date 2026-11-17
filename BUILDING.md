@@ -270,6 +270,17 @@ markup and the same import controller. Firefox opens it before native file
 selection; it initializes no bookmark or player controller. Both pages use the
 same validated theme owner and local storage. No additional permission is needed.
 
+## Copyright and license headers
+
+Authored application sources and build/configuration scripts carry short
+`Copyright 2026 Daniel Smith` and `SPDX-License-Identifier: Apache-2.0` headers.
+Tests do not require individual headers. JSON/binary assets are not modified to
+insert comments, and existing vendored attribution is preserved. Rollup inserts
+one YT Waypoints copyright/license banner into each JavaScript bundle as part of
+generation, so source maps and reviewer rebuilds remain consistent. Packages
+continue to include the full `LICENSE` and `THIRD-PARTY-NOTICES.md`; the package
+checks verify the generated banners as well as those files.
+
 ## Restricted Alap query source
 
 The checked-in `src/vendor/alap-tags-core/` is a deliberately pruned, readable

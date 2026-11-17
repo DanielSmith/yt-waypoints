@@ -1,3 +1,6 @@
+/* Copyright 2026 Daniel Smith
+ * SPDX-License-Identifier: Apache-2.0
+ */
 /* A persistent theme page uses the same palette and controls as Appearance. */
 html {
   background: var(--color-surface);

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 import { downloadFile } from "./file-download.mjs";
 // Optional save UI owns only transient copied output, focus and download resources.
 // Export orchestration decides whether to offer a file after a successful copy.

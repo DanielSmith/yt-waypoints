@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Pure production contract for video-wide tags and global named Alap queries.
 // Shared syntax dependency only: no evaluation, DOM, storage or transfer wiring.
 import { inspectExpression as inspectSyntax } from "../vendor/alap-tags-core/syntax.mjs";

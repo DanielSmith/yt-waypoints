@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Input routing preserves modal guards, native editing, and slider key ownership.
 globalThis.WAYPOINTS_CREATE_POPUP_INPUT = ({
   document,

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Self-contained: executeScript serializes this reader into the YouTube page.
 // Only read chapter models already loaded for the requested watch video.
 globalThis.WAYPOINTS_READ_CHAPTERS = function chapters(expectedId) {

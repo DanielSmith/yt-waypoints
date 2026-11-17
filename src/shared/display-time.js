@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Human-readable position clocks. Subtitle cue formatting remains separate.
 (() => {
   function displayTimestamp(seconds) {

@@ -93,6 +93,10 @@ for browser in ('firefox', 'chrome'):
     for entry in expected_scripts:
         script = package / entry
         assert script.stat().st_size < 5_000_000
+        banner = '/*! YT Waypoints | Copyright 2026 Daniel Smith | Apache-2.0 | See LICENSE and THIRD-PARTY-NOTICES.md */'
+        # WXT puts content/unlisted script banners just inside its IIFE wrapper.
+        assert banner in script.read_text()[:512], entry
+        assert script.read_text().count(banner) == 1, entry
         assert f'//# sourceMappingURL={script.name}.map' in script.read_text()
         mapping = json.loads(script.with_suffix('.js.map').read_text())
         assert mapping['sources'] and len(mapping['sources']) == len(mapping['sourcesContent'])

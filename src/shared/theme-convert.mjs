@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Shared converter: perceptual shade derivation and measured sRGB contrast.
 // No storage, UI, network or automatic regeneration of saved theme colors.
 import { normalizeSourcePalette, normalizeTheme, THEME_COLOR_ROLES } from "./theme-data.mjs";

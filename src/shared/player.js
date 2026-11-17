@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Named, self-contained functions: executeScript serializes each into the page.
 // The popup uses these operations to read or control the YouTube player.
 globalThis.WAYPOINTS_PLAYER_ACTIONS = {

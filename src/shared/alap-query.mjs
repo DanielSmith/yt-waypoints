@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Headless search owner. Callers supply eligible videos in their base display
 // order; refined results preserve evaluator order. No storage or view cache here.
 import { ALAP_SORT_FIELDS, ALAP_SORT_TYPES } from "./alap-refiner-profile.mjs";

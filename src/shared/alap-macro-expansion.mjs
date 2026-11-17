@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Bounded local text substitution only. Callers first validate definition shapes
 // and grammar. No matching, registry extensions, I/O or executable definitions.
 export function createMacroExpander(macros, limits) {

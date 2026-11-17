@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Read-only key/label metadata, not a dispatcher. Contexts, modifiers and repeat
 // policies remain explicit in popup-input.js, including the early Settings key.
 (() => {

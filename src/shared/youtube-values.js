@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Pure extension-side value validation. Serialized page readers keep their own
 // independent checks and must not close over this shared service.
 (() => {

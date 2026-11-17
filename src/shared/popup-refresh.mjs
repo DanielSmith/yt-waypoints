@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // One reader/commit path for action refreshes and storage notifications.
 // A request invalidates earlier reads even when its eventual flush is deferred.
 export function createPopupRefresh({ read, commit }) {

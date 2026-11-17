@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Theme-only persistence. No bookmark access, parsing terminal files or color derivation.
 import {
   normalizeTheme,

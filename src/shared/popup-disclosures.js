@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // One motion contract for Help, Settings and the on-demand annotation editor.
 globalThis.WAYPOINTS_ANIMATE_HEIGHT = (content, from, to) => {
   const DISCLOSURE_DURATION_MS = 500;

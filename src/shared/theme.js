@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 import { normalizeTheme, THEME_COLOR_ROLES } from "./theme-data.mjs";
 import {
   createThemeLibrary,

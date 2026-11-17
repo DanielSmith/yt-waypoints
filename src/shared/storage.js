@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Shared bookmark mutations without a background process or read/modify/write lock.
 // Each write owns a unique key. Reads merge field versions and bookmark lifetimes;
 // deletion/import/re-add starts a new lifetime, so stale patches cannot revive it.

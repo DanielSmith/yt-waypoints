@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Dependencies initialize their existing factory APIs before the coordinator.
 // Theme initialization stays in <head>, ahead of styles and popup startup.
 import "@platform";

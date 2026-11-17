@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Persistent file-picker context. Reuse trusted popup markup and the same owner;
 // never initialize bookmark, player, transcript or active-tab controllers here.
 import popupHTML from "../entrypoints/popup.html?raw";

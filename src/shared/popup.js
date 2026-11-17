@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 import { createPopupRefresh } from "./popup-refresh.mjs";
 import { createThemeImportController } from "./popup-theme-import.mjs";
 

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Shared Settings contract for popup controls and storage retention.
 // No DOM, page access, persistence or mutable settings state.
 (() => {

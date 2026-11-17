@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // JSON-only bookmark transfer. Imported fields are validated/whitelisted before
 // any storage write; browser settings and arbitrary URLs are never imported.
 (() => {

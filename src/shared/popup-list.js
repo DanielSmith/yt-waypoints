@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // List rendering, slider ownership, drag lifetime, and row/focus restoration.
 globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
   document,

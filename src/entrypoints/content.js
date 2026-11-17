@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 import { defineContentScript } from "wxt/utils/define-content-script";
 import "../shared/settings-policy.js";
 import "../shared/youtube-values.js";

@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Help and About lifecycle, including return to a surviving row/control.
 globalThis.WAYPOINTS_CREATE_POPUP_DIALOGS = ({
   document,

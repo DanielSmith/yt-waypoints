@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Settings normalization, field-intent capture, persistence, and control binding.
 globalThis.WAYPOINTS_CREATE_POPUP_SETTINGS = ({
   document,

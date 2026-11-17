@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Self-contained so the same function works in a content script and when
 // scripting.executeScript serializes it into the YouTube page.
 globalThis.WAYPOINTS_READ_METADATA = (expectedId = null) => {

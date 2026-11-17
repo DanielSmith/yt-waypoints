@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Submission tripwire for the deliberately local, pruned Alap profile.
 import fs from "node:fs";
 import path from "node:path";

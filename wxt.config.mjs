@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 import { defineConfig } from "wxt";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -31,6 +33,8 @@ export default defineConfig({
     },
   },
   vite: ({ browser }) => ({
+    // Preserve the generated legal banner through Vite's final esbuild pass.
+    esbuild: { legalComments: "inline" },
     // Preserve the full SemVer label in About on both browsers. WXT emits a
     // numeric manifest version and a Chrome-only version_name automatically.
     define: {
@@ -48,6 +52,12 @@ export default defineConfig({
       minify: false,
       sourcemap: true,
       modulePreload: false,
+      rollupOptions: {
+        output: {
+          banner:
+            "/*! YT Waypoints | Copyright 2026 Daniel Smith | Apache-2.0 | See LICENSE and THIRD-PARTY-NOTICES.md */",
+        },
+      },
     },
   }),
 });

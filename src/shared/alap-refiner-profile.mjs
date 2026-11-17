@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Trusted Waypoints policy. Generic query modules contain no bookmark field names.
 export const ALAP_SORT_TYPES = Object.freeze({
   label: "string",

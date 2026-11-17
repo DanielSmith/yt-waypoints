@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Self-contained: executeScript serializes this function into the YouTube page.
 // Mounted/virtualized DOM rows are never evidence of a complete transcript.
 globalThis.WAYPOINTS_READ_TRANSCRIPT = async function transcript(expectedId) {

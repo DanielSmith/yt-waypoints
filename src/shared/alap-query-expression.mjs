@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Local bounded macro expansion and supported-language preflight. Set evaluation
 // belongs to the pruned Alap derivative. Never inject grouping during expansion.
 import {

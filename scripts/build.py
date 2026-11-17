@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright 2026 Daniel Smith
+# SPDX-License-Identifier: Apache-2.0
 """Assemble self-contained Firefox/Chrome folders and deterministic store ZIPs.
 
 Build with WXT/Vite, validate, then package deterministically. Run npm ci first.

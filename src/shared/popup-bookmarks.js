@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Bookmark operations retain pre-request snapshots and storage lifetime guards.
 globalThis.WAYPOINTS_CREATE_POPUP_BOOKMARKS = ({
   storage,

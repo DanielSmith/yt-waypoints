@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Portable theme data only. No DOM, storage, terminal-file parsing or derivation.
 export const THEME_FORMAT = "yt-waypoints-theme";
 export const THEMES_FORMAT = "yt-waypoints-themes";

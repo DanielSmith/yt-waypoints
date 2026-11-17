@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Transcript output is independent of YouTube's changing page markup.
 globalThis.WAYPOINTS_TRANSCRIPT = (() => {
   const { isVideoId } = WAYPOINTS_YOUTUBE_VALUES;

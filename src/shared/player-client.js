@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Extension-side tab access and validated page requests. No bookmark writes or UI.
 globalThis.WAYPOINTS_CREATE_PLAYER_CLIENT = ({
   api,

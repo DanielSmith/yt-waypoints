@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // A detached, minimal query view. No independently editable bookmark library.
 import "./youtube-values.js";
 import { readVideoTags } from "./alap-data.mjs";

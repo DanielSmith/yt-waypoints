@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Direct local download, independent of clipboard support and file-offer settings.
 export function downloadFile(document, { text, mime, filename }) {
   const url = URL.createObjectURL(new Blob([text], { type: mime }));

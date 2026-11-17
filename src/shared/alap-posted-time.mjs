@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Query-input normalization only; does not collect, persist or infer publication time.
 export function readPostedTime(value) {
   const valid = (n) => Number.isSafeInteger(n) && n > 0 && n <= 8640000000000000;

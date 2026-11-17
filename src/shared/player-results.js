@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Extension-side boundary for data read from a page or returned by executeScript.
 // Injected functions cannot close over this module; validation runs after return.
 (() => {

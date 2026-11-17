@@ -1,3 +1,5 @@
+// Copyright 2026 Daniel Smith
+// SPDX-License-Identifier: Apache-2.0
 // Narrow popup interaction helpers. Owners retain view state and close actions.
 (() => {
   function navigateSummaries(event, headings, activeElement, { enterFromOutside = false } = {}) {
