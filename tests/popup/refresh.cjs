@@ -22,7 +22,11 @@ module.exports = async ({ createPopupFixture }) => {
   );
   const originalRefreshStorage = refreshFixture.context.WAYPOINTS_STORAGE;
   const oldRefreshSnapshot = await originalRefreshStorage.read();
-  const newRefreshSnapshot = structuredClone(oldRefreshSnapshot);
+  // Storage values are cloned into the receiver's realm by the browser.
+  const newRefreshSnapshot = vm.runInContext(
+    `JSON.parse(${JSON.stringify(JSON.stringify(oldRefreshSnapshot))})`,
+    refreshFixture.context,
+  );
   oldRefreshSnapshot.videos[refreshId].title = "Older pending read";
   newRefreshSnapshot.videos[refreshId].title = "Newest requested view";
   const refreshReads = [];

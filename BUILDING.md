@@ -290,7 +290,7 @@ module. See its README and license. Protocol handlers, data-source registries,
 regex and dynamic execution are absent. R1 adds bounded sort/reverse/limit/skip/shuffle
 pipelines; macros expand to supported selection expressions or reusable modifier
 chains. R2 adds copied scalar sort values, typed comparisons and ordered refined
-results; current popup entries remain unwired. Publication-time sorting accepts
+results. Publication-time sorting accepts
 known exact timestamps but does not collect them from YouTube or persist them.
 Definitions can reference other
 local macros with a 10-definition depth limit, cycle rejection and bounded output.
@@ -305,5 +305,4 @@ together; this guard is an accidental-regression tripwire, not a security proof.
 Step 2 supplies shared query modules and the standalone development consumer.
 Step 3 adds bookmark tag storage and the macro registry. Step 4 uses the shared
 validators in the popup backup path. The popup bundles macro syntax validation,
-while ordered query evaluation and refiner execution remain in the private editor
-until the popup search integration.
+and Step 5 connects ordered query evaluation and refiner execution to popup search.

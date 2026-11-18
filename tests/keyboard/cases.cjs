@@ -11,4 +11,5 @@ module.exports = [
   { name: "customThemes", expectedCases: 3, run: require("./cases/theme-library.cjs") },
   { name: "themeImport", expectedCases: 9, run: require("./cases/theme-import.cjs") },
   { name: "alapBackup", expectedCases: 3, run: require("./cases/alap-backup.cjs") },
+  { name: "alapSearch", expectedCases: 3, run: require("./cases/alap-search.cjs") },
 ];

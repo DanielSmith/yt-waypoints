@@ -26,7 +26,7 @@ export default defineConfig({
       for (let i = files.length - 1; i >= 0; i--) {
         if (
           !/\.(css|png|svg)$/.test(files[i].relativeDest) &&
-          files[i].relativeDest !== "themes.html"
+          !["themes.html", "workspace.html"].includes(files[i].relativeDest)
         )
           files.splice(i, 1);
       }

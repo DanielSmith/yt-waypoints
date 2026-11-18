@@ -6,6 +6,8 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
   listEl,
   searchEl,
   clearSearchEl,
+  getSearchResults,
+  showSearchResults,
   getVideos,
   getTrash,
   getSettings,
@@ -117,7 +119,7 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
 
   let pendingFocusIndex = null;
 
-  function renderList() {
+  function renderList({ refreshSearch = false } = {}) {
     const savedVideos = getVideos();
     const trashVideos = getTrash();
     const settings = getSettings();
@@ -126,27 +128,21 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
     // background autosave/chapter/storage snapshots update. Closing refreshes.
     if (activeScrubber || markers.editorOpen) return;
     updateHeaderMode();
-    const query = searchEl.value.trim().toLocaleLowerCase();
+    const query = searchEl.value.trim();
     clearSearchEl.hidden = searchEl.value.length === 0;
-    const videos = [
+    const eligible = [
       ...Object.values(savedVideos),
       ...(settings.showTrash ? Object.values(trashVideos) : []),
-    ]
-      .filter(
-        (v) =>
-          !query ||
-          (v.title || "").toLocaleLowerCase().includes(query) ||
-          (settings.includeChannelNames &&
-            ((v.channelName || "").toLocaleLowerCase().includes(query) ||
-              WAYPOINTS_YOUTUBE_VALUES.channelUrlSegment(v.channelUrl)
-                .toLocaleLowerCase()
-                .includes(query))),
-      )
-      .sort(
-        (a, b) =>
-          Number(Object.hasOwn(trashVideos, a.id)) - Number(Object.hasOwn(trashVideos, b.id)) ||
-          b.updated - a.updated,
-      );
+    ].sort(
+      (a, b) =>
+        Number(Object.hasOwn(trashVideos, a.id)) - Number(Object.hasOwn(trashVideos, b.id)) ||
+        b.updated - a.updated ||
+        (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+    );
+    const result = getSearchResults(eligible, query, settings, refreshSearch);
+    showSearchResults(result);
+    const byId = new Map(eligible.map((video) => [video.id, video]));
+    const videos = result.ids.map((id) => byId.get(id));
     // Keep keyboard focus on the same row or slider across re-renders.
     const focusedId = document.activeElement?.dataset?.id;
     const focusedSlider =
@@ -155,7 +151,11 @@ globalThis.WAYPOINTS_CREATE_POPUP_LIST = ({
     if (!videos.length) {
       const li = document.createElement("li");
       li.className = "empty";
-      li.textContent = query ? "No matching videos." : "No bookmarks yet.";
+      li.textContent = result.error
+        ? "Search needs attention."
+        : query
+          ? "No matching videos."
+          : "No bookmarks yet.";
       listEl.append(li);
     }
     for (const v of videos) {

@@ -1,7 +1,6 @@
 // Copyright 2026 Daniel Smith
 // SPDX-License-Identifier: Apache-2.0
-// Dispatch only. No parsing, matching or browser state. Literal quoted-search
-// escape rules remain a separate step-5 compatibility decision.
+// Shared syntax detection. Popup handle and quoted-literal rules live in the view.
 import { ALAP_LIMITS } from "./alap-data.mjs";
 export function classifySearchInput(value) {
   if (typeof value !== "string" || value.length > ALAP_LIMITS.expressionCharacters)

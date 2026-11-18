@@ -5,7 +5,7 @@ const { bookmarkSeed } = require("./seeds.cjs");
 module.exports = async ({ createPopupFixture }) => {
   const initial = bookmarkSeed();
   const undo = await createPopupFixture(initial);
-  await vm.runInContext('bookmarks.deleteVideo("b")', undo.context);
+  await vm.runInContext('bookmarks.deleteVideo("bbbbbbbbbbb")', undo.context);
   assert.equal(undo.els["restore-bookmark"].hidden, false);
   assert.equal(undo.els["search-control"].hidden, true);
   undo.els["settings-toggle"].click();
@@ -15,26 +15,26 @@ module.exports = async ({ createPopupFixture }) => {
   undo.els["restore-bookmark"].click();
   await undo.settle();
   assert.deepEqual(
-    undo.data.videos.b,
-    initial.videos.b,
+    undo.data.videos.bbbbbbbbbbb,
+    initial.videos.bbbbbbbbbbb,
     "restore exact deleted entry/time, not the active video",
   );
   assert.equal(undo.els["restore-bookmark"].hidden, true);
   assert.equal(undo.els["search-control"].hidden, false);
-  await vm.runInContext('bookmarks.deleteVideo("b");', undo.context);
-  await vm.runInContext('bookmarks.deleteVideo("c");', undo.context);
+  await vm.runInContext('bookmarks.deleteVideo("bbbbbbbbbbb");', undo.context);
+  await vm.runInContext('bookmarks.deleteVideo("ccccccccccc");', undo.context);
   undo.els["restore-bookmark"].click();
   await undo.settle();
-  assert.equal(undo.data.videos.b, undefined);
-  assert.deepEqual(undo.data.videos.c, initial.videos.c);
-  await vm.runInContext('bookmarks.deleteVideo("c")', undo.context);
+  assert.equal(undo.data.videos.bbbbbbbbbbb, undefined);
+  assert.deepEqual(undo.data.videos.ccccccccccc, initial.videos.ccccccccccc);
+  await vm.runInContext('bookmarks.deleteVideo("ccccccccccc")', undo.context);
   await vm.runInContext(
-    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.c = { id: "c", title: "Video animation tips", t: 999, updated: 1 }; await bookmarks.saveSnapshot(snapshot); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.ccccccccccc = { id: "ccccccccccc", title: "Video animation tips", t: 999, updated: 1 }; await bookmarks.saveSnapshot(snapshot); })()',
     undo.context,
   );
   undo.els["restore-bookmark"].click();
   await undo.settle();
-  assert.equal(undo.data.videos.c.t, 999, "undo must not overwrite a newly saved entry");
+  assert.equal(undo.data.videos.ccccccccccc.t, 999, "undo must not overwrite a newly saved entry");
   console.log(
     "PASS: deletion shows restore button, undo preserves original bookmark, latest deletion wins, slash returns to search, settings hide button, newer saves preserved",
   );
@@ -63,7 +63,7 @@ module.exports = async ({ createPopupFixture }) => {
   assert.equal(thumbs.doc.activeElement.dataset.id, row.dataset.id);
   let imgs = collect(thumbs.els.list, "img");
   assert.equal(imgs.length, 3);
-  assert.equal(imgs[0].src, "https://i.ytimg.com/vi/a/mqdefault.jpg");
+  assert.equal(imgs[0].src, "https://i.ytimg.com/vi/aaaaaaaaaaa/mqdefault.jpg");
   assert.equal(imgs[0].referrerPolicy, "no-referrer");
   assert.equal(imgs[0].loading, "lazy");
   imgs[0].events.error();
@@ -166,7 +166,7 @@ module.exports = async ({ createPopupFixture }) => {
   assert.equal(textPaste.doc.activeElement, textPaste.els.search);
   assert.deepEqual(
     textPaste.els.list.querySelectorAll(".main").map((r) => r.dataset.id),
-    ["b", "c"],
+    ["bbbbbbbbbbb", "ccccccccccc"],
   );
   assert.equal(textPaste.navigation.length, 0);
   assert.equal(textPaste.closed(), 0);
@@ -232,22 +232,22 @@ module.exports = async ({ createPopupFixture }) => {
   const channelData = {
     settings: { autoBookmark: false, showThumbnails: false },
     videos: {
-      a: {
-        id: "a",
+      aaaaaaaaaaa: {
+        id: "aaaaaaaaaaa",
         title: "The EV push",
         channelName: "Bloomberg",
         channelUrl: "https://www.youtube.com/@Bloomberg",
         t: 30,
         updated: 2,
       },
-      b: {
-        id: "b",
+      bbbbbbbbbbb: {
+        id: "bbbbbbbbbbb",
         title: "Bloomberg interview recap",
         channelName: "Tech Talks",
         t: 15,
         updated: 1,
       },
-      c: { id: "c", title: "Old bookmark", t: 10, updated: 0 },
+      ccccccccccc: { id: "ccccccccccc", title: "Old bookmark", t: 10, updated: 0 },
     },
   };
   const channels = await createPopupFixture(channelData);
@@ -291,14 +291,14 @@ module.exports = async ({ createPopupFixture }) => {
   const channelRows = () => channels.els.list.querySelectorAll(".main").map((r) => r.dataset.id);
   assert.deepEqual(
     channelRows(),
-    ["a", "b"],
+    ["aaaaaaaaaaa", "bbbbbbbbbbb"],
     "default search matches channel or title, ignoring case",
   );
   channels.els["settings-toggle"].click();
   channels.els["include-channel-names"].checked = false;
   channels.els["include-channel-names"].events.change();
   await channels.settle();
-  assert.deepEqual(channelRows(), ["b"], "disabling channel search keeps title matches");
+  assert.deepEqual(channelRows(), ["bbbbbbbbbbb"], "disabling channel search keeps title matches");
   assert.equal(channels.data.settings.includeChannelNames, false);
   channels.els["settings-toggle"].click();
   const channelReopen = await createPopupFixture(channels.data);
@@ -311,7 +311,7 @@ module.exports = async ({ createPopupFixture }) => {
   channels.els["include-channel-names"].checked = true;
   channels.els["include-channel-names"].events.change();
   await channels.settle();
-  assert.deepEqual(channelRows(), ["a", "b"]);
+  assert.deepEqual(channelRows(), ["aaaaaaaaaaa", "bbbbbbbbbbb"]);
   assert.deepEqual(
     channels.data.videos,
     channelData.videos,

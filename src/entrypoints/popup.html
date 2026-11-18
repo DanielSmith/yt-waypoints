@@ -14,7 +14,7 @@
   <header>
     <div class="actions">
       <div id="search-control" class="search">
-        <input id="search" type="text" placeholder="Search or paste…" aria-label="Search saved videos" aria-controls="list" autocomplete="off" spellcheck="false" disabled>
+        <input id="search" type="text" placeholder="Search or paste…" aria-label="Search saved videos" aria-controls="list" aria-describedby="search-feedback" autocomplete="off" spellcheck="false" disabled>
         <button id="clear-search" type="button" aria-label="Clear search" title="Clear search" hidden>×</button>
       </div>
       <button id="restore-bookmark" type="button" hidden>Add bookmark</button>
@@ -24,6 +24,10 @@
       </button>
       <button id="help-toggle" type="button" aria-label="Help" aria-haspopup="dialog" aria-controls="help-dialog"><span aria-hidden="true">?</span></button>
       <button id="about-toggle" type="button" aria-label="About YT Waypoints" title="About YT Waypoints" aria-haspopup="dialog" aria-controls="about-dialog"><img src="/icons/icon-48.png" width="22" height="22" alt=""></button>
+    </div>
+    <div id="search-details" hidden>
+      <span id="search-feedback" role="status"></span>
+      <button id="refresh-search" type="button" class="secondary-button" title="Run the current search again" hidden>Refresh</button>
     </div>
     <div id="status" role="status"></div>
     <!-- Initial-layout fallback; live keys are rendered from shortcut metadata. -->
@@ -55,6 +59,7 @@
           <select id="theme-select" aria-describedby="theme-help"></select>
           <p id="theme-help">System follows your device’s light or dark appearance.</p>
         </label>
+        <a href="/workspace.html#themes" target="_blank" rel="noopener" class="secondary-button workspace-link">Manage themes</a>
         <div class="theme-tools">
           <button id="theme-import" class="secondary-button theme-drop" type="button" aria-describedby="theme-import-help">Import theme file or drop it here</button>
           <input id="theme-file" type="file" hidden>
@@ -95,6 +100,7 @@
         <label class="setting">
           <span class="setting-title"><span>Include channel names in search</span><input id="include-channel-names" type="checkbox" aria-describedby="channel-search-help"></span>
           <p id="channel-search-help">Also match channel names and the last part of channel URLs, such as @Business. Channel information is saved when you bookmark or revisit a video.</p>
+          <a href="/workspace.html#search" target="_blank" rel="noopener" class="secondary-button workspace-link">Manage tags and saved searches</a>
         </label>
       </div>
     </details>

@@ -91,7 +91,7 @@ module.exports = async ({ createPopupFixture }) => {
   assert.equal(drag.writes(), 0);
   assert.equal(slider.style["--progress"], "65%");
   await vm.runInContext(
-    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.extra = {id: "extra",title: "Concurrent bookmark",t:5,duration:60,updated:1}; videos.aaaaaaaaaaa.t = 105; await bookmarks.saveSnapshot(snapshot); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.extra000001 = {id: "extra000001",title: "Concurrent bookmark",t:5,duration:60,updated:1}; videos.aaaaaaaaaaa.t = 105; await bookmarks.saveSnapshot(snapshot); })()',
     drag.context,
   );
   const writesBeforeDragCommit = drag.writes();
@@ -104,7 +104,7 @@ module.exports = async ({ createPopupFixture }) => {
   assert.equal(drag.data.videos.aaaaaaaaaaa.t, 650);
   assert.equal(drag.data.videos.aaaaaaaaaaa.updated, 123);
   assert.equal(drag.writes(), writesBeforeDragCommit + 1, "pointerup/change commits once");
-  assert.ok(drag.data.videos.extra);
+  assert.ok(drag.data.videos.extra000001);
   assert.equal(drag.navigation.length, 0);
   assert.equal(drag.closed(), 0);
   slider = findSlider();
@@ -147,7 +147,7 @@ module.exports = async ({ createPopupFixture }) => {
   const live = await createPopupFixture(seekData, "https://example.com/", {
     tabs: [{ id: 7, windowId: 1, url: "https://www.youtube.com/watch?v=aaaaaaaaaaa" }],
     executeScript: async (request, data) => {
-      data.videos.late = { id: "late", title: "Added while seeking", t: 2, duration: 50 };
+      data.videos.late0000001 = { id: "late0000001", title: "Added while seeking", t: 2, duration: 50 };
       return [{ result: { id: "aaaaaaaaaaa", t: 750, duration: 1000, paused: true } }];
     },
   });
@@ -157,7 +157,7 @@ module.exports = async ({ createPopupFixture }) => {
   liveSlider.events.change();
   await live.settle();
   assert.equal(live.data.videos.aaaaaaaaaaa.t, 750);
-  assert.ok(live.data.videos.late);
+  assert.ok(live.data.videos.late0000001);
   assert.deepEqual(live.executions.at(-1), {
     operation: "seekTo",
     args: [750, "aaaaaaaaaaa"],

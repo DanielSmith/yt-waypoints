@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createPopupRefresh } from "./popup-refresh.mjs";
 import { createAlapTransfer, importAlapBackup } from "./alap-transfer.mjs";
+import { ALAP_MACROS_STORAGE_KEY } from "./alap-data.mjs";
+import { classifyPopupSearch, createAlapSearchView } from "./alap-search-view.mjs";
 import { createMacroStore } from "./alap-macro-store.mjs";
 import { createThemeImportController } from "./popup-theme-import.mjs";
 
@@ -36,8 +38,18 @@ const WATCH_RE = /^https:\/\/(www\.|m\.)?youtube\.com\/watch\?/;
 const CHAPTER_REFRESH_INTERVAL_MS = 5000;
 const TRASH_CLEANUP_INTERVAL_MS = 60000;
 let queue = Promise.resolve();
+const searchView = createAlapSearchView({ classify: classifyPopupSearch });
 const refreshCoordinator = createPopupRefresh({
-  read: () => WAYPOINTS_STORAGE.read(),
+  async read() {
+    const [snapshot, macroState] = await Promise.all([
+      WAYPOINTS_STORAGE.read(),
+      macroStore.read().then(
+        ({ library }) => ({ macros: library.macros }),
+        () => ({ macroError: "Saved macros could not be read." }),
+      ),
+    ]);
+    return { ...snapshot, ...macroState };
+  },
   commit: renderSnapshot,
 });
 
@@ -58,11 +70,17 @@ let showRestoreBookmark = false;
 let searchRequested = false;
 
 const searchEl = document.getElementById("search");
+const searchDetails = document.getElementById("search-details");
+const searchFeedback = document.getElementById("search-feedback");
+const refreshSearch = document.getElementById("refresh-search");
 const searchControl = document.getElementById("search-control");
 const actionsEl = document.querySelector(".actions");
 const clearSearchEl = document.getElementById("clear-search");
 let savedVideos = {};
 let trashVideos = {};
+let searchMacros = {};
+let macroError;
+let retiredBookmarks = Object.create(null);
 let currentDeleted = false;
 const hintEl = document.getElementById("hint");
 hintEl.textContent = `${shortcuts.hint("focusSearch")} search · ${shortcuts.hint("playPause")} play · ${shortcuts.hint("openVideo")} open · ${shortcuts.hint("help")} help`;
@@ -236,6 +254,33 @@ const listController = WAYPOINTS_CREATE_POPUP_LIST({
   listEl,
   searchEl,
   clearSearchEl,
+  getSearchResults(videos, query, options, refresh) {
+    return searchView.read(
+      {
+        videos,
+        macros: searchMacros,
+        macroError,
+        retired: retiredBookmarks,
+        scope: options.showTrash,
+        includeChannelNames: options.includeChannelNames,
+      },
+      query,
+      { refresh },
+    );
+  },
+  showSearchResults(result) {
+    let detail = "";
+    if (result.error) detail = result.error;
+    else if (result.stale) detail = `${result.resultCount} shown. Refresh to update.`;
+    else if (result.rootInputCount !== null)
+      detail = `${result.resultCount} of ${result.rootInputCount} matches`;
+    else if (result.hasRefiners) detail = `${result.resultCount} shown`;
+    if (searchFeedback.textContent !== detail) searchFeedback.textContent = detail;
+    searchEl.setAttribute("aria-invalid", String(Boolean(result.error)));
+    refreshSearch.hidden = !(result.hasRefiners || result.invalidated);
+    searchDetails.hidden =
+      settingsOpen || showingBookmarkButton() || (!detail && refreshSearch.hidden);
+  },
   getVideos: () => savedVideos,
   getTrash: () => trashVideos,
   getSettings: () => settings,
@@ -320,6 +365,8 @@ function showingBookmarkButton() {
 function updateHeaderMode() {
   const showButton = showingBookmarkButton();
   searchControl.hidden = settingsOpen || showButton;
+  searchDetails.hidden =
+    settingsOpen || showButton || (!searchFeedback.textContent && refreshSearch.hidden);
   restoreBookmarkEl.hidden = settingsOpen || !showButton;
   restoreBookmarkEl.textContent =
     showRestoreBookmark || trashVideos[currentId] ? "Restore bookmark" : "Add bookmark";
@@ -344,6 +391,12 @@ function renderSnapshot(snapshot) {
   markers.sync(snapshot);
   savedVideos = snapshot.videos;
   trashVideos = snapshot.trash;
+  searchMacros = snapshot.macros ?? {};
+  macroError = snapshot.macroError;
+  retiredBookmarks = Object.create(null);
+  for (const [id, record] of Object.entries(snapshot.records)) {
+    if (record.purged) retiredBookmarks[id] = JSON.stringify(record.purged);
+  }
   currentDeleted = snapshot.records[currentId]?.life.deleted === true;
   document.getElementById("trash-count").textContent =
     `${Object.keys(trashVideos).length} in trash. Empty trash permanently deletes these bookmarks.`;
@@ -376,6 +429,11 @@ async function init() {
   annotationEditor.init();
   restoreBookmarkEl.addEventListener("click", () => enqueue(restoreBookmark));
   inputController.initControls();
+  refreshSearch.addEventListener("click", () => {
+    if (markers.editorOpen) return;
+    searchEl.focus();
+    renderList({ refreshSearch: true });
+  });
   settingsToggle.addEventListener("click", () => {
     setSettingsOpen(!settingsOpen);
   });
@@ -439,7 +497,11 @@ api.storage.onChanged.addListener((changes, area) => {
     settings = next;
     updateSettingsUI();
   }
-  if (WAYPOINTS_STORAGE.changed(changes) || changes.settings)
+  if (
+    WAYPOINTS_STORAGE.changed(changes) ||
+    changes.settings ||
+    Object.hasOwn(changes, ALAP_MACROS_STORAGE_KEY)
+  )
     refreshCoordinator.schedule(queue).catch((e) => setStatus(e.message));
 });
 if (typeof setInterval === "function") {

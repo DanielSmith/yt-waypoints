@@ -37,10 +37,15 @@ module.exports = async ({ createPopupFixture }) => {
   );
   p.doc.listeners.keydown({ key: "/", preventDefault() {} });
   const rows = () => p.els.list.querySelectorAll(".main").map((e) => e.dataset.id);
-  assert.deepEqual(rows(), ["a", "b", "c"]);
+  assert.deepEqual(rows(), ["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"]);
+  p.els.search.value = ".";
+  p.els.search.events.input();
+  assert.deepEqual(rows(), ["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"]);
+  assert.equal(p.els["search-feedback"].textContent, "");
+  assert.equal(p.els.search["aria-invalid"], "false");
   p.els.search.value = "VIDEO";
   p.els.search.events.input();
-  assert.deepEqual(rows(), ["b", "c"]);
+  assert.deepEqual(rows(), ["bbbbbbbbbbb", "ccccccccccc"]);
   assert.equal(p.els["clear-search"].hidden, false);
   assert.equal(p.writes(), 0, "search must never change saved bookmarks");
   p.els.search.value = "missing";
@@ -48,7 +53,7 @@ module.exports = async ({ createPopupFixture }) => {
   assert.deepEqual(rows(), []);
   assert.equal(p.els.list.children[0].textContent, "No matching videos.");
   p.els["clear-search"].click();
-  assert.deepEqual(rows(), ["a", "b", "c"]);
+  assert.deepEqual(rows(), ["aaaaaaaaaaa", "bbbbbbbbbbb", "ccccccccccc"]);
   assert.equal(p.els.search.value, "");
   assert.equal(p.els["clear-search"].hidden, true);
   assert.equal(p.doc.activeElement, p.els.search);
@@ -65,11 +70,11 @@ module.exports = async ({ createPopupFixture }) => {
   p.els.search.value = "resolve";
   p.els.search.events.input();
   p.doc.listeners.keydown({ key: "ArrowDown", preventDefault() {} });
-  assert.equal(p.doc.activeElement.dataset.id, "b");
+  assert.equal(p.doc.activeElement.dataset.id, "bbbbbbbbbbb");
   p.doc.listeners.keydown({ key: "Delete", preventDefault() {} });
   await p.settle();
-  assert.equal(p.data.videos.b, undefined);
-  assert.ok(p.data.videos.a && p.data.videos.c);
+  assert.equal(p.data.videos.bbbbbbbbbbb, undefined);
+  assert.ok(p.data.videos.aaaaaaaaaaa && p.data.videos.ccccccccccc);
   assert.equal(p.doc.activeElement, p.els["restore-bookmark"]);
   assert.equal(p.els["search-control"].hidden, true);
   assert.equal(p.els["restore-bookmark"].hidden, false);
@@ -89,9 +94,9 @@ module.exports = async ({ createPopupFixture }) => {
   p.els["settings-toggle"].click();
   assert.equal(p.els["search-control"].hidden, false);
   assert.equal(p.els.search.value, "Dario");
-  assert.deepEqual(rows(), ["a"]);
+  assert.deepEqual(rows(), ["aaaaaaaaaaa"]);
   await vm.runInContext(
-    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.a.title = "Renamed title"; await bookmarks.saveSnapshot(snapshot); await render(); })()',
+    '(async () => { const snapshot = await bookmarks.loadSnapshot(); const { videos } = snapshot; videos.aaaaaaaaaaa.title = "Renamed title"; await bookmarks.saveSnapshot(snapshot); await render(); })()',
     p.context,
   );
   assert.deepEqual(rows(), [], "storage refresh must keep applying current search");
@@ -145,7 +150,7 @@ module.exports = async ({ createPopupFixture }) => {
     settings: { autoBookmark: false },
     videos: {
       aaaaaaaaaaa: { id: "aaaaaaaaaaa", title: "Current", t: 70, updated: 1 },
-      other: { id: "other", title: "Newer", t: 10, updated: 2 },
+      nnnnnnnnnnn: { id: "nnnnnnnnnnn", title: "Newer", t: 10, updated: 2 },
     },
   });
   assert.equal(existing.doc.activeElement.dataset.id, "aaaaaaaaaaa");
@@ -175,7 +180,7 @@ module.exports = async ({ createPopupFixture }) => {
     "storage refresh must not steal search",
   );
   assert.equal(manualSearch.els["search-control"].hidden, false);
-  const toggled = await createPopupFixture(initial);
+  const toggled = await createPopupFixture(initial, "https://www.youtube.com/watch?v=ddddddddddd");
   await vm.runInContext("settings.autoBookmark = true", toggled.context);
   toggled.els["settings-toggle"].click();
   toggled.els["auto-bookmark"].checked = false;

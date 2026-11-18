@@ -6,7 +6,7 @@ const { spawn } = require("node:child_process");
 const { pathToFileURL } = require("node:url");
 const features = require("./cases.cjs");
 
-async function runBrowser({ fixturePath, temporary, options }) {
+async function runBrowser({ fixturePath, temporary, options, expectedFeatures = features }) {
   const candidates = [
     process.env.WAYPOINTS_CHROME_BINARY,
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -112,11 +112,11 @@ async function runBrowser({ fixturePath, temporary, options }) {
     assert.equal(report.pass, true, `${report.stage}: ${report.error}`);
     assert.deepEqual(
       report.features,
-      features.map(({ name, expectedCases }) => ({ name, cases: expectedCases })),
+      expectedFeatures.map(({ name, expectedCases }) => ({ name, cases: expectedCases })),
     );
     assert.equal(
       report.cases.length,
-      features.reduce((total, feature) => total + feature.expectedCases, 0),
+      expectedFeatures.reduce((total, feature) => total + feature.expectedCases, 0),
     );
     return report;
   } finally {

@@ -3,9 +3,9 @@ function bookmarkSeed() {
   return {
     settings: { autoBookmark: false },
     videos: {
-      a: { id: "a", title: "Dario and Daniela", t: 100, updated: 3 },
-      b: { id: "b", title: "Making Videos in Resolve", t: 50, updated: 2 },
-      c: { id: "c", title: "Video animation tips", t: 20, updated: 1 },
+      aaaaaaaaaaa: { id: "aaaaaaaaaaa", title: "Dario and Daniela", t: 100, updated: 3 },
+      bbbbbbbbbbb: { id: "bbbbbbbbbbb", title: "Making Videos in Resolve", t: 50, updated: 2 },
+      ccccccccccc: { id: "ccccccccccc", title: "Video animation tips", t: 20, updated: 1 },
     },
   };
 }

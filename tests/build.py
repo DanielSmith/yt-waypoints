@@ -88,7 +88,8 @@ for browser in ('firefox', 'chrome'):
     assert (package / 'themes.html').read_bytes() == (shared / 'themes.html').read_bytes()
     manager_scripts = re.findall(r'<script\b[^>]*\bsrc="([^"]+)"', (package / 'themes.html').read_text())
     assert manager_scripts == ['/theme.js', '/theme-manager.js']
-    expected_scripts = ['theme.js', 'theme-manager.js', 'content-scripts/content.js', popup_script]
+    assert (package / 'workspace.html').read_bytes() == (shared / 'workspace.html').read_bytes()
+    expected_scripts = ['theme.js', 'theme-manager.js', 'workspace.js', 'content-scripts/content.js', popup_script]
     assert sorted(str(p.relative_to(package)) for p in package.rglob('*.js')) == sorted(expected_scripts)
     for entry in expected_scripts:
         script = package / entry
@@ -117,8 +118,8 @@ for browser in ('firefox', 'chrome'):
         if entry == popup_script:
             assert any(name.endswith('/alap-transfer.mjs') for name in mapping['sources'])
             assert any(name.endswith('/alap-macro-store.mjs') for name in mapping['sources'])
-            assert not any(name.endswith(('/alap-query.mjs', '/alap-tags-core/index.mjs',
-                                          '/alap-tags-core/refiners.mjs')) for name in mapping['sources'])
+            for query_module in ('alap-query.mjs', 'alap-search-view.mjs', 'alap-tags-core/refiners.mjs'):
+                assert any(name.endswith('/' + query_module) for name in mapping['sources']), query_module
             for helper in ('display-time.js', 'popup-dom.js', 'popup-shortcuts.js', 'popup-annotation-editor.js', 'popup-file-save.js'):
                 assert any(name.endswith('/' + helper) for name in mapping['sources'])
                 assert not (package / helper).exists()

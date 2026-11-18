@@ -48,9 +48,14 @@ switches to an existing tab for that video when available, or opens it at the sa
 
 ### Search your collection
 
-Press **/** to focus search, then type part of a video title, channel name, or
-channel URL ending such as **@Business**.
-Search ignores case and filters your saved videos. Use Up / Down to move through
+Press **/** to focus search, then type part of a title, saved tag, channel
+name, or channel handle such as **@Business**. Ordinary text ignores case.
+Use `.research` for an exact tag, `.research + .history` for both tags, or
+`@watchlist` to run a saved macro. A matching macro name takes precedence over
+a handle. Use quotes, such as `"@Business"`, to search literally.
+
+A refined view keeps its order while the list updates. Click **Refresh** to
+rerun it with current data. Use Up / Down to move through
 the results, then Enter to open one.
 
 Thumbnails and available channel names appear alongside video titles by default.
@@ -177,8 +182,7 @@ Shift distance from its default of **×3** to a multiplier from 1–10.
 
 - **Show thumbnails (t)** is on by default. Turn it off to hide images, or press
   lowercase **t** outside search to toggle the same preference.
-- **Include channel names in search** is on by default. Turn it off for title-only
-  matching. When enabled, it also matches the last part of channel URLs, such as
+- **Include channel names in search** is on by default. Turn it off to match titles and tags only. When enabled, it also matches the last part of channel URLs, such as
   **@Business**. Available channel names still appear beneath titles.
 
 ### Manage trash and deletion

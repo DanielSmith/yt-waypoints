@@ -77,6 +77,25 @@ YouTube supplies every end time, the video's total duration isn't needed.
 Transcript JSON and bookmark-backup JSON serve different purposes. A transcript
 JSON file contains timed text; it can't be used to restore your bookmark list.
 
+## Bookmark search
+
+Plain text matches titles and saved tags. With **Include channel names in
+search** enabled, it also matches channel names and handles. Use `.tag` to
+match an exact tag, `+` for both conditions, `|` for either, and `-` to exclude.
+Parentheses group conditions. Enter a saved macro as `@name`.
+
+An exact saved macro name wins over a standalone handle. If no macro matches,
+a standalone handle searches as text. Use double quotes around the whole query
+to force text search, for example `"@Business"`. Grouping such as `(@watchlist)`
+explicitly requests a macro, so a missing name produces a query error.
+
+Queries without refiners keep the usual recency order, with current bookmarks
+above visible trash. A refined result keeps the evaluator's order and stays
+stable through playback updates. **Refresh** reruns it with current data.
+Deleted or hidden rows disappear without replacement until refresh. Showing or
+hiding trash rebuilds the eligible set. Changing an active macro requires a
+refresh, and a malformed query shows an error distinct from an empty result.
+
 ## Bookmark transfer and validation
 
 Use **Copy JSON** or **Shift+C** when you want a backup or want to carry your

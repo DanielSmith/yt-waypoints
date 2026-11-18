@@ -34,5 +34,5 @@ Its source, provenance and full license are in `src/vendor/alap-tags-core/`.
 This derivative retains tag matching, ordered set operators, grouping and five
 reviewed local refiner operations derived from Alap RefinerPipeline.ts;
 it contains no protocol/source handlers, network capabilities or plugin registry.
-The private editor uses the evaluator. The extension popup uses the strict syntax
-module to validate macro definitions in backups.
+The private editor and extension popup use the evaluator. The popup also uses
+the strict syntax module to validate macro definitions in backups.

@@ -15,6 +15,7 @@ export const ALAP_QUERY_SOURCES = Object.freeze([
   "src/shared/alap-query-expression.mjs",
   "src/shared/alap-video-catalog.mjs",
   "src/shared/alap-query.mjs",
+  "src/shared/alap-search-view.mjs",
   "src/shared/youtube-values.js",
   "src/vendor/alap-tags-core/index.mjs",
   "src/vendor/alap-tags-core/syntax.mjs",

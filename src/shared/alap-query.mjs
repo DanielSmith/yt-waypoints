@@ -12,14 +12,14 @@ import { createVideoCatalog, matchVideoText } from "./alap-video-catalog.mjs";
 // or re-evaluate a shuffled query; rerenders should reuse its previous result.
 export function createVideoSearchSnapshot(videos) {
   const catalog = createVideoCatalog(videos);
-  const parser = new TagExpressionParser(catalog.allLinks, {
-    fields: ALAP_SORT_FIELDS,
-    fieldTypes: ALAP_SORT_TYPES,
-  });
+  let parser;
   return Object.freeze({
-    search(value, { macros = {}, includeChannelNames = true, evaluation = {} } = {}) {
+    search(
+      value,
+      { macros = {}, includeChannelNames = true, evaluation = {}, literal = false } = {},
+    ) {
       const input = classifySearchInput(value);
-      if (input.kind === "text") {
+      if (literal || input.kind === "text") {
         const ids = matchVideoText(catalog.records, input.text, { includeChannelNames });
         return {
           kind: "text",
@@ -32,6 +32,10 @@ export function createVideoSearchSnapshot(videos) {
         };
       }
       const prepared = prepareAlapQuery(input.text, macros);
+      parser ??= new TagExpressionParser(catalog.allLinks, {
+        fields: ALAP_SORT_FIELDS,
+        fieldTypes: ALAP_SORT_TYPES,
+      });
       const resolved = parser.resolve(prepared.expandedExpression, evaluation);
       const ordered = resolved.ids.map((key) => catalog.videoIds.get(key));
       const matching = new Set(ordered);

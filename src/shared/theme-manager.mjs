@@ -5,7 +5,7 @@
 import popupHTML from "../entrypoints/popup.html?raw";
 import { createThemeImportController } from "./popup-theme-import.mjs";
 
-export async function initializeThemeManager() {
+export async function initializeThemeManager({ dropTarget = document } = {}) {
   const api = globalThis.browser ?? globalThis.chrome;
   const service = globalThis.WAYPOINTS_THEME;
   const source = new DOMParser().parseFromString(popupHTML, "text/html");
@@ -55,11 +55,11 @@ export async function initializeThemeManager() {
     }
   }
   for (const id of ["theme-manager-close", "theme-manager-done"])
-    document.getElementById(id).addEventListener("click", closeTab);
-  document.addEventListener("dragover", (event) => {
+    document.getElementById(id)?.addEventListener("click", closeTab);
+  dropTarget.addEventListener("dragover", (event) => {
     if (event.dataTransfer?.types.includes("Files")) event.preventDefault();
   });
-  document.addEventListener("drop", (event) => {
+  dropTarget.addEventListener("drop", (event) => {
     if (event.defaultPrevented || !event.dataTransfer?.files.length) return;
     event.preventDefault();
     if (event.dataTransfer.files.length !== 1)
